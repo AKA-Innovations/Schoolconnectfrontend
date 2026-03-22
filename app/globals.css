@@ -1,26 +1,130 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+}
+
+/* ───────────────────────────────────────────
+   BRAND TOKENS  –  Single source of truth
+   primary:    #2563EB  →  221 83% 53%
+   secondary:  #10B981  →  160 84% 39%
+   background: #F8FAFC  →  210 40% 98%
+   text:       #0F172A  →  222 47% 11%
+   muted:      #64748B  →  215 16% 47%
+   border:     #E2E8F0  →  214 32% 91%
+─────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface */
+  --background:           210 40% 98%;
+  --foreground:           222 47% 11%;
+
+  /* Card / Popover */
+  --card:                 0 0% 100%;
+  --card-foreground:      222 47% 11%;
+  --popover:              0 0% 100%;
+  --popover-foreground:   222 47% 11%;
+
+  /* Brand */
+  --primary:              221 83% 53%;
+  --primary-foreground:   0 0% 100%;
+
+  --secondary:            160 84% 39%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Neutral */
+  --muted:                214 32% 91%;   /* uses border hue, lighter */
+  --muted-foreground:     215 16% 47%;
+
+  --accent:               221 83% 96%;   /* primary tint for hover bg */
+  --accent-foreground:    221 83% 40%;
+
+  /* Semantic */
+  --destructive:          0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Chrome */
+  --border:               214 32% 91%;
+  --input:                214 32% 91%;
+  --ring:                 221 83% 53%;   /* matches primary */
+
+  /* Shape */
+  --radius: 0.625rem;
+
+  /* Sidebar (mirrors brand exactly) */
+  --sidebar-background:           0 0% 100%;
+  --sidebar-foreground:           215 16% 47%;
+  --sidebar-primary:              221 83% 53%;
+  --sidebar-primary-foreground:   0 0% 100%;
+  --sidebar-accent:               221 83% 96%;
+  --sidebar-accent-foreground:    221 83% 40%;
+  --sidebar-border:               214 32% 91%;
+  --sidebar-ring:                 221 83% 53%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background:             hsl(var(--background));
+  --color-foreground:             hsl(var(--foreground));
+
+  --color-card:                   hsl(var(--card));
+  --color-card-foreground:        hsl(var(--card-foreground));
+
+  --color-popover:                hsl(var(--popover));
+  --color-popover-foreground:     hsl(var(--popover-foreground));
+
+  --color-primary:                hsl(var(--primary));
+  --color-primary-foreground:     hsl(var(--primary-foreground));
+
+  --color-secondary:              hsl(var(--secondary));
+  --color-secondary-foreground:   hsl(var(--secondary-foreground));
+
+  --color-muted:                  hsl(var(--muted));
+  --color-muted-foreground:       hsl(var(--muted-foreground));
+
+  --color-accent:                 hsl(var(--accent));
+  --color-accent-foreground:      hsl(var(--accent-foreground));
+
+  --color-destructive:            hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border:                 hsl(var(--border));
+  --color-input:                  hsl(var(--input));
+  --color-ring:                   hsl(var(--ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up:   accordion-up   0.2s ease-out;
+
+  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Utility helpers kept minimal */
+.glass-card {
+  background: hsl(0 0% 100% / 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border));
+  box-shadow: var(--shadow-card);
+}
+
+.subtle-shadow {
+  box-shadow: var(--shadow-sm);
 }
