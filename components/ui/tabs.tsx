@@ -28,7 +28,7 @@ const TabsList = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "inline-flex h-11 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground shadow-sm",
+      "inline-flex h-9 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground gap-1 border border-border",
       className
     )}
     {...props}
@@ -48,10 +48,10 @@ const TabsTrigger = React.forwardRef<
       ref={ref}
       onClick={() => onValueChange(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-ring disabled:pointer-events-none disabled:opacity-50",
         isActive
-          ? "bg-background text-foreground shadow-sm"
-          : "hover:bg-background/50 hover:text-foreground",
+          ? "bg-card text-primary shadow-sm font-semibold"
+          : "text-muted-foreground hover:text-foreground",
         className
       )}
       {...props}
@@ -71,7 +71,7 @@ const TabsContent = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 animate-in fade-in-50 duration-200",
+        "mt-4 focus-visible:outline-none animate-in fade-in-50 duration-200",
         className
       )}
       {...props}

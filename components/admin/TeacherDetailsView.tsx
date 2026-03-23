@@ -73,103 +73,101 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       {/* Header Profile Section */}
-      <div className="relative group overflow-hidden rounded-3xl p-8 bg-linear-to-br from-indigo-900 via-slate-900 to-black text-white shadow-card">
-        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-           <SchoolIcon className="h-48 w-48 -rotate-12 translate-x-12 translate-y--12" />
-        </div>
-        
-        <div className="relative flex flex-col md:flex-row items-center md:items-end gap-8">
+      <Card className="erp-card overflow-hidden">
+        <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
           <div className="shrink-0 relative">
-            <div className="h-32 w-32 rounded-3xl bg-white/10 backdrop-blur-xl border-2 border-white/20 flex items-center justify-center overflow-hidden shadow-2xl relative group-hover:scale-105 transition-transform">
+            <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50">
               {teacher.profileImageUrl ? (
                 <img src={teacher.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <User className="h-16 w-16 text-white/50" />
+                <div className="text-primary/60 font-black text-3xl uppercase tracking-tighter">
+                  {teacher.firstName.charAt(0)}{teacher.lastName.charAt(0)}
+                </div>
               )}
             </div>
-            <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-emerald-500 border-4 border-slate-900 flex items-center justify-center shadow-lg" title="Active Account">
-               <ShieldCheck className="h-4 w-4 text-white" />
+            <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-green-500 border-2 border-card shadow-sm flex items-center justify-center" title="Active Account">
+               <ShieldCheck className="h-3 w-3 text-white" />
             </div>
           </div>
 
-          <div className="flex-1 text-center md:text-left space-y-2">
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-2">
-              <Badge variant="outline" className="bg-white/5 border-white/20 text-white/90 text-[10px] font-bold tracking-widest uppercase">
+          <div className="flex-1 text-center md:text-left space-y-1.5">
+            <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1.5">
+              <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border border-border/40">
                 {teacher.employeeId}
-              </Badge>
-              <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] font-bold tracking-widest uppercase">
+              </span>
+              <span className="bg-green-500/10 text-green-600 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border border-green-500/20">
                 {teacher.status || 'Active'}
-              </Badge>
+              </span>
             </div>
-            <h1 className="text-4xl font-black tracking-tight">{teacher.firstName} {teacher.lastName}</h1>
-            <div className="flex flex-wrap justify-center md:justify-start gap-6 text-white/60">
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                <span className="text-sm">{teacher.employeeEmail}</span>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{teacher.firstName} {teacher.lastName}</h1>
+            <div className="flex flex-wrap justify-center md:justify-start gap-x-5 gap-y-1.5 text-muted-foreground/70 mt-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Mail className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {teacher.employeeEmail}
               </div>
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                <span className="text-sm">{teacher.isPrincipal ? 'Principal Seat' : 'Academic Faculty'}</span>
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Briefcase className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {teacher.isPrincipal ? 'Principal Seat' : 'Academic Faculty'}
               </div>
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button variant="outline" size="icon" onClick={onBack} className="rounded-2xl h-12 w-12 bg-white/5 border-white/20 text-white hover:bg-white/10 hover:text-white border-none shadow-none">
-              <ArrowLeft className="h-5 w-5" />
+          <div className="flex gap-2.5">
+            <Button variant="secondary" size="icon" onClick={onBack} className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background" title="Back to Directory">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-            <Button variant="premium" className="rounded-2xl h-12 px-6 shadow-xl">
+            <Button variant="secondary" className="rounded-xl h-10 px-5 shadow-sm text-xs font-bold border border-border/50 bg-background/50 hover:bg-background">
                Manage Roles
             </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Sidebar Info */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border-none shadow-card bg-muted/30 overflow-hidden">
-            <CardHeader className="bg-background/50 border-b">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">Inception Metrics</CardTitle>
+          <Card className="erp-card overflow-hidden">
+            <CardHeader className="bg-muted/10 border-b border-border/50 pb-4">
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-primary/70">Inception Metrics</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-               <div className="space-y-1">
-                 <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                   <Calendar className="h-3 w-3" />
+            <CardContent className="pt-6 space-y-6 px-6">
+               <div className="space-y-1.5">
+                 <div className="text-[10px] font-black text-muted-foreground/60 uppercase flex items-center gap-1.5 tracking-wider">
+                   <Calendar className="h-3 w-3 opacity-60" />
                    Onboarding Date
                  </div>
-                 <div className="text-sm font-semibold">{new Date(teacher.joiningDate).toLocaleDateString(undefined, { dateStyle: 'long' })}</div>
+                 <div className="text-sm font-bold text-foreground/80">{new Date(teacher.joiningDate).toLocaleDateString(undefined, { dateStyle: 'long' })}</div>
                </div>
-               <div className="space-y-1">
-                 <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                   <Activity className="h-3 w-3" />
+               <div className="space-y-1.5">
+                 <div className="text-[10px] font-black text-muted-foreground/60 uppercase flex items-center gap-1.5 tracking-wider">
+                   <Activity className="h-3 w-3 opacity-60" />
                    Session Load
                  </div>
-                 <div className="text-sm font-semibold">{teacher.classes?.length || 0} Dynamic Assignments</div>
+                 <div className="text-sm font-bold text-foreground/80">{teacher.classes?.length || 0} Dynamic Assignments</div>
                </div>
-               <div className="space-y-1">
-                 <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                   <Users className="h-3 w-3" />
+               <div className="space-y-1.5">
+                 <div className="text-[10px] font-black text-muted-foreground/60 uppercase flex items-center gap-1.5 tracking-wider">
+                   <Users className="h-3 w-3 opacity-60" />
                    Gender Attribute
                  </div>
-                 <div className="text-sm font-semibold">{teacher.gender}</div>
+                 <div className="text-sm font-bold text-foreground/80">{teacher.gender}</div>
                </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-card bg-linear-to-br from-primary/5 to-transparent">
-             <CardHeader>
-               <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">Quick Actions</CardTitle>
+          <Card className="erp-card overflow-hidden bg-primary/5">
+             <CardHeader className="pb-3 px-6">
+               <CardTitle className="text-[10px] font-black uppercase tracking-widest text-primary/70">Quick Actions</CardTitle>
              </CardHeader>
-             <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start text-xs font-bold h-10 border-none bg-background/50 hover:bg-background">
-                  <ImageIcon className="h-4 w-4 mr-2 text-primary" />
+             <CardContent className="space-y-2 px-6 pb-6">
+                <Button variant="secondary" className="w-full justify-start text-[11px] font-bold h-10 rounded-xl bg-background/60 border-border/30 hover:bg-background shadow-sm">
+                  <ImageIcon className="h-4 w-4 mr-2.5 text-primary/60" />
                   Update Credentials
                 </Button>
-                <Button variant="outline" className="w-full justify-start text-xs font-bold h-10 border-none bg-background/50 hover:bg-background">
-                  <ExternalLink className="h-4 w-4 mr-2 text-primary" />
+                <Button variant="secondary" className="w-full justify-start text-[11px] font-bold h-10 rounded-xl bg-background/60 border-border/30 hover:bg-background shadow-sm">
+                  <ExternalLink className="h-4 w-4 mr-2.5 text-primary/60" />
                   Export Portfolio
                 </Button>
              </CardContent>
@@ -180,7 +178,7 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
         <div className="lg:col-span-3 space-y-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="overflow-x-auto pb-4 custom-scrollbar">
-              <TabsList className="flex w-max min-w-full gap-2 bg-muted/50 p-1.5 rounded-2xl border border-border/50">
+              <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
                 {[
                   { id: 'personal', label: 'Identity' },
                   { id: 'classes', label: 'Pedagogy' },
@@ -189,14 +187,14 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
                   { id: 'professional', label: 'Career' },
                   { id: 'family', label: 'Kinship' }
                 ].map(tab => (
-                  <TabsTrigger key={tab.id} value={tab.id} className="rounded-xl px-6 py-2.5 text-xs font-bold tracking-tight uppercase">
+                  <TabsTrigger key={tab.id} value={tab.id} className="rounded-xl px-6 py-2.5 text-[10px] font-black tracking-widest uppercase data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
                     {tab.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </div>
 
-            <div className="mt-8 transition-all">
+            <div className="mt-6 transition-all">
               <TabsContent value="personal" className="mt-0">
                 <DetailsFormSection 
                   title="Profile Identity" 
@@ -252,25 +250,25 @@ function DetailsFormSection({ title, description, data, onSave }: { title: strin
   const [localData, setLocalData] = useState(data);
 
   return (
-    <Card className="border-none shadow-card overflow-hidden">
-      <CardHeader className="border-b bg-muted/5 flex flex-row items-center justify-between py-6">
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
         <div>
-          <CardTitle className="text-2xl font-black tracking-tight">{title}</CardTitle>
-          <CardDescription className="text-sm mt-1">{description}</CardDescription>
+          <CardTitle className="text-xl font-bold tracking-tight">{title}</CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-1">{description}</CardDescription>
         </div>
-        <Button variant="premium" onClick={() => onSave(localData)} className="rounded-xl h-10 px-6 font-bold shadow-lg">
+        <Button onClick={() => onSave(localData)} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
           <Save className="mr-2 h-4 w-4" />
           Synchronize
         </Button>
       </CardHeader>
       <CardContent className="p-8">
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-slate-900 text-emerald-400 font-mono text-xs shadow-inner border border-slate-800 relative group overflow-hidden">
+          <div className="p-6 rounded-2xl bg-muted/20 text-foreground/80 font-mono text-[11px] border border-border/50 relative group overflow-hidden shadow-inner">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                <ShieldCheck className="h-32 w-32" />
             </div>
             <textarea 
-              className="min-h-[300px] w-full bg-transparent border-none focus:ring-0 resize-none leading-relaxed tracking-wider custom-scrollbar selection:bg-emerald-500/30 selection:text-emerald-200"
+              className="min-h-[300px] w-full bg-transparent border-none focus:ring-0 resize-none leading-relaxed tracking-wide custom-scrollbar selection:bg-primary/20"
               spellCheck={false}
               value={JSON.stringify(localData, null, 2)}
               onChange={(e) => {
@@ -280,8 +278,8 @@ function DetailsFormSection({ title, description, data, onSave }: { title: strin
               }}
             />
           </div>
-          <div className="flex items-center gap-2 p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs font-semibold text-primary/80">
-            <Activity className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 p-4 rounded-xl bg-muted/30 border border-border/50 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+            <Activity className="h-4 w-4 shrink-0 opacity-50" />
             Direct database serialization interface. Data structure validation enforced upon synchronization.
           </div>
         </div>
@@ -302,45 +300,49 @@ function AddressSection({ teacherId, initialAddresses }: { teacherId: string, in
   };
 
   return (
-    <Card className="border-none shadow-card overflow-hidden">
-      <CardHeader className="border-b bg-muted/5 flex flex-row items-center justify-between py-6">
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
         <div>
-          <CardTitle className="text-2xl font-black tracking-tight">Geographic Hub</CardTitle>
-          <CardDescription className="text-sm mt-1">Verified physical residency and transit records.</CardDescription>
+          <CardTitle className="text-xl font-bold tracking-tight">Geographic Hub</CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-1">Verified physical residency and transit records.</CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="rounded-xl h-10 px-6 font-bold border-2 hover:bg-muted transition-all">
+        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold border border-border/50 bg-background/50 hover:bg-background text-xs shadow-sm">
           <Plus className="mr-2 h-4 w-4" />
           Register Address
         </Button>
       </CardHeader>
       <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         {addresses.map(addr => (
-          <div key={addr.id} className="relative p-6 rounded-2xl bg-background border-2 border-border/50 group hover:border-primary/50 hover:shadow-xl transition-all">
+          <div key={addr.id} className="relative p-6 rounded-2xl bg-muted/5 border border-border/50 group hover:border-primary/40 hover:bg-background transition-all">
             <div className="flex gap-4">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary/70 shrink-0 group-hover:scale-110 transition-transform">
                 <MapPin className="h-5 w-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-foreground">{addr.city}, {addr.state}</h4>
-                  {addr.isPermanent && <Badge className="bg-primary/10 text-primary border-none text-[8px] font-black tracking-widest uppercase">Permanent</Badge>}
+                  <h4 className="font-bold text-foreground/80">{addr.city}, {addr.state}</h4>
+                  {addr.isPermanent && (
+                    <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] font-black tracking-widest uppercase border border-primary/20">
+                      Permanent
+                    </span>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{addr.address}</p>
+                <p className="text-sm text-muted-foreground/80 font-medium leading-relaxed">{addr.address}</p>
                 <div className="flex items-center gap-4 pt-2">
-                   <span className="text-[10px] font-bold text-muted-foreground uppercase">{addr.country}</span>
-                   <span className="text-[10px] font-black text-primary opacity-50 tracking-widest">{addr.pincode}</span>
+                   <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-wider">{addr.country}</span>
+                   <span className="text-[10px] font-black text-primary/40 tracking-widest">{addr.pincode}</span>
                 </div>
               </div>
             </div>
-            <Button size="icon" variant="ghost" className="absolute top-4 right-4 h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleDelete(addr.id)}>
+            <Button size="icon" variant="ghost" className="absolute top-4 right-4 h-8 w-8 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5 opacity-0 group-hover:opacity-100 transition-all rounded-lg" onClick={() => handleDelete(addr.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ))}
         {addresses.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed">
+          <div className="col-span-full py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
             <MapPin className="h-8 w-8 mx-auto mb-2 opacity-20" />
-            <p className="text-sm font-medium">No geographic associations detected.</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest">No geographic associations detected.</p>
           </div>
         )}
       </CardContent>
@@ -360,13 +362,13 @@ function ClassesSection({ teacherId, initialClasses }: { teacherId: string, init
   };
 
   return (
-    <Card className="border-none shadow-card overflow-hidden">
-      <CardHeader className="border-b bg-muted/5 flex flex-row items-center justify-between py-6">
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
         <div>
-          <CardTitle className="text-2xl font-black tracking-tight">Pedagogical Portfolio</CardTitle>
-          <CardDescription className="text-sm mt-1">Institutional academic load and instructional assignments.</CardDescription>
+          <CardTitle className="text-xl font-bold tracking-tight">Pedagogical Portfolio</CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-1">Institutional academic load and instructional assignments.</CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="rounded-xl h-10 px-6 font-bold border-2 hover:bg-muted transition-all">
+        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold border border-border/50 bg-background/50 hover:bg-background text-xs shadow-sm">
           <Plus className="mr-2 h-4 w-4" />
           Append Assignment
         </Button>
@@ -374,31 +376,31 @@ function ClassesSection({ teacherId, initialClasses }: { teacherId: string, init
       <CardContent className="p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {classes.map(cls => (
-            <div key={cls.id} className="p-5 rounded-2xl bg-linear-to-br from-white to-slate-50 border-2 border-border/50 group hover:border-primary/50 hover:bg-white hover:shadow-xl transition-all">
+            <div key={cls.id} className="p-5 rounded-2xl bg-muted/5 border border-border/50 group hover:border-primary/40 hover:bg-background transition-all">
               <div className="flex justify-between items-start mb-4">
-                <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600/70 group-hover:scale-110 transition-transform">
                   <BookOpen className="h-5 w-5" />
                 </div>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => cls.id && handleDelete(cls.id)}>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/5 opacity-0 group-hover:opacity-100 transition-all rounded-lg" onClick={() => cls.id && handleDelete(cls.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               <div>
-                <h4 className="font-extrabold text-foreground">{cls.className} - {cls.sectionName}</h4>
-                <p className="text-xs font-bold text-primary uppercase tracking-widest mt-1 opacity-70">{cls.subjectName}</p>
-                <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                <h4 className="font-bold text-foreground/80">{cls.className} - {cls.sectionName}</h4>
+                <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest mt-1.5">{cls.subjectName}</p>
+                <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-between">
                    <div className="flex -space-x-2">
-                     {[1,2,3].map(i => <div key={i} className="h-6 w-6 rounded-full border-2 border-white bg-muted" />)}
+                     {[1,2,3].map(i => <div key={i} className="h-6 w-6 rounded-full border border-background bg-muted/30" />)}
                    </div>
-                   <span className="text-[10px] font-bold text-muted-foreground">ACT-0{cls.id}</span>
+                   <span className="text-[9px] font-black text-muted-foreground/40 tracking-tighter">ACT-0{cls.id}</span>
                 </div>
               </div>
             </div>
           ))}
           {classes.length === 0 && (
-            <div className="col-span-full py-12 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed">
+            <div className="col-span-full py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
               <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-20" />
-              <p className="text-sm font-medium">No pedagogical records established.</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest">No pedagogical records established.</p>
             </div>
           )}
         </div>

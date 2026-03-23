@@ -7,19 +7,19 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 
 function Badge({ className, variant = "default", ...props }: BadgeProps) {
   const variants = {
-    default: "border-transparent bg-primary/10 text-primary hover:bg-primary/20",
-    secondary: "border-transparent bg-secondary/10 text-secondary hover:bg-secondary/20",
-    destructive: "border-transparent bg-destructive/10 text-destructive hover:bg-destructive/20",
-    outline: "border-border text-foreground",
-    success: "border-transparent bg-secondary/10 text-secondary hover:bg-secondary/20",
-    warning: "border-transparent bg-primary/5 text-muted-foreground border-border",
-    premium: "border-primary/20 bg-primary/10 text-primary font-bold",
+    default: "bg-[hsl(var(--primary-subtle))] text-[hsl(var(--primary))]",
+    secondary: "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
+    destructive: "bg-[hsl(var(--destructive-subtle))] text-[hsl(var(--destructive))]",
+    outline: "border border-[hsl(var(--border))] text-[hsl(var(--foreground))] bg-transparent",
+    success: "bg-[hsl(var(--success-subtle))] text-[hsl(var(--success))]",
+    warning: "bg-[hsl(var(--warning-subtle))] text-[hsl(var(--warning-foreground))]",
+    premium: "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] font-bold",
   }
 
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors",
         variants[variant],
         className
       )}

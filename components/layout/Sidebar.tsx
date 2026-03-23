@@ -4,8 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '../../lib/utils';
-import { 
-  School, Users, BarChart3, Settings, CreditCard, 
+import {
+  School, Users, BarChart3, Settings, CreditCard,
   GraduationCap, Calendar, MessageSquare, ClipboardCheck,
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
@@ -63,63 +63,92 @@ export function Sidebar() {
   const links = role ? sidebarLinks[role] : [];
 
   return (
-    <aside className={cn(
-      "h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col z-50",
-      collapsed ? "w-20" : "w-64"
-    )}>
-      <div className="p-6 flex items-center justify-between">
-        {!collapsed && (
-          <div className="flex items-center gap-2 group">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <span className="font-bold text-lg tracking-tight text-sidebar-foreground">SkoolConnect</span>
-          </div>
-        )}
-        <button 
-          onClick={() => setCollapsed(!collapsed)} 
-          className="p-1.5 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
+    <aside
+      style={{ background: 'hsl(var(--sidebar-background))', borderRight: '1px solid hsl(var(--sidebar-border))' }}
+      className={cn(
+        "h-screen transition-all duration-300 flex flex-col z-50 relative",
+        collapsed ? "w-16" : "w-64"
+      )}
+    >
+      {/* ── Logo ── */}
+      <div
+        style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
+        className="h-16 flex items-center px-4 gap-3 shrink-0"
+      >
+        {/* Icon mark */}
+        <div
+          style={{ background: 'hsl(var(--sidebar-primary))' }}
+          className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
+          <Sparkles className="h-4 w-4 text-white" />
+        </div>
+        {!collapsed && (
+          <span className="font-bold text-lg tracking-tight text-foreground">
+            Skool<span style={{ color: 'hsl(var(--sidebar-primary))' }}>Connect</span>
+          </span>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      {/* ── Collapse toggle ── */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          background: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--sidebar-border))',
+          color: 'hsl(var(--sidebar-foreground))',
+        }}
+        className="absolute -right-3 top-20 w-6 h-6 flex items-center justify-center rounded-full shadow-sm z-50 hover:bg-[hsl(var(--accent))] transition-colors"
+      >
+        {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+      </button>
+
+      {/* ── Navigation ── */}
+      <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-1">
         {links.map((link) => {
           const isActive = pathname === link.href;
           const Icon = link.icon;
           return (
-            <Link 
-              key={link.name} 
+            <Link
+              key={link.name}
               href={link.href}
+              style={isActive ? {
+                background: 'hsl(var(--sidebar-accent))',
+                color: 'hsl(var(--sidebar-accent-foreground))',
+                fontWeight: 600,
+              } : {
+                color: 'hsl(var(--sidebar-foreground))',
+              }}
               className={cn(
-                "flex items-center px-3 py-2.5 rounded-md transition-all group relative",
-                isActive 
-                  ? "bg-primary/10 text-primary font-semibold" 
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 group relative",
+                !isActive && "hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]"
               )}
             >
-              <Icon size={18} className={cn(isActive ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-accent-foreground")} />
-              {!collapsed && <span className="ml-3 text-sm">{link.name}</span>}
+              <Icon size={18} className={cn("shrink-0", isActive ? "text-[hsl(var(--sidebar-primary))]" : "")} />
+              {!collapsed && <span className="ml-3">{link.name}</span>}
               {isActive && !collapsed && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-l-full shadow-[0px_0px_8px_rgba(var(--primary),0.5)]" />
+                <div
+                  style={{ background: 'hsl(var(--sidebar-primary))' }}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                />
               )}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <button 
+      {/* ── Logout ── */}
+      <div style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }} className="p-4">
+        <button
           onClick={() => {
             clearAuth();
             document.cookie = "auth-token=; Max-Age=0; path=/";
             document.cookie = "user-role=; Max-Age=0; path=/";
             window.location.href = '/login';
           }}
-          className="flex items-center w-full px-3 py-2.5 text-destructive hover:bg-destructive/10 rounded-md transition-all text-sm font-medium"
+          style={{ color: 'hsl(var(--sidebar-foreground))' }}
+          className="flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-destructive/10 hover:text-destructive transition-colors group"
         >
-          <LogOut size={18} />
+          <LogOut size={18} className="shrink-0 group-hover:text-destructive" />
           {!collapsed && <span className="ml-3">Logout</span>}
         </button>
       </div>

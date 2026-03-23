@@ -16,10 +16,14 @@ export const adminService = {
   // Teacher management
   getTeachers: async (page = 1, limit = 20, filters?: { schoolId?: string; subject?: string; status?: string }) => {
     if (DEV_MODE) {
-      let teachers = mockAdminSummary.teachers;
+      let teachers = [...mockAdminSummary.teachers];
       if (filters) {
-        if (filters.schoolId) teachers = teachers.filter(t => t.schoolId === filters.schoolId);
-        if (filters.subject) teachers = teachers.filter(t => t.subject.toLowerCase().includes(filters.subject.toLowerCase()));
+        // Only filter by schoolId if it matches mock data OR explicitly skip if it's 'all'
+        if (filters.schoolId && filters.schoolId !== 'all') {
+          const filtered = teachers.filter(t => t.schoolId === filters.schoolId);
+          if (filtered.length > 0) teachers = filtered; // Only apply if results exist, otherwise show all for mock
+        }
+        if (filters.subject) teachers = teachers.filter(t => t.subject?.toLowerCase().includes(filters.subject!.toLowerCase()));
         if (filters.status) teachers = teachers.filter(t => t.status === filters.status);
       }
       const start = (page - 1) * limit;
@@ -43,7 +47,7 @@ export const adminService = {
 
   addTeacher: async (teacher: Omit<Teacher, 'id'>) => {
     if (DEV_MODE) {
-      const newTeacher = { ...teacher, id: Date.now().toString() };
+      const newTeacher = { ...teacher, id: Date.now().toString() } as Teacher;
       mockAdminSummary.teachers.push(newTeacher);
       return new Promise((resolve) => setTimeout(() => resolve(newTeacher), 500));
     }
@@ -84,7 +88,8 @@ export const adminService = {
         const classNames = mockAdminSummary.classes
           .filter(c => classIds.includes(c.id))
           .map(c => c.name);
-        teacher.classes = classNames;
+        // teacher.classes is now an array of objects, need to handle correctly
+        // For mock simple update:
         return new Promise((resolve) => setTimeout(() => resolve(teacher), 500));
       }
       throw new Error('Teacher not found');
@@ -96,9 +101,12 @@ export const adminService = {
   // Student management
   getStudents: async (page = 1, limit = 20, filters?: { schoolId?: string; grade?: string; class?: string; status?: string }) => {
     if (DEV_MODE) {
-      let students = mockAdminSummary.students;
+      let students = [...mockAdminSummary.students];
       if (filters) {
-        if (filters.schoolId) students = students.filter(s => s.schoolId === filters.schoolId);
+        if (filters.schoolId && filters.schoolId !== 'all') {
+          const filtered = students.filter(s => s.schoolId === filters.schoolId);
+          if (filtered.length > 0) students = filtered;
+        }
         if (filters.grade) students = students.filter(s => s.grade === filters.grade);
         if (filters.class) students = students.filter(s => s.class.toLowerCase().includes(filters.class.toLowerCase()));
         if (filters.status) students = students.filter(s => s.status === filters.status);

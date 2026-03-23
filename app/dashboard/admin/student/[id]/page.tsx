@@ -2,284 +2,268 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import {
+  ArrowLeft, User, BookOpen, Mail, Phone, Calendar,
+  Fingerprint, ShieldAlert, GraduationCap, MapPin,
+  MoreHorizontal, Download, Edit3, Trash2,
+  CheckCircle2, AlertCircle, TrendingUp, Clock,
+  FileText, CreditCard, MessageSquare
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Mock components from your UI library
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { adminService } from '@/services/admin.service';
-import { Student } from '@/types/roles';
-import { ArrowLeft, User, BookOpen } from 'lucide-react';
+
+const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 
 export default function StudentProfilePage() {
   const params = useParams();
   const router = useRouter();
   const studentId = params.id as string;
 
-  const [student, setStudent] = useState<Student | null>(null);
+  const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('details');
-
-  const [apiResponse, setApiResponse] = useState<any>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  const [updateForm, setUpdateForm] = useState({
-    name: '', email: '', grade: '', class: '', phone: '', dateOfBirth: '', gender: ''
-  });
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    loadStudent();
+    const loadData = async () => {
+      const summary = await adminService.getSummary();
+      const found = summary.students.find((s: any) => s.id === studentId);
+      setStudent(found);
+      setLoading(false);
+    };
+    loadData();
   }, [studentId]);
 
-  const loadStudent = async () => {
-    try {
-      const mockData = await adminService.getSummary();
-      const foundStudent = mockData.students.find(s => s.id === studentId);
-      if (foundStudent) {
-        setStudent(foundStudent);
-        setUpdateForm({
-          name: foundStudent.name,
-          email: foundStudent.email,
-          grade: foundStudent.grade,
-          class: foundStudent.class,
-          phone: foundStudent.phone || '',
-          dateOfBirth: foundStudent.dateOfBirth || '',
-          gender: foundStudent.gender || ''
-        });
-      }
-    } catch (error) {
-      console.error('Error loading student:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateStudentDetails = async () => {
-    setApiLoading(true);
-    try {
-      const response = await fetch(`/api/student/${studentId}/details`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateForm)
-      });
-      const result = await response.json();
-      setApiResponse(result);
-      if (response.ok) loadStudent();
-    } catch (error: any) {
-      setApiResponse({ error: error.message });
-    } finally {
-      setApiLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  if (!student) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background text-center p-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Student Not Found</h2>
-          <Button onClick={() => router.back()} className="mt-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="h-screen w-full flex items-center justify-center bg-[#F8FAFC]">Loading Student Registry...</div>;
 
   return (
-    <div className="flex-1 space-y-8 p-4 md:p-8 pt-6 animate-in fade-in duration-500 bg-background">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{student.name}</h1>
-            <p className="text-muted-foreground mt-1">Student Record & Academic Corpus</p>
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
+      <div className="max-w-[1400px] mx-auto space-y-6">
+
+        {/* HEADER / ACTION BAR */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="p-2.5 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors"
+            >
+              <ArrowLeft size={18} className="text-slate-500" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">{student?.name}</h1>
+                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[10px] font-bold uppercase tracking-tighter">
+                  {student?.status || 'Active'}
+                </Badge>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">UID: {student?.schoolId || 'STU-9920'}</p>
+            </div>
+          </div>
+
+          {/* ADMIN CALLS TO ACTION */}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="h-10 rounded-xl border-slate-200 text-xs font-bold gap-2">
+              <Download size={14} /> Report
+            </Button>
+            <Button variant="outline" className="h-10 rounded-xl border-slate-200 text-xs font-bold gap-2">
+              <CreditCard size={14} /> Fees
+            </Button>
+            <div className="h-6 w-px bg-slate-200 mx-1" />
+            <Button className="h-10 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold gap-2 px-6">
+              <Edit3 size={14} /> Edit Profile
+            </Button>
+            <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+              <MoreHorizontal size={18} className="text-slate-400" />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-           <Badge variant="premium">Student</Badge>
-           <Badge variant={student.status === 'active' ? 'success' : 'secondary'}>{student.status}</Badge>
+
+        <div className="grid grid-cols-12 gap-8">
+
+          {/* LEFT COLUMN: IDENTITY CARD */}
+          <div className="col-span-12 lg:col-span-4 space-y-6">
+            <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-8 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />
+
+              <div className="relative mx-auto w-32 h-32 rounded-[2.5rem] border-4 border-white shadow-xl overflow-hidden mb-6">
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                  <User size={48} className="text-slate-300" />
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">{student?.name}</h2>
+              <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mt-1">Grade {student?.grade} — {student?.class}</p>
+
+              <div className="grid grid-cols-2 gap-3 mt-8">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Attendance</p>
+                  <p className="text-xl font-black text-slate-900">94.2%</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Average GPA</p>
+                  <p className="text-xl font-black text-indigo-600">3.82</p>
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-3">
+                <button className="w-full flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl group hover:bg-indigo-600 transition-all">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare size={16} className="text-indigo-400" />
+                    <span className="text-xs font-bold uppercase tracking-tight">Contact Parent</span>
+                  </div>
+                  <ArrowLeft size={14} className="rotate-180 opacity-0 group-hover:opacity-100 transition-all" />
+                </button>
+                <button className="w-full flex items-center gap-3 p-4 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all">
+                  <Calendar size={16} className="text-slate-400" />
+                  <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">Schedule Meeting</span>
+                </button>
+              </div>
+            </div>
+
+            {/* QUICK HEALTH CHECK */}
+            <div className="bg-slate-900 rounded-[2rem] p-6 text-white">
+              <div className="flex items-center gap-2 mb-6">
+                <ShieldAlert size={16} className="text-amber-400" />
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Administrative Status</h3>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: 'Documents', status: 'Verified', color: 'text-emerald-400' },
+                  { label: 'Fee Account', status: 'Pending', color: 'text-amber-400' },
+                  { label: 'Conduct Registry', status: 'Exemplary', color: 'text-indigo-400' }
+                ].map((item, i) => (
+                  <div key={i} className="flex justify-between items-center pb-3 border-b border-white/5">
+                    <span className="text-xs text-slate-400 font-medium">{item.label}</span>
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", item.color)}>{item.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: DETAILED TABS */}
+          <div className="col-span-12 lg:col-span-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="bg-transparent gap-8 h-12 p-0 border-b border-slate-200 rounded-none w-full justify-start">
+                {['Overview', 'Academic', 'Registry', 'Billing'].map((t) => (
+                  <TabsTrigger
+                    key={t}
+                    value={t.toLowerCase()}
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-600 data-[state=active]:bg-transparent data-[state=active]:text-indigo-600 px-0 h-12 text-xs font-black uppercase tracking-widest"
+                  >
+                    {t}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              <TabsContent value="overview" className="mt-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Bio Information */}
+                  <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                      <Fingerprint size={14} className="text-slate-400" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Biometric Identity</span>
+                    </div>
+                    <CardContent className="p-6 space-y-5">
+                      <div className="grid grid-cols-2 gap-4">
+                        <InfoItem label="Full Legal Name" value={student?.name} />
+                        <InfoItem label="Date of Birth" value={student?.dateOfBirth || '14 Oct 2008'} />
+                        <InfoItem label="Gender" value={student?.gender || 'Female'} />
+                        <InfoItem label="Blood Group" value="O+" />
+                      </div>
+                      <div className="pt-4 border-t border-slate-100">
+                        <InfoItem label="Address" value="42nd Academic Blvd, North Wing Housing Complex" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Contact Information */}
+                  <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                      <Phone size={14} className="text-slate-400" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Secure Contact</span>
+                    </div>
+                    <CardContent className="p-6 space-y-5">
+                      <div className="flex items-center gap-4 p-3 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">
+                          <Mail size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Student Email</p>
+                          <p className="text-xs font-bold text-slate-900">{student?.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-600 shadow-sm">
+                          <Phone size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Emergency Contact</p>
+                          <p className="text-xs font-bold text-slate-900">{student?.phone || '+1 882-992-00'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Performance Timeline */}
+                <Card className="rounded-3xl border-slate-200 shadow-sm p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <TrendingUp size={20} className="text-indigo-600" />
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Academic Trajectory</h3>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                        <div className="w-2 h-2 rounded-full bg-indigo-600" /> Current Year
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                        <div className="w-2 h-2 rounded-full bg-slate-200" /> Class Avg
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-48 w-full flex items-end gap-3 pb-4">
+                    {/* Simplified bar chart representation */}
+                    {[20, 40, 60, 80].map((h, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
+                        <div className="w-full bg-slate-100 rounded-t-lg relative overflow-hidden h-full">
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${h}%` }}
+                            className="absolute bottom-0 w-full bg-indigo-600/10 group-hover:bg-indigo-600 transition-all rounded-t-lg"
+                          />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Term {i + 1}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="academic">
+                {/* This would be your Subject Load/Grade Table card */}
+                <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
+                  <p className="text-slate-500 italic text-sm">Academic transcripts and course enrollment details...</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 rounded-xl w-fit">
-          <TabsTrigger value="details">Profile Overview</TabsTrigger>
-          <TabsTrigger value="academic">Academic Data</TabsTrigger>
-          <TabsTrigger value="edit">Edit Profile</TabsTrigger>
-          <TabsTrigger value="api">API Status</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="details" className="space-y-8 focus-visible:outline-none">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="border-none shadow-card bg-slate-50/50 overflow-hidden">
-              <CardContent className="p-8">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-40 h-40 rounded-full p-1 bg-linear-to-tr from-primary to-amber-400 overflow-hidden shadow-xl">
-                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                      {student.profileImageUrl ? (
-                        <img src={student.profileImageUrl} alt={student.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-muted/30">
-                          <User className="h-20 w-20 text-muted-foreground/40" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold mt-6">{student.name}</h3>
-                  <p className="text-muted-foreground">Grade {student.grade} • Section {student.class}</p>
-                  <div className="mt-8 w-full grid grid-cols-2 gap-3">
-                     <div className="p-3 bg-white rounded-lg border border-gray-100 text-center">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Attendance</p>
-                        <p className="text-lg font-bold text-primary">94%</p>
-                     </div>
-                     <div className="p-3 bg-white rounded-lg border border-gray-100 text-center">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">GPA</p>
-                        <p className="text-lg font-bold text-amber-600">3.8</p>
-                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2 border-none shadow-card">
-              <CardHeader className="border-b pb-4">
-                <CardTitle className="text-xl">Biographical Information</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Official Email</Label>
-                      <p className="text-foreground font-medium mt-1">{student.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Contact Phone</Label>
-                      <p className="text-foreground font-medium mt-1">{student.phone || '—'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Enrollment Date</Label>
-                      <p className="text-foreground font-medium mt-1">{student.enrollmentDate}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-6">
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Date of Birth</Label>
-                      <p className="text-foreground font-medium mt-1">{student.dateOfBirth || '—'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Registry ID</Label>
-                      <p className="text-foreground font-medium mt-1">{student.schoolId}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Guardian Details</Label>
-                      <p className="text-foreground font-medium mt-1">{student.parentDetails?.fatherName || 'Not specified'}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="academic" className="focus-visible:outline-none">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="border-none shadow-md">
-                 <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                       <BookOpen className="h-4 w-4 text-primary" /> Current Subject Load
-                    </CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                    <div className="space-y-3">
-                       {['Mathematics', 'Physics', 'Chemistry', 'English'].map(sub => (
-                         <div key={sub} className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-100">
-                            <span className="text-sm">{sub}</span>
-                            <Badge variant="outline" className="text-[10px]">A+</Badge>
-                         </div>
-                       ))}
-                    </div>
-                 </CardContent>
-              </Card>
-           </div>
-        </TabsContent>
-
-        <TabsContent value="edit" className="focus-visible:outline-none">
-          <Card className="border-none shadow-card">
-             <CardHeader className="border-b pb-4">
-                <CardTitle>Modification Controls</CardTitle>
-             </CardHeader>
-             <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="std-name">Full Student Name</Label>
-                    <Input id="std-name" value={updateForm.name} onChange={(e) => setUpdateForm({ ...updateForm, name: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="std-email">Primary Email</Label>
-                    <Input id="std-email" type="email" value={updateForm.email} onChange={(e) => setUpdateForm({ ...updateForm, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="std-grade">Assigned Grade</Label>
-                    <Input id="std-grade" value={updateForm.grade} onChange={(e) => setUpdateForm({ ...updateForm, grade: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="std-class">Class Section</Label>
-                    <Input id="std-class" value={updateForm.class} onChange={(e) => setUpdateForm({ ...updateForm, class: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="std-gender">Gender Identity</Label>
-                    <Select value={updateForm.gender} onValueChange={(value) => setUpdateForm({ ...updateForm, gender: value })}>
-                      <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end pt-4 border-t">
-                  <Button onClick={updateStudentDetails} disabled={apiLoading} variant="premium">
-                    {apiLoading ? 'Processing...' : 'Apply Registry Updates'}
-                  </Button>
-                </div>
-             </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="api" className="focus-visible:outline-none">
-          <Card className="border-none shadow-card overflow-hidden">
-             <CardHeader className="bg-slate-900 text-slate-50">
-                <CardTitle className="text-lg">API Transaction History</CardTitle>
-             </CardHeader>
-             <CardContent className="p-0">
-                {apiResponse ? (
-                  <pre className="p-6 bg-slate-950 text-emerald-400 font-mono text-sm overflow-auto max-h-[500px]">
-                    {JSON.stringify(apiResponse, null, 2)}
-                  </pre>
-                ) : (
-                  <div className="p-12 text-center text-muted-foreground italic">
-                     System waiting for telemetry...
-                  </div>
-                )}
-             </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
+}
+
+function InfoItem({ label, value }: { label: string, value: string }) {
+  return (
+    <div>
+      <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] leading-none mb-1.5">{label}</p>
+      <p className="text-sm font-bold text-slate-900 tracking-tight">{value}</p>
+    </div>
+  )
 }

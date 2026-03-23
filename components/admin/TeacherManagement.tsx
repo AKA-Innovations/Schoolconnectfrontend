@@ -1,18 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import {
+  Plus, Edit, Trash2, Users, Search, Eye, RefreshCw,
+  Sparkles, X, LayoutGrid, List, MoreVertical,
+  GraduationCap, ShieldCheck, Briefcase
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
+
 import { teacherService } from '@/services/teacher.service';
-import { adminService } from '@/services/admin.service';
-import { Teacher, Class, TeacherFilterParams } from '@/types/roles';
-import { Plus, Edit, Trash2, Users, Search, Filter, Eye, ArrowLeft, RefreshCw, MoreVertical, CheckCircle2 } from 'lucide-react';
+import { Teacher, TeacherFilterParams } from '@/types/roles';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { TeacherRegistrationForm } from '@/components/admin/TeacherRegistrationForm';
@@ -27,14 +31,21 @@ export function TeacherManagement() {
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'details'>('list');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [filters, setFilters] = useState<TeacherFilterParams>({
-    page: 1,
-    pageSize: 10,
-    schoolId: schoolId || '',
+    page: 1, pageSize: 10, schoolId: schoolId || '',
   });
+  const [activeDropdown, setActiveDropdown] = useState<'class' | 'subject' | null>(null);
 
-  useEffect(() => {
-    loadTeachers();
-  }, [filters, searchTerm]);
+  // Mock data - in a real app, these would come from your schoolService or props
+  const classOptions = ['Grade 10', 'Grade 11', 'Grade 12', 'Year 1', 'Year 2'];
+  const subjectOptions = ['Mathematics', 'Physics', 'English', 'History', 'Computer Science'];
+  const roles = [
+    { label: 'All Staff', key: 'all', icon: Users },
+    { label: 'Principals', key: 'isPrincipal', icon: ShieldCheck },
+    { label: 'Coordinators', key: 'isCoordinator', icon: Briefcase },
+    { label: 'Subject Teachers', key: 'isSubjectTeacher', icon: GraduationCap },
+  ];
+
+  useEffect(() => { loadTeachers(); }, [filters, searchTerm]);
 
   const loadTeachers = async () => {
     setLoading(true);
@@ -46,296 +57,249 @@ export function TeacherManagement() {
       setTeachers(response.data || []);
       setTotalPages(Math.ceil((response.total || 0) / (filters.pageSize || 10)));
     } catch (error) {
-      console.error('Error loading teachers:', error);
-    } finally {
-      setLoading(false);
-    }
+      console.error(error);
+    } finally { setLoading(false); }
   };
 
-  const handleDeleteTeacher = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this teacher record? This action cannot be undone.')) return;
-    try {
-      await teacherService.deleteTeacher(id);
-      loadTeachers();
-    } catch (error) {
-      console.error('Error deleting teacher:', error);
-    }
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilters({ page: 1, pageSize: 10, schoolId: schoolId || '' });
   };
 
-  if (viewMode === 'add') {
-    return (
-      <TeacherRegistrationForm
-        onCancel={() => setViewMode('list')}
-        onSuccess={() => {
-          setViewMode('list');
-          loadTeachers();
-        }}
-      />
-    );
-  }
-
-  if (viewMode === 'details' && selectedTeacher) {
-    return (
-      <TeacherDetailsView
-        teacherId={selectedTeacher.id}
-        onBack={() => setViewMode('list')}
-      />
-    );
-  }
+  if (viewMode === 'add') return <TeacherRegistrationForm onCancel={() => setViewMode('list')} onSuccess={() => { setViewMode('list'); loadTeachers(); }} />;
+  if (viewMode === 'details' && selectedTeacher) return <TeacherDetailsView teacherId={selectedTeacher.id} onBack={() => setViewMode('list')} />;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Faculty Directory</h2>
-          <p className="text-muted-foreground mt-1 text-sm">Oversee and manage your academic staff and class assignments.</p>
+    <div className="max-w-[1600px] mx-auto space-y-8 p-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">
+            <Sparkles size={14} className="animate-pulse" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Academic Management</span>
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900/80">Faculty <span className="text-slate-400 font-light">Directory</span></h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => loadTeachers()} disabled={loading}>
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => loadTeachers()} className="rounded-2xl h-12 w-12 border-slate-200">
+            <RefreshCw className={cn("h-4 w-4 text-slate-500", loading && "animate-spin")} />
           </Button>
-          <Button variant="premium" onClick={() => setViewMode('add')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Onboard Teacher
+          <Button onClick={() => setViewMode('add')} className="h-12 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all active:scale-95">
+            <Plus className="mr-2 h-5 w-5" />
+            <span className="font-bold">Onboard Staff</span>
           </Button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-card border border-border rounded-xl px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Name search */}
-          <div className="relative flex-[1_1_250px] min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search by name, ID, or email..."
+      {/* Modern Filter Card */}
+      {/*  */}
+      {/* Custom Filter Engine */}
+      {/* Custom Filter Engine */}
+      <div className="bg-white/80 backdrop-blur-2xl border border-slate-100 rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 space-y-8">
+        <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+
+          {/* Search Bar */}
+          <div className="relative w-full lg:max-w-xs group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <input
+              placeholder="Search staff..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-10 bg-muted/40 border-border focus:bg-background focus:border-primary/40 rounded-lg text-sm placeholder:text-muted-foreground/60 transition-all w-full"
+              className="w-full h-12 pl-11 pr-4 bg-slate-50/50 border-transparent rounded-2xl text-sm font-medium focus:bg-white focus:ring-4 focus:ring-indigo-500/5 transition-all"
             />
           </div>
 
-          {/* Divider */}
-          <div className="hidden sm:block w-px h-7 bg-border shrink-0" />
+          <div className="hidden lg:block w-px h-8 bg-slate-100" />
 
-          {/* Subject */}
-          <Select
-            value={filters.subjectName || 'all'}
-            onValueChange={(v) => setFilters({ ...filters, subjectName: v === 'all' ? undefined : v, page: 1 })}
-          >
-            <SelectTrigger className="flex-[1_1_140px] max-w-[200px] sm:max-w-none h-10 bg-muted/40 border-border rounded-lg text-sm focus:border-primary/40 transition-all">
-              <SelectValue placeholder="All Subjects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Subjects</SelectItem>
-              <SelectItem value="Mathematics">Mathematics</SelectItem>
-              <SelectItem value="Physics">Physics</SelectItem>
-              <SelectItem value="Chemistry">Chemistry</SelectItem>
-              <SelectItem value="Biology">Biology</SelectItem>
-              <SelectItem value="History">History</SelectItem>
-              <SelectItem value="English">English</SelectItem>
-              <SelectItem value="Computer Science">Computer Science</SelectItem>
-              <SelectItem value="Geography">Geography</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Custom Dropdown Filters */}
+          <div className="flex flex-wrap items-center gap-4">
 
-          {/* Class */}
-          <Select
-            value={filters.className || 'all'}
-            onValueChange={(v) => setFilters({ ...filters, className: v === 'all' ? undefined : v, page: 1 })}
-          >
-            <SelectTrigger className="flex-[1_1_120px] max-w-[150px] sm:max-w-none h-10 bg-muted/40 border-border rounded-lg text-sm focus:border-primary/40 transition-all">
-              <SelectValue placeholder="All Classes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              <SelectItem value="9">Class 9</SelectItem>
-              <SelectItem value="10">Class 10</SelectItem>
-              <SelectItem value="11">Class 11</SelectItem>
-              <SelectItem value="12">Class 12</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Section */}
-          <Select
-            value={filters.sectionName || 'all'}
-            onValueChange={(v) => setFilters({ ...filters, sectionName: v === 'all' ? undefined : v, page: 1 })}
-          >
-            <SelectTrigger className="flex-[1_1_120px] max-w-[150px] sm:max-w-none h-10 bg-muted/40 border-border rounded-lg text-sm focus:border-primary/40 transition-all">
-              <SelectValue placeholder="All Sections" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Sections</SelectItem>
-              <SelectItem value="A">Section A</SelectItem>
-              <SelectItem value="B">Section B</SelectItem>
-              <SelectItem value="C">Section C</SelectItem>
-              <SelectItem value="D">Section D</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Role */}
-          <Select
-            value={
-              filters.isPrincipal ? 'principal'
-              : filters.isCoordinator ? 'coordinator'
-              : filters.isClassTeacher ? 'classTeacher'
-              : filters.isSubjectTeacher ? 'subjectTeacher'
-              : 'all'
-            }
-            onValueChange={(v) => setFilters({
-              ...filters,
-              isPrincipal: v === 'principal' ? true : undefined,
-              isCoordinator: v === 'coordinator' ? true : undefined,
-              isClassTeacher: v === 'classTeacher' ? true : undefined,
-              isSubjectTeacher: v === 'subjectTeacher' ? true : undefined,
-              page: 1,
-            })}
-          >
-            <SelectTrigger className="flex-[1_1_140px] max-w-[180px] sm:max-w-none h-10 bg-muted/40 border-border rounded-lg text-sm focus:border-primary/40 transition-all">
-              <SelectValue placeholder="All Roles" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="principal">Principal</SelectItem>
-              <SelectItem value="coordinator">Coordinator</SelectItem>
-              <SelectItem value="classTeacher">Class Teacher</SelectItem>
-              <SelectItem value="subjectTeacher">Subject Teacher</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Results + Clear */}
-          <div className="flex items-center gap-3 shrink-0 ml-auto pl-2">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
-              <span className="font-semibold text-foreground">{teachers.length}</span> results
-            </span>
-            {(searchTerm || filters.subjectName || filters.className || filters.sectionName ||
-              filters.isPrincipal || filters.isCoordinator ||
-              filters.isClassTeacher || filters.isSubjectTeacher) && (
+            {/* Subject Dropdown */}
+            <div className="relative">
               <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilters({ page: 1, pageSize: 10, schoolId: schoolId || '' });
-                }}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline whitespace-nowrap"
+                onClick={() => setActiveDropdown(activeDropdown === 'subject' ? null : 'subject')}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border transition-all",
+                  filters.subjectId ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
               >
-                Clear
+                <GraduationCap size={14} />
+                {filters.subjectId || "All Subjects"}
+                <MoreVertical size={12} className="rotate-90 ml-1 opacity-40" />
               </button>
-            )}
+
+              <AnimatePresence>
+                {activeDropdown === 'subject' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full mt-2 left-0 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 overflow-hidden p-2"
+                    >
+                      {subjectOptions.map((sub) => (
+                        <button
+                          key={sub}
+                          onClick={() => { setFilters({ ...filters, subjectId: sub }); setActiveDropdown(null); }}
+                          className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-600 hover:text-indigo-600 transition-colors"
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Class Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'class' ? null : 'class')}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border transition-all",
+                  filters.classId ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                )}
+              >
+                <LayoutGrid size={14} />
+                {filters.classId || "All Classes"}
+                <MoreVertical size={12} className="rotate-90 ml-1 opacity-40" />
+              </button>
+
+              <AnimatePresence>
+                {activeDropdown === 'class' && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full mt-2 left-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-20 overflow-hidden p-2"
+                    >
+                      {classOptions.map((cls) => (
+                        <button
+                          key={cls}
+                          onClick={() => { setFilters({ ...filters, classId: cls }); setActiveDropdown(null); }}
+                          className="w-full text-left px-4 py-2.5 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-600 hover:text-purple-600 transition-colors"
+                        >
+                          {cls}
+                        </button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
           </div>
+
+          {/* Role Chips (Compact Version) */}
+          <div className="flex flex-wrap gap-2 lg:ml-auto">
+            {roles.filter(r => r.key !== 'all').map((role) => {
+              const isActive = filters[role.key as keyof TeacherFilterParams];
+              return (
+                <button
+                  key={role.key}
+                  onClick={() => setFilters({ ...filters, [role.key]: !isActive })}
+                  className={cn(
+                    "p-2.5 rounded-xl transition-all border",
+                    isActive ? "bg-slate-900 border-slate-900 text-white shadow-lg" : "bg-white border-slate-100 text-slate-400 hover:border-indigo-200 hover:text-indigo-600"
+                  )}
+                  title={role.label}
+                >
+                  <role.icon size={16} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Clear All Button */}
+          <AnimatePresence>
+            {(searchTerm || filters.subjectId || filters.classId) && (
+              <motion.button
+                initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
+                onClick={resetFilters}
+                className="flex items-center gap-1.5 px-3 py-2 text-rose-500 font-bold text-[10px] uppercase hover:bg-rose-50 rounded-lg transition-colors"
+              >
+                <X size={14} /> Clear
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-
-      <Card className="border-none shadow-card overflow-hidden">
+      {/* Results Table */}
+      <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-slate-200/40 overflow-hidden bg-white">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[120px] py-4">Employee ID</TableHead>
-                <TableHead>Teacher Details</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Assignments</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right pr-6 whitespace-nowrap">Actions</TableHead>
+              <TableRow className="hover:bg-transparent border-b border-slate-50 bg-slate-50/50">
+                <TableHead className="py-5 pl-8 text-[10px] font-black uppercase tracking-widest text-slate-400">Identity</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">Department</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">Load</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</TableHead>
+                <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest text-slate-400">Manage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={6} className="py-8">
-                      <div className="flex items-center space-x-4">
-                        <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-                        <div className="space-y-2 flex-1">
-                          <div className="h-4 bg-muted rounded animate-pulse w-1/4" />
-                          <div className="h-3 bg-muted rounded animate-pulse w-1/3" />
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <TableRow key={i}><TableCell colSpan={5} className="p-8"><Skeleton className="h-12 w-full rounded-2xl" /></TableCell></TableRow>
                 ))
               ) : teachers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-20">
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Users className="h-12 w-12 mb-4 opacity-20" />
-                      <p className="text-lg font-medium">No results found</p>
-                      <p className="text-sm">Try adjusting your filters or adding a new teacher.</p>
+                  <TableCell colSpan={5} className="h-64 text-center">
+                    <div className="flex flex-col items-center gap-2 opacity-30">
+                      <Users size={48} />
+                      <p className="font-bold">No Staff Found</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 teachers.map((teacher) => (
-                  <TableRow key={teacher.id} className="hover:bg-muted/5 transition-colors group">
-                    <TableCell className="font-mono text-xs font-semibold text-muted-foreground py-4">
-                      #{teacher.employeeId}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-linear-to-br from-primary/10 to-blue-500/10 flex items-center justify-center text-primary font-bold border border-primary/20 group-hover:scale-105 transition-transform">
-                          {teacher.firstName[0]}{teacher.lastName[0]}
+                  <TableRow key={teacher.id} className="group transition-colors hover:bg-indigo-50/30 border-b border-slate-50">
+                    <TableCell className="py-5 pl-8">
+                      <div className="flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
+                          {teacher.firstName}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-semibold text-foreground leading-tight">{teacher.firstName} {teacher.lastName}</span>
-                          <span className="text-xs text-muted-foreground">{teacher.employeeEmail}</span>
+                          <span className="font-bold text-slate-900">{teacher.firstName} {teacher.lastName}</span>
+                          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">{teacher.employeeEmail}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-2 py-0">
-                        {teacher.classes?.[0]?.subjectName || 'Unassigned'}
+                      <Badge className="bg-slate-100 text-slate-600 border-none px-3 py-1 rounded-lg font-bold text-[10px]">
+                        {teacher.classes?.subjectName || 'General'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {teacher.classes?.slice(0, 2).map((cls, idx) => (
-                          <div key={idx} className="text-[10px] font-bold px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground">
-                            {cls.className}-{cls.sectionName}
+                      <div className="flex -space-x-2">
+                        {teacher.classes?.slice(0, 3).map((c, i) => (
+                          <div key={i} className="h-7 px-2 flex items-center bg-white border border-slate-100 rounded-md text-[9px] font-black text-slate-500 shadow-sm">
+                            {c.className}-{c.sectionName}
                           </div>
                         ))}
-                        {(teacher.classes?.length || 0) > 2 && (
-                          <div className="text-[10px] font-bold px-2 py-0.5 rounded border border-dashed border-border text-muted-foreground">
-                            +{(teacher.classes?.length || 0) - 2}
-                          </div>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", teacher.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400')} />
-                        <span className="text-xs font-medium capitalize">{teacher.status || 'active'}</span>
+                      <div className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter",
+                        teacher.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-400"
+                      )}>
+                        <div className={cn("h-1 w-1 rounded-full", teacher.status === 'active' ? "bg-emerald-600" : "bg-slate-400")} />
+                        {teacher.status || 'Active'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => {
-                            setSelectedTeacher(teacher);
-                            setViewMode('details');
-                          }}
-                        >
-                          <Eye className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                    <TableCell className="text-right pr-8">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => { setSelectedTeacher(teacher); setViewMode('details'); }}>
+                          <Eye size={16} className="text-slate-400" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => {
-                            setSelectedTeacher(teacher);
-                            setViewMode('add');
-                          }}
-                        >
-                          <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => { setSelectedTeacher(teacher); setViewMode('add'); }}>
+                          <Edit size={16} className="text-slate-400" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-400 hover:text-red-500 hover:bg-red-50"
-                          onClick={() => handleDeleteTeacher(teacher.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-500" onClick={() => handleDeleteTeacher(teacher.id)}>
+                          <Trash2 size={16} />
                         </Button>
                       </div>
                     </TableCell>
@@ -345,38 +309,24 @@ export function TeacherManagement() {
             </TableBody>
           </Table>
 
-          <div className="flex items-center justify-between p-4 border-t bg-muted/10">
-            <p className="text-xs text-muted-foreground italic">
-              Showing <span className="font-semibold text-foreground">{(filters.page || 1) * (filters.pageSize || 10) - (filters.pageSize || 10) + 1}</span> to <span className="font-semibold text-foreground">{Math.min((filters.page || 1) * (filters.pageSize || 10), teachers.length)}</span> of <span className="font-semibold text-foreground">{totalPages * (filters.pageSize || 10)}</span> records
-            </p>
-            <div className="flex items-center gap-2">
+          {/* Pagination */}
+          <div className="flex items-center justify-between p-6 bg-slate-50/50">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Page {filters.page} of {totalPages}
+            </span>
+            <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
-                className="h-8 px-3 text-xs bg-background shadow-subtle"
+                className="rounded-xl border-slate-200"
                 disabled={filters.page === 1}
                 onClick={() => setFilters({ ...filters, page: (filters.page || 1) - 1 })}
               >
                 Previous
               </Button>
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(totalPages, 3) }).map((_, i) => (
-                  <Button
-                    key={i}
-                    variant={filters.page === i + 1 ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 w-8 p-0 text-xs"
-                    onClick={() => setFilters({ ...filters, page: i + 1 })}
-                  >
-                    {i + 1}
-                  </Button>
-                ))}
-              </div>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-8 px-3 text-xs bg-background shadow-subtle"
-                disabled={filters.page === totalPages || totalPages === 0}
+                className="rounded-xl border-slate-200"
+                disabled={filters.page === totalPages}
                 onClick={() => setFilters({ ...filters, page: (filters.page || 1) + 1 })}
               >
                 Next

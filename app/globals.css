@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ── Typography ───────────────────────────────────────────── */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
@@ -8,108 +9,133 @@
   src: url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 }
 
+
 /* ───────────────────────────────────────────
-   BRAND TOKENS  –  Single source of truth
-   primary:    #2563EB  →  221 83% 53%
-   secondary:  #10B981  →  160 84% 39%
-   background: #F8FAFC  →  210 40% 98%
-   text:       #0F172A  →  222 47% 11%
-   muted:      #64748B  →  215 16% 47%
-   border:     #E2E8F0  →  214 32% 91%
+   PREMIUM ERP DESIGN TOKENS (Refined System)
 ─────────────────────────────────────────── */
 
 :root {
-  /* Surface */
-  --background:           210 40% 98%;
-  --foreground:           222 47% 11%;
+  /* ── Surface (softer, less glare) ───────────────────────── */
+  --background: 210 30% 97%;
+  --foreground: 222 40% 12%;
 
-  /* Card / Popover */
-  --card:                 0 0% 100%;
-  --card-foreground:      222 47% 11%;
-  --popover:              0 0% 100%;
-  --popover-foreground:   222 47% 11%;
+  /* ── Card / Elevation ──────────────────────────────────── */
+  --card: 0 0% 100%;
+  --card-foreground: 222 40% 12%;
 
-  /* Brand */
-  --primary:              221 83% 53%;
-  --primary-foreground:   0 0% 100%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 40% 12%;
 
-  --secondary:            160 84% 39%;
+  /* ── Primary – Deep ERP Indigo (less loud, more authority) */
+  --primary: 232 68% 46%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 232 68% 40%;
+  --primary-subtle: 232 60% 96%;
+  --primary-muted: 232 45% 88%;
+
+  /* ── Secondary – Blue-leaning Teal (enterprise feel) ───── */
+  --secondary: 188 52% 38%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Neutral */
-  --muted:                214 32% 91%;   /* uses border hue, lighter */
-  --muted-foreground:     215 16% 47%;
+  /* ── Neutral System (better readability) ───────────────── */
+  --muted: 210 25% 92%;
+  --muted-foreground: 215 18% 42%;
 
-  --accent:               221 83% 96%;   /* primary tint for hover bg */
-  --accent-foreground:    221 83% 40%;
+  --accent: 232 60% 96%;
+  --accent-foreground: 232 55% 38%;
 
-  /* Semantic */
-  --destructive:          0 84% 60%;
+  /* ── Semantic (balanced, not aggressive) ───────────────── */
+  --success: 142 55% 42%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 10%;
+
+  --destructive: 0 72% 52%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Chrome */
-  --border:               214 32% 91%;
-  --input:                214 32% 91%;
-  --ring:                 221 83% 53%;   /* matches primary */
+  /* ── Chrome / UI Elements ─────────────────────────────── */
+  --border: 214 28% 88%;
+  --input: 214 28% 88%;
+  --ring: 232 68% 46%;
 
-  /* Shape */
-  --radius: 0.625rem;
+  /* ── Shape & Spacing ──────────────────────────────────── */
+  --radius: 0.75rem;
 
-  /* Sidebar (mirrors brand exactly) */
-  --sidebar-background:           0 0% 100%;
-  --sidebar-foreground:           215 16% 47%;
-  --sidebar-primary:              221 83% 53%;
-  --sidebar-primary-foreground:   0 0% 100%;
-  --sidebar-accent:               221 83% 96%;
-  --sidebar-accent-foreground:    221 83% 40%;
-  --sidebar-border:               214 32% 91%;
-  --sidebar-ring:                 221 83% 53%;
+  /* ── Sidebar (slightly elevated tone) ─────────────────── */
+  --sidebar-background: 210 30% 98%;
+  --sidebar-foreground: 215 18% 42%;
+
+  --sidebar-primary: 232 68% 46%;
+  --sidebar-primary-foreground: 0 0% 100%;
+
+  --sidebar-accent: 232 60% 96%;
+  --sidebar-accent-foreground: 232 55% 38%;
+
+  --sidebar-border: 214 28% 88%;
+  --sidebar-ring: 232 68% 46%;
 }
 
+
+/* ── Tailwind Theme Mapping ─────────────────────────────── */
 @theme inline {
-  --color-background:             hsl(var(--background));
-  --color-foreground:             hsl(var(--foreground));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
 
-  --color-card:                   hsl(var(--card));
-  --color-card-foreground:        hsl(var(--card-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
 
-  --color-popover:                hsl(var(--popover));
-  --color-popover-foreground:     hsl(var(--popover-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
 
-  --color-primary:                hsl(var(--primary));
-  --color-primary-foreground:     hsl(var(--primary-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
 
-  --color-secondary:              hsl(var(--secondary));
-  --color-secondary-foreground:   hsl(var(--secondary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
 
-  --color-muted:                  hsl(var(--muted));
-  --color-muted-foreground:       hsl(var(--muted-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
 
-  --color-accent:                 hsl(var(--accent));
-  --color-accent-foreground:      hsl(var(--accent-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
 
-  --color-destructive:            hsl(var(--destructive));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 
-  --color-border:                 hsl(var(--border));
-  --color-input:                  hsl(var(--input));
-  --color-ring:                   hsl(var(--ring));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
 
+  /* Radius scale */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
+  /* Animations */
   --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up:   accordion-up   0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
 
-  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  /* Shadows (clean SaaS style) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-card: 0 2px 6px -1px rgb(0 0 0 / 0.06),
+    0 1px 3px -1px rgb(0 0 0 / 0.04);
+  --shadow-elevated: 0 8px 24px -6px rgb(0 0 0 / 0.08);
 }
 
+
+/* ── Base Layer ─────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
@@ -117,14 +143,47 @@
   }
 }
 
-/* Utility helpers kept minimal */
+
+/* ── UX Utilities (ERP-focused) ─────────────────────────── */
+
+/* Premium glass effect (use sparingly) */
 .glass-card {
-  background: hsl(0 0% 100% / 0.75);
-  backdrop-filter: blur(12px);
+  background: hsl(0 0% 100% / 0.7);
+  backdrop-filter: blur(14px);
   border: 1px solid hsl(var(--border));
   box-shadow: var(--shadow-card);
 }
 
+/* Clean card for dashboards */
+.erp-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+}
+
+.erp-card:hover {
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-1px);
+}
+
+/* Subtle depth */
 .subtle-shadow {
   box-shadow: var(--shadow-sm);
+}
+
+/* Interactive states */
+.interactive {
+  transition: all 0.2s ease;
+}
+
+.interactive:hover {
+  background: hsl(var(--accent));
+}
+
+/* Focus ring (very important for UX) */
+.focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.25);
 }
