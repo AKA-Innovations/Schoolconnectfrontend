@@ -1,25 +1,83 @@
 import api from '../lib/api';
-import { 
-  Teacher, 
-  TeacherSummary, 
-  TeacherRegistrationData, 
-  TeacherUpdateDetails, 
-  TeacherClass, 
-  Address, 
+import {
+  Teacher,
+  TeacherSummary,
+  TeacherRegistrationData,
+  TeacherUpdateDetails,
+  TeacherClass,
+  Address,
   SchoolRecord,
   TeacherFilterParams
 } from '../types/roles';
 import { mockAdminSummary, mockTeacherSummary } from '../lib/mockData';
 
-const DEV_MODE = true; // Set to true to use mock data
+/** Map the backend TeacherDtls shape to the frontend Teacher interface.
+ * Works for both list response (schoolRecord: single object) and
+ * detail response (same shape). */
+function mapBackendTeacher(t: any): Teacher {
+  // Both list and detail endpoints return `schoolRecord` (single object)
+  const schoolRecord = t.schoolRecord ?? {};
+  return {
+    id: t.id,
+    firstName: t.firstName ?? '',
+    lastName: t.lastName ?? '',
+    emailId: t.emailId,
+    employeeEmail: schoolRecord.employeeEmail ?? t.emailId,
+    mobileNumber: t.mobileNumber,
+    alternateMobileNumber: t.alternateMobileNumber,
+    // Both endpoints return `classes` array
+    classes: (t.classes ?? []).map((c: any): TeacherClass => ({
+      id: c.id,
+      className: c.className,
+      sectionName: c.sectionName,
+      subjectName: c.subjectName,
+    })),
+    status: t.isActive === false ? 'inactive' : 'active',
+    schoolId: t.schoolId,
+    employeeId: t.employeeId,
+    joiningDate: schoolRecord.joiningDate ?? '',
+    dateOfBirth: t.dateOfBirth ?? '',
+    gender: t.gender ?? '',
+    isPrincipal: t.isPrincipal ?? false,
+    isCoordinator: t.isCoordinator ?? false,
+    isClassTeacher: t.isClassTeacher ?? false,
+    isSubjectTeacher: t.isSubjectTeacher ?? false,
+    profileImageUrl: t.profileImageUrl,
+    // Detail endpoint returns `addresses`, list does not
+    addresses: (t.addresses ?? []).map((a: any): Address => ({
+      id: a.id,
+      isPermanent: a.isPermanent ?? false,
+      address: a.address,
+      state: a.state,
+      city: a.city,
+      country: a.country,
+      pincode: a.pincode,
+      googleAddressUrl: a.googleAddressUrl,
+      latitude: a.latitude,
+      longitude: a.longitude,
+    })),
+    schoolRecords: schoolRecord.id ? [{
+      id: schoolRecord.id,
+      employeeId: schoolRecord.employeeId,
+      joiningDate: schoolRecord.joiningDate,
+      employeeEmail: schoolRecord.employeeEmail,
+    }] : [],
+    teacherPersonalData: t.teacherPersonalData,
+    teacherAcademicData: t.teacherAcademicData,
+    teacherProfessionalData: t.teacherProfessionalData,
+    teacherFamilyDetails: t.teacherFamilyDetails,
+  };
+}
+
+const DEV_MODE = false; // Set to true to use mock data
 
 export const teacherService = {
   getSummary: async (): Promise<TeacherSummary> => {
     if (DEV_MODE) {
       return new Promise((resolve) => setTimeout(() => resolve(mockTeacherSummary), 800));
     }
-    const response = await api.get('/teacher/dashboard-summary');
-    return response.data;
+    // Teacher dashboard summary is not implemented in the backend yet; fall back to mock
+    return new Promise((resolve) => setTimeout(() => resolve(mockTeacherSummary), 800));
   },
 
   registerTeacher: async (data: TeacherRegistrationData): Promise<any> => {
@@ -91,7 +149,8 @@ export const teacherService = {
       }
       throw new Error('Teacher not found');
     }
-    const response = await api.delete(`/teacher/${id}`);
+    // Backend has no DELETE /teacher/:id — mark as inactive via details update
+    const response = await api.put(`/teacher/${id}/details`, { isActive: false });
     return response.data;
   },
 
@@ -134,26 +193,31 @@ export const teacherService = {
     if (DEV_MODE) {
       let teachers = [...mockAdminSummary.teachers];
       if (params.schoolId) teachers = teachers.filter(t => t.schoolId === params.schoolId);
-      if (params.subjectName) teachers = teachers.filter(t => 
+      if (params.subjectName) teachers = teachers.filter(t =>
         t.classes.some(c => c.subjectName?.toLowerCase().includes(params.subjectName!.toLowerCase()))
       );
-      if (params.firstName) teachers = teachers.filter(t => 
+      if (params.firstName) teachers = teachers.filter(t =>
         t.firstName.toLowerCase().includes(params.firstName!.toLowerCase()) ||
         t.lastName.toLowerCase().includes(params.firstName!.toLowerCase())
       );
-      
+
       const page = params.page || 1;
       const pageSize = params.pageSize || 10;
       const start = (page - 1) * pageSize;
       const end = start + pageSize;
-      
+
       return new Promise((resolve) => setTimeout(() => resolve({
         data: teachers.slice(start, end),
         total: teachers.length
       }), 500));
     }
     const response = await api.get('/teacher', { params });
-    return response.data;
+    // Backend returns { items: TeacherDtls[], pagination: { totalItemsCount, ... } }
+    const raw = response.data;
+    return {
+      data: (raw.items || []).map(mapBackendTeacher),
+      total: raw.pagination?.totalItemsCount || 0,
+    };
   },
 
   getTeacherById: async (id: string): Promise<Teacher> => {
@@ -165,6 +229,7 @@ export const teacherService = {
       throw new Error('Teacher not found');
     }
     const response = await api.get(`/teacher/${id}`);
-    return response.data;
+    // Backend returns { message, data: { ...teacher } } — unwrap the data envelope
+    return mapBackendTeacher(response.data?.data ?? response.data);
   }
 };

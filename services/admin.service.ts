@@ -2,15 +2,43 @@ import api from '../lib/api';
 import { AdminSummary, Teacher, Student, Class } from '../types/roles';
 import { mockAdminSummary } from '../lib/mockData';
 
-const DEV_MODE = true; // Toggle for mock vs real API
+const DEV_MODE = false; // Toggle for mock vs real API
 
 export const adminService = {
-  getSummary: async (): Promise<AdminSummary> => {
+  getSummary: async (schoolId: string): Promise<AdminSummary> => {
     if (DEV_MODE) {
       return new Promise((resolve) => setTimeout(() => resolve(mockAdminSummary), 800));
     }
-    const response = await api.get('/admin/dashboard-summary');
-    return response.data;
+    // Compose dashboard summary from available backend endpoints
+    const [schoolRes, teachersRes] = await Promise.all([
+      api.get(`/school/${schoolId}`),
+      api.get('/teacher', { params: { schoolId, pageSize: 1 } }),
+    ]);
+
+    const school = schoolRes.data;
+    const teacherCount: number = teachersRes.data?.pagination?.totalItemsCount ?? 0;
+
+    const ownerName = school.ownerDetails
+      ? `${school.ownerDetails.firstName} ${school.ownerDetails.lastName}`
+      : '—';
+
+    return {
+      kpis: [
+        { label: 'Total Teachers', value: teacherCount, trendType: 'neutral', iconName: 'Users' },
+      ],
+      school: {
+        id: school.id,
+        name: school.name,
+        principal: ownerName,
+        totalStudents: 0,
+        totalTeachers: teacherCount,
+        totalClasses: 0,
+      },
+      teachers: [],
+      students: [],
+      classes: [],
+      recentData: [],
+    };
   },
 
   // Teacher management

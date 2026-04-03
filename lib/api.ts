@@ -1,7 +1,28 @@
 import axios from 'axios';
 
+function resolveApiBaseUrl() {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const fallbackBaseUrl = 'http://127.0.0.1:3000';
+
+  if (!configuredBaseUrl) {
+    return fallbackBaseUrl;
+  }
+
+  try {
+    const parsedUrl = new URL(configuredBaseUrl);
+
+    if (parsedUrl.hostname === 'localhost') {
+      parsedUrl.hostname = '127.0.0.1';
+    }
+
+    return parsedUrl.toString().replace(/\/$/, '');
+  } catch {
+    return configuredBaseUrl;
+  }
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://unscaffolded-carman-hoarsely.ngrok-free.dev',
+  baseURL: resolveApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },

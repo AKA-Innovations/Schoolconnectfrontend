@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeacherManagement } from '@/components/admin/TeacherManagement';
 import { StudentManagement } from '@/components/admin/StudentManagement';
+import { SchoolManagement } from '@/components/admin/SchoolManagement';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
   Plus, Users, School, GraduationCap,
   Search, Bell, ArrowRight, LayoutDashboard,
-  Settings2, Download
+  Settings2, Download, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SlidingTabs from '@/components/admin/tabs';
@@ -29,10 +30,11 @@ export default function AdminDashboard() {
     { label: 'Teachers', value: 'teachers', icon: School },
     { label: 'Admin', value: 'overview', icon: Settings2 },
     { label: 'Student', value: 'students', icon: GraduationCap },
+    { label: 'School', value: 'school', icon: Building2 },
   ];
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab) setActiveTab(tab);
+    setActiveTab(tab ?? 'overview');
   }, [searchParams]);
 
   const handleTabChange = (tabId: string) => {
@@ -65,7 +67,7 @@ export default function AdminDashboard() {
 
                   {/* MAIN PROFILE: Using your .erp-card class */}
                   <div className="lg:col-span-8">
-                    <div className="erp-card p-8 bg-card">
+                    <div className="erp-card p-4 bg-card">
                       <div className="flex flex-row items-start justify-between mb-10">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest">
@@ -88,7 +90,7 @@ export default function AdminDashboard() {
                         ].map((item, i) => (
                           <div key={i} className="p-6 rounded-xl border border-border bg-background/30 hover:bg-card hover:border-primary/20 transition-all group">
                             <item.icon className={cn("mb-4", item.color)} size={20} />
-                            <div className="text-3xl font-black text-foreground tabular-nums tracking-tight">{item.value ?? '0'}</div>
+                            <div className="text-3xl font-bold text-foreground tabular-nums tracking-tight">{item.value ?? '0'}</div>
                             <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-1">{item.label}</div>
                           </div>
                         ))}
@@ -114,7 +116,7 @@ export default function AdminDashboard() {
                   {/* SIDEBAR: Utility Cards */}
                   <aside className="lg:col-span-4 space-y-8">
                     <div className="space-y-4">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Control Panel</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] px-1">Control Panel</p>
                       <QuickActions actions={actions} />
                     </div>
 
@@ -161,6 +163,14 @@ export default function AdminDashboard() {
               <TabsContent key="students" value="students" className="outline-none">
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <StudentManagement />
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {activeTab === 'school' && (
+              <TabsContent key="school" value="school" className="outline-none">
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                  <SchoolManagement />
                 </motion.div>
               </TabsContent>
             )}

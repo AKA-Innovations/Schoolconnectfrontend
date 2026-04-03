@@ -9,7 +9,7 @@ import {
   GraduationCap, Calendar, MessageSquare, ClipboardCheck,
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
-  Sparkles
+  Sparkles, Building2, UserCog,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { Role } from '../../types/roles';
@@ -24,9 +24,11 @@ const sidebarLinks: Record<Role, any[]> = {
     { name: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
   ],
   school_admin: [
-    { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-    { name: 'Teachers', href: '/dashboard/admin?tab=teachers', icon: Users },
-    { name: 'Students', href: '/dashboard/admin?tab=students', icon: GraduationCap },
+    { name: 'Dashboard',     href: '/dashboard/admin',          icon: LayoutDashboard },
+    { name: 'Teachers',      href: '/dashboard/admin?tab=teachers', icon: Users },
+    { name: 'Students',      href: '/dashboard/admin?tab=students', icon: GraduationCap },
+    { name: 'School Profile', href: '/dashboard/admin/school',  icon: Building2 },
+    { name: 'My Profile',    href: '/dashboard/admin/profile',  icon: UserCog },
   ],
   principal: [
     { name: 'Dashboard', href: '/dashboard/principal', icon: LayoutDashboard },

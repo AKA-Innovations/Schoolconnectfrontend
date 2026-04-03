@@ -77,21 +77,21 @@ export interface TeacherRegistrationData {
 }
 
 export interface TeacherUpdateDetails {
-  isPrincipal: boolean;
-  isCoordinator: boolean;
-  isClassTeacher: boolean;
-  isSubjectTeacher: boolean;
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  gender: string;
-  mobileNumber: string;
+  isPrincipal?: boolean;
+  isCoordinator?: boolean;
+  isClassTeacher?: boolean;
+  isSubjectTeacher?: boolean;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  mobileNumber?: string;
   alternateMobileNumber?: string;
-  emailId: string;
-  teacherPersonalData?: any;
-  teacherAcademicData?: any;
-  teacherProfessionalData?: any;
-  teacherFamilyDetails?: any;
+  emailId?: string;
+  teacherPersonalData?: Record<string, any>;
+  teacherAcademicData?: Record<string, any>;
+  teacherProfessionalData?: Record<string, any>;
+  teacherFamilyDetails?: Record<string, any>;
 }
 
 export interface Student {

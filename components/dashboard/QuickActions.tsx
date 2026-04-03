@@ -18,15 +18,15 @@ export function QuickActions({ actions }: QuickActionsProps) {
   return (
     <Card className="erp-card bg-card/60 backdrop-blur-sm">
       <CardHeader className="pb-3 pt-6 px-6">
-        <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">
+        <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em]">
           Control Panel
         </p>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-2.5 pb-6 px-6">
         {actions.map((action, idx) => (
-          <Button 
-            key={idx} 
-            variant="secondary" 
+          <Button
+            key={idx}
+            variant="secondary"
             className="justify-between group h-11 px-4 rounded-xl bg-background/50 border border-border/40 hover:bg-background hover:border-primary/20 transition-all duration-500 shadow-sm"
             onClick={action.onClick}
           >

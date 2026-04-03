@@ -15,7 +15,7 @@ export const mockAdminSummary: AdminSummary = {
     totalTeachers: 25,
     totalClasses: 18,
   },
-  teachersq: [
+  teachers: [
     {
       id: '1',
       name: 'Alice Brown',

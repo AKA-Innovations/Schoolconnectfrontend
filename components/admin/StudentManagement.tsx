@@ -143,7 +143,7 @@ export function StudentManagement() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em]">
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-[0.3em]">
             <div className="h-1 w-6 bg-indigo-600 rounded-full" />
             Academic Registry
           </div>
@@ -152,7 +152,7 @@ export function StudentManagement() {
 
         <div className="flex items-center gap-3">
           <Button variant="outline" className="rounded-2xl border-slate-200 hover:bg-slate-50 font-bold text-xs h-11 px-6 shadow-sm transition-all">
-            <Download className="mr-2 h-4 w-4 text-slate-400" /> Export CSV
+            <Download className="mr-2 h-4 w-4 text-slate-500" /> Export CSV
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -162,7 +162,7 @@ export function StudentManagement() {
             </DialogTrigger>
             {/* Add Dialog Content - Simplified for brevity but keeps your structure */}
             <DialogContent className="max-w-xl rounded-[2.5rem] border-none shadow-2xl p-8">
-              <DialogHeader><DialogTitle className="text-2xl font-black">New Enrollment</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle className="text-2xl font-bold">New Enrollment</DialogTitle></DialogHeader>
               {/* Form Fields... */}
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <Input placeholder="Full Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
@@ -177,12 +177,12 @@ export function StudentManagement() {
       </div>
 
       {/* Filter Engine */}
-      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/40">
+      <div className="bg-white z-10 border border-slate-100 rounded-[2.5rem] p-2 shadow-xl shadow-slate-200/40">
         <div className="flex flex-wrap items-center gap-4">
 
           {/* Search Box */}
           <div className="relative flex-[1_1_350px] group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 transition-colors" />
             <Input
               placeholder="Search by scholar identity or digital mail..."
               value={searchTerm}
@@ -201,7 +201,7 @@ export function StudentManagement() {
               <button
                 onClick={() => setActiveDropdown(activeDropdown === 'grade' ? null : 'grade')}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all",
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all",
                   gradeFilter ? "bg-indigo-50 border-indigo-100 text-indigo-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                 )}
               >
@@ -227,7 +227,7 @@ export function StudentManagement() {
               <button
                 onClick={() => setActiveDropdown(activeDropdown === 'class' ? null : 'class')}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all",
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all",
                   classFilter ? "bg-purple-50 border-purple-100 text-purple-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                 )}
               >
@@ -253,7 +253,7 @@ export function StudentManagement() {
               <button
                 onClick={() => setActiveDropdown(activeDropdown === 'status' ? null : 'status')}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all",
+                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all",
                   statusFilter ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
                 )}
               >
@@ -276,15 +276,15 @@ export function StudentManagement() {
           </div>
 
           {/* Reset & Count */}
-          <div className="ml-auto flex items-center gap-6">
+          <div className="ml-auto flex items-center gap-6 pr-4">
             {(searchTerm || gradeFilter || statusFilter || classFilter) && (
-              <button onClick={() => { setSearchTerm(''); setGradeFilter(''); setStatusFilter(''); setClassFilter('') }} className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 transition-colors">
+              <button onClick={() => { setSearchTerm(''); setGradeFilter(''); setStatusFilter(''); setClassFilter('') }} className="text-[10px] font-bold uppercase tracking-widest text-rose-500 hover:text-rose-600 transition-colors">
                 Reset All
               </button>
             )}
-            <div className="text-right">
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Total Active</p>
-              <p className="text-xl font-black text-slate-900 leading-none">{filteredStudents.length}</p>
+            <div className="text-right flex flex-col align-center justify-center items-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Total Active</p>
+              <p className="text-xl font-bold  text-green-600 leading-none">{filteredStudents.length}</p>
             </div>
           </div>
         </div>
@@ -295,11 +295,11 @@ export function StudentManagement() {
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b border-slate-100">
-              <TableHead className="h-14 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 pl-8">Learner Identity</TableHead>
-              <TableHead className="h-14 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Academic Node</TableHead>
-              <TableHead className="h-14 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Contact Matrix</TableHead>
-              <TableHead className="h-14 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Status</TableHead>
-              <TableHead className="h-14 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 text-right pr-8">Actions</TableHead>
+              <TableHead className="h-14 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 pl-8">Learner Identity</TableHead>
+              <TableHead className="h-14 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Academic Node</TableHead>
+              <TableHead className="h-14 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Contact Matrix</TableHead>
+              <TableHead className="h-14 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Status</TableHead>
+              <TableHead className="h-14 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 text-right pr-8">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -311,7 +311,7 @@ export function StudentManagement() {
               <TableRow key={student.id} className="group hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-none">
                 <TableCell className="py-5 pl-8">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center font-black text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
+                    <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
                       {student.name.charAt(0)}
                     </div>
                     <div>
@@ -331,15 +331,15 @@ export function StudentManagement() {
                     <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                       <Mail size={12} className="text-slate-300" /> {student.email}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-tight">
                       <Phone size={12} className="text-slate-300" /> {student.phone || "No Contact"}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter",
-                    student.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter",
+                    student.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
                   )}>
                     <div className={cn("w-1 h-1 rounded-full", student.status === 'active' ? "bg-emerald-500" : "bg-slate-400")} />
                     {student.status || 'Active'}
@@ -361,7 +361,7 @@ export function StudentManagement() {
 
         {/* Improved Pagination */}
         <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Showing <span className="text-indigo-600">{filteredStudents.length}</span> Scholars</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Showing <span className="text-indigo-600">{filteredStudents.length}</span> Scholars</p>
           <div className="flex items-center gap-2">
             <Button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} variant="outline" className="h-9 rounded-xl border-slate-200 text-xs font-bold px-4">Previous</Button>
             <div className="h-9 px-4 flex items-center bg-white border border-slate-200 rounded-xl text-[10px] font-bold text-slate-900">Page {currentPage} of {totalPages}</div>

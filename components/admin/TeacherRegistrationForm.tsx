@@ -24,27 +24,32 @@ const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
 export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: TeacherRegistrationFormProps) {
   const { schoolId } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const isEditMode = !!initialData?.id;
 
-  const [formData, setFormData] = useState<TeacherRegistrationData>({
-    username: '',
+  const [formData, setFormData] = useState<TeacherRegistrationData>(() => ({
+    username: initialData?.username ?? '',
     password: '',
-    schoolId: schoolId || '',
-    employeeId: '',
-    isPrincipal: false,
-    isCoordinator: false,
-    isClassTeacher: false,
-    isSubjectTeacher: false,
-    firstName: '',
-    lastName: '',
-    dateOfBirth: '',
-    gender: '',
-    mobileNumber: '',
-    alternateMobileNumber: '',
-    emailId: '',
-    joiningDate: '',
-    employeeEmail: '',
-    classes: [],
-  });
+    schoolId: initialData?.schoolId ?? schoolId ?? '',
+    employeeId: initialData?.employeeId ?? '',
+    isPrincipal: initialData?.isPrincipal ?? false,
+    isCoordinator: initialData?.isCoordinator ?? false,
+    isClassTeacher: initialData?.isClassTeacher ?? false,
+    isSubjectTeacher: initialData?.isSubjectTeacher ?? false,
+    firstName: initialData?.firstName ?? '',
+    lastName: initialData?.lastName ?? '',
+    dateOfBirth: initialData?.dateOfBirth
+      ? new Date(initialData.dateOfBirth).toISOString().slice(0, 10)
+      : '',
+    gender: initialData?.gender ?? '',
+    mobileNumber: initialData?.mobileNumber ?? '',
+    alternateMobileNumber: initialData?.alternateMobileNumber ?? '',
+    emailId: initialData?.emailId ?? '',
+    joiningDate: initialData?.schoolRecords?.[0]?.joiningDate
+      ? new Date(initialData.schoolRecords[0].joiningDate).toISOString().slice(0, 10)
+      : '',
+    employeeEmail: initialData?.employeeEmail ?? initialData?.schoolRecords?.[0]?.employeeEmail ?? '',
+    classes: initialData?.classes ?? [],
+  }));
 
   const [newClass, setNewClass] = useState<TeacherClass>({
     className: '',
@@ -82,11 +87,27 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
     e.preventDefault();
     setLoading(true);
     try {
-      await teacherService.registerTeacher(formData);
+      if (isEditMode) {
+        await teacherService.updateTeacherDetails(initialData.id, {
+          isPrincipal: formData.isPrincipal,
+          isCoordinator: formData.isCoordinator,
+          isClassTeacher: formData.isClassTeacher,
+          isSubjectTeacher: formData.isSubjectTeacher,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          dateOfBirth: formData.dateOfBirth,
+          gender: formData.gender,
+          mobileNumber: formData.mobileNumber,
+          alternateMobileNumber: formData.alternateMobileNumber,
+          emailId: formData.emailId,
+        });
+      } else {
+        await teacherService.registerTeacher(formData);
+      }
       onSuccess();
     } catch (error) {
       console.error(error);
-      alert('Registration protocol failed.');
+      alert(isEditMode ? 'Update failed. Please try again.' : 'Registration protocol failed.');
     } finally {
       setLoading(false);
     }
@@ -107,9 +128,9 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="h-1.5 w-6 bg-indigo-600 rounded-full" />
-              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Institutional Node</span>
+              <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Institutional Node</span>
             </div>
-            <h2 className="text-3xl font-black tracking-tight text-slate-900">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">
               {initialData ? 'Update Profile' : 'Onboard Faculty'}
             </h2>
           </div>
@@ -131,35 +152,56 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                 <ShieldCheck size={20} />
               </div>
-              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Personal Identity</h3>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900">Personal Identity</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">First Given Name</label>
-                <input name="firstName" required value={formData.firstName} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="e.g. Jean" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">First Given Name</label>
+                <input name="firstName" required value={formData.firstName} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="e.g. Jean" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Surname</label>
-                <input name="lastName" required value={formData.lastName} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="e.g. Grey" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Surname</label>
+                <input name="lastName" required value={formData.lastName} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="e.g. Grey" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Birth Date</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Birth Date</label>
                 <div className="relative">
                   <Calendar className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
-                  <input name="dateOfBirth" type="date" required value={formData.dateOfBirth} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" />
+                  <input name="dateOfBirth" type="date" required value={formData.dateOfBirth} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Gender Matrix</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Gender</label>
                 <div className="relative">
                   <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 pointer-events-none" />
-                  <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-none rounded-2xl text-sm font-bold appearance-none focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all">
+                  <select name="gender" required value={formData.gender} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold appearance-none focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all">
                     <option value="">Select Option</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Mobile Number</label>
+                <div className="relative">
+                  <Phone className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                  <input name="mobileNumber" type="tel" required value={formData.mobileNumber} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="+91 9999999999" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Personal Email</label>
+                <div className="relative">
+                  <Mail className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                  <input name="emailId" type="email" required value={formData.emailId} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="teacher@email.com" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Alternate Mobile <span className="text-slate-300">(optional)</span></label>
+                <div className="relative">
+                  <Phone className="absolute right-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
+                  <input name="alternateMobileNumber" type="tel" value={formData.alternateMobileNumber ?? ''} onChange={handleInputChange} className="w-full h-14 px-6 bg-slate-50/50 border-1 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all" placeholder="+91 8888888888" />
                 </div>
               </div>
             </div>
@@ -172,9 +214,9 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
                 <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
                   <SchoolIcon size={20} />
                 </div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Pedagogy Scope</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900">Pedagogy Scope</h3>
               </div>
-              <span className="text-[10px] font-black px-3 py-1 bg-slate-100 rounded-full text-slate-500 uppercase tracking-tighter">
+              <span className="text-[10px] font-bold px-3 py-1 bg-slate-100 rounded-full text-slate-500 uppercase tracking-tighter">
                 {formData.classes.length} Linked Assignments
               </span>
             </div>
@@ -182,16 +224,16 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
             {/* Class Adder UI */}
             <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-wrap gap-4 items-end mb-8">
               <div className="flex-1 min-w-[120px] space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Grade</label>
-                <input placeholder="10" value={newClass.className} onChange={e => setNewClass({ ...newClass, className: e.target.value })} className="w-full h-12 px-4 bg-white border-none rounded-xl text-xs font-bold outline-none" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Grade</label>
+                <input placeholder="10" value={newClass.className} onChange={e => setNewClass({ ...newClass, className: e.target.value })} className="w-full h-12 px-4 bg-white border-1 rounded-xl text-xs font-bold outline-none" />
               </div>
               <div className="flex-1 min-w-[80px] space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Section</label>
-                <input placeholder="A" value={newClass.sectionName} onChange={e => setNewClass({ ...newClass, sectionName: e.target.value })} className="w-full h-12 px-4 bg-white border-none rounded-xl text-xs font-bold outline-none" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Section</label>
+                <input placeholder="A" value={newClass.sectionName} onChange={e => setNewClass({ ...newClass, sectionName: e.target.value })} className="w-full h-12 px-4 bg-white border-1 rounded-xl text-xs font-bold outline-none" />
               </div>
               <div className="flex- min-w-[150px] space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Expertise</label>
-                <input placeholder="Quantum Physics" value={newClass.subjectName} onChange={e => setNewClass({ ...newClass, subjectName: e.target.value })} className="w-full h-12 px-4 bg-white border-none rounded-xl text-xs font-bold outline-none" />
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Expertise</label>
+                <input placeholder="Quantum Physics" value={newClass.subjectName} onChange={e => setNewClass({ ...newClass, subjectName: e.target.value })} className="w-full h-12 px-4 bg-white border-1 rounded-xl text-xs font-bold outline-none" />
               </div>
               <button type="button" onClick={addClass} className="h-12 w-12 bg-indigo-600 hover:bg-slate-900 text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-indigo-100">
                 <Plus size={20} />
@@ -208,7 +250,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
                     className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl group hover:border-indigo-200 transition-all shadow-sm"
                   >
                     <div>
-                      <p className="text-xs font-black text-slate-900">Grade {cls.className} — {cls.sectionName}</p>
+                      <p className="text-xs font-bold text-slate-900">Grade {cls.className} — {cls.sectionName}</p>
                       <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">{cls.subjectName}</p>
                     </div>
                     <button type="button" onClick={() => removeClass(idx)} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-all">
@@ -220,7 +262,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
               {formData.classes.length === 0 && (
                 <div className="col-span-full py-12 border-2 border-dashed border-slate-100 rounded-[2rem] flex flex-col items-center justify-center opacity-30">
                   <Globe size={32} className="mb-2" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Awaiting Pedagogical Mapping</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest">Awaiting Pedagogical Mapping</p>
                 </div>
               )}
             </div>
@@ -236,22 +278,30 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
               <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                 <Briefcase size={20} />
               </div>
-              <h3 className="text-sm font-black uppercase tracking-widest">Employment</h3>
+              <h3 className="text-sm font-bold uppercase tracking-widest">Employment</h3>
             </div>
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Corporate ID</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">School ID</label>
+                <input name="schoolId" required value={formData.schoolId} onChange={handleInputChange} className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold focus:bg-white/10 outline-none transition-all" placeholder="School UUID" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Employee ID</label>
                 <input name="employeeId" required value={formData.employeeId} onChange={handleInputChange} className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold focus:bg-white/10 outline-none transition-all" placeholder="FAC-001" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Professional Email</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Joining Date</label>
+                <input name="joiningDate" type="date" required value={formData.joiningDate} onChange={handleInputChange} className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold focus:bg-white/10 outline-none transition-all" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Professional Email</label>
                 <input name="employeeEmail" type="email" required value={formData.employeeEmail} onChange={handleInputChange} className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold focus:bg-white/10 outline-none transition-all" placeholder="faculty@institution.edu" />
               </div>
 
               {/* Roles Matrix */}
               <div className="pt-6 mt-6 border-t border-white/10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Institutional Roles</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400">Institutional Roles</p>
                 <div className="space-y-2">
                   {[
                     { id: 'isPrincipal', label: 'Principal Seat' },
@@ -281,12 +331,12 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           <section className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-xl shadow-slate-200/40">
             <div className="flex items-center gap-3 mb-6">
               <Fingerprint className="text-indigo-600" size={18} />
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Security Credentials</h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-900">Security Credentials</h3>
             </div>
             <div className="space-y-4">
-              <input name="username" required value={formData.username} onChange={handleInputChange} className="w-full h-12 px-5 bg-slate-50 border-none rounded-xl text-xs font-bold outline-none" placeholder="System Username" />
+              <input name="username" required value={formData.username} onChange={handleInputChange} className="w-full h-12 px-5 bg-slate-50 border-1 rounded-xl text-xs font-bold outline-none" placeholder="System Username" />
               {!initialData && (
-                <input name="password" type="password" required value={formData.password} onChange={handleInputChange} className="w-full h-12 px-5 bg-slate-50 border-none rounded-xl text-xs font-bold outline-none" placeholder="Access Password" />
+                <input name="password" type="password" required value={formData.password} onChange={handleInputChange} className="w-full h-12 px-5 bg-slate-50 border-1 rounded-xl text-xs font-bold outline-none" placeholder="Access Password" />
               )}
             </div>
           </section>
@@ -296,7 +346,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
             <button
               disabled={loading}
               type="submit"
-              className="w-full h-16 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-sm shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+              className="w-full h-16 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-bold text-sm shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95"
             >
               {loading ? 'Processing protocol...' : (
                 <>
@@ -308,7 +358,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
             <button
               type="button"
               onClick={onCancel}
-              className="w-full h-12 text-slate-400 hover:text-rose-500 font-black text-[10px] uppercase tracking-widest transition-colors"
+              className="w-full h-12 text-slate-400 hover:text-rose-500 font-bold text-[10px] uppercase tracking-widest transition-colors"
             >
               Abort Mission
             </button>
