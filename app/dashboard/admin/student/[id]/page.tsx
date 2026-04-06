@@ -1,273 +1,294 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  ArrowLeft, User, Phone, Mail, Fingerprint, ShieldAlert,
-  TrendingUp, Download, Edit3, MoreHorizontal, CreditCard,
-  MessageSquare, Calendar
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// Mock components from your UI folder
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { adminService } from '@/services/admin.service';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Camera, Trash2, User, RefreshCw, Phone, Calendar, BookOpen, Heart, MapPin, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useStudent, useUpdateStudentStatus, useUploadStudentImage, useDeleteStudentImage } from '@/hooks/useStudents';
+import { PersonalTab } from '@/components/admin/student/tabs/PersonalTab';
+import { AcademicTab } from '@/components/admin/student/tabs/AcademicTab';
+import { ParentsTab } from '@/components/admin/student/tabs/ParentsTab';
+import { MedicalTab } from '@/components/admin/student/tabs/MedicalTab';
+import { AddressTab } from '@/components/admin/student/tabs/AddressTab';
 
-const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
+const AcademicAnalysis = dynamic(() => import('@/components/admin/student/AcademicAnalysis'), { ssr: false });
+
+function ParentsIcon({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function ProfileImageSection({ studentId, profileImageUrl }: { studentId: string; profileImageUrl?: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadMutation = useUploadStudentImage(studentId);
+  const deleteMutation = useDeleteStudentImage(studentId);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file, {
+      onError: () => alert('Upload failed.'),
+    });
+    e.target.value = '';
+  };
+
+  const handleDelete = () => {
+    if (!confirm('Delete profile image?')) return;
+    deleteMutation.mutate(undefined, {
+      onError: () => alert('Delete failed.'),
+    });
+  };
+
+  const busy = uploadMutation.isPending || deleteMutation.isPending;
+
+  return (
+    <div className="shrink-0  relative group cursor-pointer">
+      <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50">
+        {profileImageUrl ? (
+          <img src={profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+        ) : (
+          <div className="text-primary/60 font-bold text-3xl uppercase tracking-tighter">
+            {/* Placeholder initials */}
+          </div>
+        )}
+        <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
+            <Camera className="h-3 w-3" />
+            {busy ? 'Uploading…' : 'Upload'}
+          </button>
+          {profileImageUrl && (
+            <button type="button" onClick={handleDelete}
+              className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
+              <Trash2 className="h-3 w-3" />Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+      <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-card shadow-sm flex items-center justify-center">
+        <ShieldCheck className="h-3 w-3 text-white" />
+      </div>
+    </div>
+  );
+}
 
 export default function StudentProfilePage() {
   const params = useParams();
   const router = useRouter();
   const studentId = params.id as string;
+  const { data: student, isLoading, isFetching, refetch } = useStudent(studentId);
+  const statusMutation = useUpdateStudentStatus(studentId);
+  const [activeTab, setActiveTab] = useState('personal');
 
-  const [student, setStudent] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const toggleStatus = () => {
+    const next = student?.status === 'Active' ? 'Inactive' : 'Active';
+    statusMutation.mutate(next);
+  };
 
-  const tabs = ['Overview', 'Academic', 'Registry', 'Billing'];
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4 animate-pulse">
+        <div className="h-24 w-24 rounded-full bg-muted" />
+        <div className="h-8 bg-muted rounded w-48" />
+        <div className="h-4 bg-muted rounded w-64" />
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    const loadData = async () => {
-      const summary = await adminService.getSummary();
-      const found = summary.students.find((s: any) => s.id === studentId);
-      setStudent(found);
-      setLoading(false);
-    };
-    loadData();
-  }, [studentId]);
+  if (!student) {
+    return (
+      <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border/50">
+        <User className="h-12 w-12 mx-auto mb-4 opacity-20" />
+        <h3 className="text-xl font-bold">Student Not Found</h3>
+        <p className="text-muted-foreground mt-2">The record may have been relocated or deleted.</p>
+        <Button variant="outline" onClick={() => router.back()} className="mt-6 rounded-xl">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Directory
+        </Button>
+      </div>
+    );
+  }
 
-  if (loading) return (
-    <div className="h-screen w-full flex items-center justify-center bg-[#F8FAFC] text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-      Initializing Registry...
-    </div>
-  );
+  const tabs = [
+    { id: 'personal', label: 'Personal', icon: <User size={13} /> },
+    { id: 'academic', label: 'Academic', icon: <BookOpen size={13} /> },
+    { id: 'analysis', label: 'Analysis', icon: <BookOpen size={13} /> },
+    { id: 'parents', label: 'Parents', icon: <ParentsIcon size={13} /> },
+    { id: 'medical', label: 'Medical', icon: <Heart size={13} /> },
+    { id: 'address', label: 'Address', icon: <MapPin size={13} /> },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 md:px-8 md:py-4 font-sans">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className=" m-4 my-4  space-y-6 animate-in fade-in duration-500">
 
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="p-2.5 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors">
-              <ArrowLeft size={18} className="text-slate-500" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{student?.name}</h1>
-                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[10px] font-bold uppercase tracking-tighter shadow-none">
-                  {student?.status || 'Active'}
+      {/* Header / Profile Card */}
+      <Card className="overflow-hidden border-border shadow-sm">
+        <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
+          <ProfileImageSection studentId={studentId} profileImageUrl={student.profileImageUrl} />
+          <div className="flex-1 text-center md:text-left space-y-1.5">
+            <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1.5">
+              <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border border-border/40">
+                {student.academics?.[0]?.rollNumber || student.id.slice(-6).toUpperCase()}
+              </span>
+              <span className={cn(
+                'px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border',
+                student.status === 'Active'
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : 'bg-red-500/10 text-red-600 border-red-500/20'
+              )}>
+                {student.status}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {student.firstName} {student.lastName}
+            </h1>
+            <div className="flex flex-wrap justify-center md:justify-start gap-x-5 gap-y-1.5 text-muted-foreground/70 mt-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Phone className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {student.mobileNumber}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <User className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {student.gender || '—'}
+              </div>
+              {student.dateOfBirth && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Calendar className="h-3.5 w-3.5 opacity-40 text-primary" />
+                  {new Date(student.dateOfBirth).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                </div>
+              )}
+            </div>
+            {student.academics?.[0] && (
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-3">
+                <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  Class {student.academics[0].className} - {student.academics[0].sectionName}
                 </Badge>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">UID: {student?.schoolId || 'STU-9920'}</p>
-            </div>
+            )}
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-10 rounded-xl border-slate-200 text-xs font-bold gap-2">
-              <Download size={14} /> Report
+          <div className="absolute top-4 right-4 flex gap-2">
+            <Button variant="secondary" size="icon" onClick={() => refetch()}
+              className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
+              title="Refresh">
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
             </Button>
-            <Button variant="outline" className="h-10 rounded-xl border-slate-200 text-xs font-bold gap-2 text-indigo-600">
-              <CreditCard size={14} /> Fees
+            <Button variant="secondary" size="icon" onClick={() => router.back()}
+              className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
+              title="Back to Directory">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="h-6 w-px bg-slate-200 mx-1" />
-            <Button className="h-10 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold gap-2 px-6 transition-all">
-              <Edit3 size={14} /> Edit Profile
-            </Button>
-            <button className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
-              <MoreHorizontal size={18} className="text-slate-400" />
-            </button>
           </div>
-        </header>
-
-        <div className="grid grid-cols-12 gap-8">
-
-          {/* LEFT COLUMN */}
-          <aside className="col-span-12 lg:col-span-4 space-y-6">
-            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />
-              <div className="relative mx-auto w-32 h-32 rounded-[2.5rem] border-4 border-white shadow-xl overflow-hidden mb-6 bg-slate-100 flex items-center justify-center">
-                <User size={48} className="text-slate-300" />
-              </div>
-
-              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{student?.name}</h2>
-              <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mt-1">Grade {student?.grade} — {student?.class}</p>
-
-              <div className="grid grid-cols-2 gap-3 mt-8">
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attendance</p>
-                  <p className="text-xl font-bold text-slate-900">94.2%</p>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Average GPA</p>
-                  <p className="text-xl font-bold text-indigo-600">3.82</p>
-                </div>
-              </div>
-
-              <div className="mt-8 space-y-3">
-                <button className="w-full flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl group hover:bg-indigo-600 transition-all">
-                  <div className="flex items-center gap-3">
-                    <MessageSquare size={16} className="text-indigo-400" />
-                    <span className="text-xs font-bold uppercase tracking-tight">Contact Parent</span>
-                  </div>
-                  <ArrowLeft size={14} className="rotate-180 opacity-0 group-hover:opacity-100 transition-all" />
-                </button>
-                <button className="w-full flex items-center gap-3 p-4 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all text-slate-600">
-                  <Calendar size={16} className="text-slate-400" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Schedule Meeting</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 rounded-[2rem] p-6 text-white">
-              <div className="flex items-center gap-2 mb-6 opacity-80">
-                <ShieldAlert size={16} className="text-amber-400" />
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em]">Compliance Check</h3>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { label: 'Documents', status: 'Verified', color: 'text-emerald-400' },
-                  { label: 'Fee Account', status: 'Pending', color: 'text-amber-400' },
-                  { label: 'Conduct Registry', status: 'Exemplary', color: 'text-indigo-400' }
-                ].map((item, i) => (
-                  <div key={i} className="flex justify-between items-center pb-3 border-b border-white/5">
-                    <span className="text-xs text-slate-400 font-medium">{item.label}</span>
-                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", item.color)}>{item.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          {/* RIGHT COLUMN: SLIDING TABS */}
-          <main className="col-span-12 lg:col-span-8">
-            <div className="relative flex bg-transparent gap-8 border-b border-slate-200 w-full justify-start mb-8">
-              {tabs.map((t) => {
-                const id = t.toLowerCase();
-                const isActive = activeTab === id;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => setActiveTab(id)}
-                    className={cn(
-                      "relative h-12 text-xs font-bold uppercase tracking-widest transition-colors duration-300",
-                      isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    {t}
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeTabUnderline"
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"
-                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* TAB CONTENT */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                {activeTab === 'overview' ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Identity Card */}
-                      <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                          <Fingerprint size={14} className="text-slate-400" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Biometric Identity</span>
-                        </div>
-                        <CardContent className="p-6 space-y-5">
-                          <div className="grid grid-cols-2 gap-4">
-                            <InfoItem label="Full Legal Name" value={student?.name} />
-                            <InfoItem label="Date of Birth" value="14 Oct 2008" />
-                            <InfoItem label="Gender" value="Female" />
-                            <InfoItem label="Blood Group" value="O+" />
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Contact Card */}
-                      <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                          <Phone size={14} className="text-slate-400" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Secure Contact</span>
-                        </div>
-                        <CardContent className="p-6 space-y-4">
-                          <ContactItem icon={<Mail size={16} />} label="Student Email" value={student?.email} active />
-                          <ContactItem icon={<Phone size={16} />} label="Emergency Contact" value="+1 882-992-00" />
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Performance Timeline */}
-                    <Card className="rounded-[2rem] border-slate-200 shadow-sm p-8">
-                      <div className="flex items-center gap-3 mb-8">
-                        <TrendingUp size={20} className="text-indigo-600" />
-                        <h3 className="text-lg font-bold text-slate-900 tracking-tight">Academic Trajectory</h3>
-                      </div>
-                      <div className="h-48 w-full flex items-end gap-3">
-                        {[40, 70, 55, 90, 85].map((h, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
-                            <div className="w-full bg-slate-100 rounded-xl relative h-full overflow-hidden">
-                              <motion.div
-                                initial={{ height: 0 }}
-                                animate={{ height: `${h}%` }}
-                                className="absolute bottom-0 w-full bg-indigo-600/10 group-hover:bg-indigo-600 transition-all"
-                              />
-                            </div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase">Term {i + 1}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-[2rem] border border-slate-200 p-20 text-center">
-                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">{activeTab} module</p>
-                    <p className="text-slate-400 text-sm italic">Detailed registry records for this section are being compiled...</p>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </main>
         </div>
-      </div>
-    </div>
-  );
-}
+      </Card>
 
-/* --- HELPER COMPONENTS --- */
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
+            {tabs.map(tab => (
+              <TabsTrigger key={tab.id} value={tab.id}
+                className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase gap-1.5 flex items-center data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+                {tab.icon}{tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <div className="mt-6">
+          <TabsContent value="personal" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Personal Information</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Core identity and contact details.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <PersonalTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-function InfoItem({ label, value }: { label: string, value: string }) {
-  return (
-    <div>
-      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-sm font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
+          <TabsContent value="academic" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Academic Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Class assignments and academic history.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AcademicTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-function ContactItem({ icon, label, value, active }: any) {
-  return (
-    <div className={cn("flex items-center gap-4 p-3 rounded-2xl border transition-all", active ? "bg-indigo-50/50 border-indigo-100" : "bg-slate-50 border-slate-100")}>
-      <div className={cn("w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm", active ? "text-indigo-600" : "text-slate-400")}>
-        {icon}
-      </div>
-      <div>
-        <p className={cn("text-[9px] font-bold uppercase tracking-widest", active ? "text-indigo-400" : "text-slate-400")}>{label}</p>
-        <p className="text-xs font-bold text-slate-900">{value}</p>
-      </div>
+          <TabsContent value="analysis" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Academic Analysis</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Performance trends and subject analysis.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AcademicAnalysis studentId={studentId} student={student} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="parents" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Parent / Guardian Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Family and emergency contact information.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <ParentsTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="medical" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Medical History</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Health information and medical records.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <MedicalTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="address" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Address Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Residential and contact locations.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AddressTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }

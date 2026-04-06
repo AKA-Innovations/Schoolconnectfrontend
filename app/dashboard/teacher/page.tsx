@@ -6,7 +6,7 @@ import { StatsRow } from '../../../components/dashboard/StatsRow';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
 import { cn } from '../../../lib/utils';
-import { ClipboardCheck, FilePlus, PenTool, Layout } from 'lucide-react';
+import { ClipboardCheck, FilePlus, PenTool } from 'lucide-react';
 
 export default function TeacherDashboard() {
   const { data: summary, isLoading } = useTeacherDashboard();

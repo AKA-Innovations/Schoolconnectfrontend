@@ -34,6 +34,31 @@ export default function LoginPage() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const router = useRouter();
 
+  const ROLE_REDIRECT: Record<string, string> = {
+    super_admin: '/dashboard/admin',
+    school_admin: '/dashboard/admin',
+    principal: '/dashboard/principal',
+    teacher: '/dashboard/teacher',
+    subject_coordinator: '/dashboard/coordinator',
+    student: '/dashboard/student',
+  };
+
+  const parseJwt = (token: string): any | null => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(''),
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -41,18 +66,16 @@ export default function LoginPage() {
 
     try {
       const isDev = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-      let data;
-      
+      let data: { accessToken: string; role: string; username: string; userId?: string; schoolId?: string | null };
+
       if (isDev) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        let role: any = 'school_admin';
-        if (username.includes('principal')) role = 'principal';
-        if (username.includes('teacher')) role = 'teacher';
-        
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const role = username.includes('principal') ? 'principal' : username.includes('teacher') ? 'teacher' : 'school_admin';
         data = {
-          accessToken: `mock-token-${Math.random().toString(36).substr(2)}`,
+          accessToken: `mock-token-${Math.random().toString(36).slice(2)}`,
           role,
           username,
+          userId: `mock-user-${Math.random().toString(36).slice(2)}`,
           schoolId: 'school-123',
         };
       } else {
@@ -60,19 +83,26 @@ export default function LoginPage() {
         data = response.data;
       }
 
+      // Prefer authoritative schoolId from JWT payload (backend embeds schoolId in token)
+      const payload = parseJwt(data.accessToken);
+      const tokenSchoolId = payload?.schoolId ?? null;
+
       setAuth({
         user: {
-          id: `user-${Math.random().toString(36).substr(2)}`,
+          id: data.userId ?? `user-${Math.random().toString(36).slice(2)}`,
           name: data.username,
           username: data.username,
-          role: data.role,
-          schoolId: data.schoolId || undefined,
+          role: data.role as any,
+          schoolId: tokenSchoolId ?? undefined,
         },
         token: data.accessToken,
       });
 
       document.cookie = `auth-token=${data.accessToken}; path=/; SameSite=Strict`;
-      router.push('/dashboard/admin'); // Default redirect
+      document.cookie = `user-role=${data.role}; path=/; SameSite=Strict`;
+
+      const redirect = ROLE_REDIRECT[data.role] ?? '/dashboard/admin';
+      router.push(redirect);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
     } finally {
@@ -162,7 +192,7 @@ export default function LoginPage() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor="password" text-slate-700 font-medium>Password</Label>
+                    <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
                     <button type="button" className="text-xs text-blue-600 hover:text-blue-700 font-semibold transition-colors">
                       Reset Password?
                     </button>

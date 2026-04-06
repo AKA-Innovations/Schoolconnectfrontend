@@ -9,7 +9,7 @@ import {
   GraduationCap, Calendar, MessageSquare, ClipboardCheck,
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
-  Sparkles, Building2, UserCog,
+  Sparkles, Building2, UserCog, Grid3X3, Users2,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { Role } from '../../types/roles';
@@ -24,11 +24,14 @@ const sidebarLinks: Record<Role, any[]> = {
     { name: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
   ],
   school_admin: [
-    { name: 'Dashboard',     href: '/dashboard/admin',          icon: LayoutDashboard },
-    { name: 'Teachers',      href: '/dashboard/admin?tab=teachers', icon: Users },
-    { name: 'Students',      href: '/dashboard/admin?tab=students', icon: GraduationCap },
-    { name: 'School Profile', href: '/dashboard/admin/school',  icon: Building2 },
-    { name: 'My Profile',    href: '/dashboard/admin/profile',  icon: UserCog },
+    { name: 'Dashboard',      href: '/dashboard/admin',                   icon: LayoutDashboard },
+    { name: 'Teachers',       href: '/dashboard/admin?tab=teachers',      icon: Users },
+    { name: 'Students',       href: '/dashboard/admin/students',          icon: GraduationCap },
+    { name: 'Classes',        href: '/dashboard/admin/class/dashboard',   icon: BookOpen },
+    { name: 'Class Overview', href: '/dashboard/admin/class',             icon: Grid3X3 },
+    { name: 'Class Teachers', href: '/dashboard/admin/class/teachers',    icon: Users2 },
+    { name: 'School Profile', href: '/dashboard/admin/school',            icon: Building2 },
+    { name: 'My Profile',     href: '/dashboard/admin/profile',           icon: UserCog },
   ],
   principal: [
     { name: 'Dashboard', href: '/dashboard/principal', icon: LayoutDashboard },
@@ -41,6 +44,7 @@ const sidebarLinks: Record<Role, any[]> = {
   teacher: [
     { name: 'Dashboard', href: '/dashboard/teacher', icon: LayoutDashboard },
     { name: 'My Classes', href: '/dashboard/teacher/classes', icon: BookOpen },
+    { name: 'Class Room', href: '/dashboard/teacher/classroom', icon: Users2 },
     { name: 'Attendance', href: '/dashboard/teacher/attendance', icon: ClipboardCheck },
     { name: 'Assignments', href: '/dashboard/teacher/assignments', icon: FileText },
     { name: 'Grades', href: '/dashboard/teacher/grades', icon: GraduationCap },
