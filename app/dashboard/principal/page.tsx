@@ -20,8 +20,8 @@ export default function PrincipalDashboard() {
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Principal Dashboard</h1>
-        <p className="text-gray-500 mt-1">School-wide performance monitoring</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Principal Dashboard</h1>
+        <p className="text-muted-foreground mt-1">School-wide performance monitoring</p>
       </div>
 
       <StatsRow stats={summary?.kpis} isLoading={isLoading} />
@@ -34,23 +34,23 @@ export default function PrincipalDashboard() {
           <CardContent>
             <div className="space-y-4">
               {isLoading ? (
-                [1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />)
+                [1, 2, 3].map(i => <div key={i} className="h-16 bg-muted rounded animate-pulse" />)
               ) : (
                 summary?.teachers.map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
+                  <div key={teacher.id} className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
+                      <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center text-success font-bold">
                         {teacher.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{teacher.name}</p>
-                        <p className="text-xs text-gray-500">{teacher.subject}</p>
+                        <p className="font-semibold text-foreground">{teacher.name}</p>
+                        <p className="text-xs text-muted-foreground">{teacher.subject}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <span className={cn(
                         "w-2 h-2 rounded-full",
-                        teacher.attendance === 'Present' ? "bg-emerald-500" : "bg-red-500"
+                        teacher.attendance === 'Present' ? "bg-success" : "bg-destructive"
                       )} />
                       <span className="text-sm font-medium">{teacher.attendance}</span>
                     </div>

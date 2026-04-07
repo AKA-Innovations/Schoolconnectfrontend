@@ -136,7 +136,7 @@ export const adminService = {
           if (filtered.length > 0) students = filtered;
         }
         if (filters.grade) students = students.filter(s => s.grade === filters.grade);
-        if (filters.class) students = students.filter(s => s.class.toLowerCase().includes(filters.class.toLowerCase()));
+        if (filters.class) students = students.filter(s => s.class.toLowerCase().includes(filters.class!.toLowerCase()));
         if (filters.status) students = students.filter(s => s.status === filters.status);
       }
       const start = (page - 1) * limit;

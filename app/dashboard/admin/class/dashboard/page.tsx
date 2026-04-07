@@ -54,7 +54,7 @@ export default function ClassManagementDashboard() {
   const router = useRouter();
 
   return (
-    <div className="space-y-8 m-3 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Class Management</h1>

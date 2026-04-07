@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useClass, useUpdateClass } from '@/hooks/useClasses';
+import { useClass, useUpdateClass, useAssignClassTeacher } from '@/hooks/useClasses';
+import { TeacherSelectDropdown } from '@/components/admin/class/TeacherSelectDropdown';
 import { ArrowLeft, Save } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function EditClassForm() {
   const params = useParams();
@@ -16,6 +18,8 @@ export function EditClassForm() {
 
   const { data: classData, isLoading } = useClass(classDtlsId);
   const updateClassMutation = useUpdateClass(classDtlsId);
+  // Coordinated mutation: updates class + flips teacher's isClassTeacher
+  const assignTeacherMutation = useAssignClassTeacher(classDtlsId);
 
   const [formData, setFormData] = useState({
     className: '',
@@ -24,35 +28,65 @@ export function EditClassForm() {
     classTeacherId: '',
   });
 
+  // Track the original teacher id to detect changes
+  const [originalTeacherId, setOriginalTeacherId] = useState('');
+
   useEffect(() => {
     if (classData) {
+      const tid = classData.classTeacherId || '';
       setFormData({
         className: classData.className || '',
         sectionName: classData.sectionName || '',
         maxLimit: classData.maxLimit != null ? String(classData.maxLimit) : '',
-        classTeacherId: classData.classTeacherId || '',
+        classTeacherId: tid,
       });
+      setOriginalTeacherId(tid);
     }
   }, [classData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    updateClassMutation.mutate(
-      {
-        className: formData.className || undefined,
-        sectionName: formData.sectionName || undefined,
-        maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
-        classTeacherId: formData.classTeacherId || undefined,
-      },
-      {
-        onSuccess: () => {
-          router.push(`/dashboard/admin/class/${classDtlsId}`);
+    const teacherChanged = formData.classTeacherId !== originalTeacherId;
+
+    if (teacherChanged) {
+      // Use coordinating mutation that also updates teacher's isClassTeacher
+      assignTeacherMutation.mutate(
+        { classTeacherId: formData.classTeacherId || undefined },
+        {
+          onSuccess: async () => {
+            // Update remaining fields separately if any changed
+            await updateClassMutation.mutateAsync({
+              className: formData.className || undefined,
+              sectionName: formData.sectionName || undefined,
+              maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
+            });
+            toast.success('Class updated — teacher assignment applied successfully');
+            router.push(`/dashboard/admin/class/${classDtlsId}`);
+          },
+          onError: () => toast.error('Failed to assign class teacher'),
+        }
+      );
+    } else {
+      updateClassMutation.mutate(
+        {
+          className: formData.className || undefined,
+          sectionName: formData.sectionName || undefined,
+          maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
+          classTeacherId: formData.classTeacherId || undefined,
         },
-        onError: () => alert('Failed to update class'),
-      }
-    );
+        {
+          onSuccess: () => {
+            toast.success('Class updated successfully');
+            router.push(`/dashboard/admin/class/${classDtlsId}`);
+          },
+          onError: () => toast.error('Failed to update class'),
+        }
+      );
+    }
   };
+
+  const isPending = updateClassMutation.isPending || assignTeacherMutation.isPending;
 
   if (isLoading) {
     return (
@@ -66,7 +100,7 @@ export function EditClassForm() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-2xl">
+    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
@@ -84,7 +118,7 @@ export function EditClassForm() {
       </div>
 
       {/* Form Card */}
-      <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
+      <Card className="erp-card overflow-hidden">
         <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
           <CardTitle className="text-lg font-bold tracking-tight">Class Information</CardTitle>
           <CardDescription className="text-xs font-medium mt-1">
@@ -137,20 +171,12 @@ export function EditClassForm() {
               />
             </div>
 
-            {/* Class Teacher ID */}
-            <div className="space-y-2">
-              <Label htmlFor="classTeacherId" className="text-xs font-bold uppercase tracking-widest">
-                Class Teacher ID
-              </Label>
-              <Input
-                id="classTeacherId"
-                value={formData.classTeacherId}
-                onChange={(e) => setFormData({ ...formData, classTeacherId: e.target.value })}
-                placeholder="Teacher UUID (optional)"
-                className="rounded-xl h-10"
-              />
-              <p className="text-xs text-muted-foreground">Optional: UUID of the teacher assigned as class teacher</p>
-            </div>
+            {/* Teacher Picker — replaces raw UUID input */}
+            <TeacherSelectDropdown
+              value={formData.classTeacherId}
+              onChange={(val) => setFormData({ ...formData, classTeacherId: val })}
+              currentTeacherId={originalTeacherId || undefined}
+            />
 
             {/* Actions */}
             <div className="flex gap-3 justify-end pt-6">
@@ -164,11 +190,11 @@ export function EditClassForm() {
               </Button>
               <Button
                 type="submit"
-                disabled={updateClassMutation.isPending}
+                disabled={isPending}
                 className="rounded-xl"
               >
                 <Save className="mr-2 h-4 w-4" />
-                {updateClassMutation.isPending ? 'Saving...' : 'Save Changes'}
+                {isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </form>
@@ -177,4 +203,3 @@ export function EditClassForm() {
     </div>
   );
 }
-

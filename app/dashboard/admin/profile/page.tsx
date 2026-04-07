@@ -36,8 +36,8 @@ export default function AdminProfilePage() {
   if (isLoading) return <PageSkeleton />;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
+    <div className="bg-transparent py-2">
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
         <HeroCard
           user={user}
           admin={adminData ?? null}
@@ -117,12 +117,12 @@ function HeroCard({
             )}
             <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
               <button type="button" onClick={() => fileRef.current?.click()}
-                className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
+                className="text-primary-foreground text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-primary-hover transition-colors">
                 <Camera className="h-3 w-3" />{busy ? 'Uploading…' : 'Upload'}
               </button>
               {admin?.profileUrl && (
                 <button type="button" onClick={handleDelete}
-                  className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
+                  className="text-destructive text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-destructive transition-colors">
                   <Trash2 className="h-3 w-3" />Remove
                 </button>
               )}

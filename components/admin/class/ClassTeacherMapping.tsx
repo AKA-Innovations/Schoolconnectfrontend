@@ -26,7 +26,7 @@ export function ClassTeacherMapping() {
   const total = pagination?.totalPages || 1;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Class Teacher Mapping</h2>

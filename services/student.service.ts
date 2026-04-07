@@ -181,7 +181,7 @@ export interface AttendanceRecord {
 
 export interface BulkAttendancePayload {
   date: string;
-  records: { studentId: string; status: string; remarks?: string }[];
+  attendance: { studentId: string; attendanceStatus: string }[];
 }
 
 export interface AttendanceFilterParams {

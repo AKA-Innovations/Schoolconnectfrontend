@@ -5,13 +5,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatsRow } from '@/components/dashboard/StatsRow';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-import { School, Users, GraduationCap, Settings2, Download, ArrowRight } from 'lucide-react';
+import { School, Users, GraduationCap, Settings2, Download, ArrowRight, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OverviewTabProps {
   summary: any;
   isLoading: boolean;
-  actions: { label: string; icon: React.ElementType; onClick: () => void }[];
+  actions: { label: string; icon: LucideIcon; onClick: () => void }[];
 }
 
 export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabProps) {

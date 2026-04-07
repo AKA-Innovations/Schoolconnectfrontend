@@ -1,180 +1,159 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, BookOpen, Fingerprint } from 'lucide-react';
 import { classService } from '@/services/class.service';
+import { teacherService } from '@/services/teacher.service';
+import { TeacherSelectDropdown } from '@/components/admin/class/TeacherSelectDropdown';
+import { toast } from 'sonner';
+
+const classSchema = z.object({
+  className: z.string().min(1, 'Class name is required'),
+  sectionName: z.string().min(1, 'Section name is required'),
+  maxLimit: z.string().optional(),
+  classTeacherId: z.string().optional(),
+});
+
+type ClassFormValues = z.infer<typeof classSchema>;
+
+function FG({ label, children, required, error }: { label: string; children: React.ReactNode; required?: boolean; error?: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
+      {children}
+      {error && <p className="text-xs text-destructive font-semibold mt-1">{error}</p>}
+    </div>
+  );
+}
 
 export default function NewClassPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const [formData, setFormData] = useState({
-    className: '',
-    sectionName: '',
-    maxLimit: '',
-    classTeacherId: '',
+  const { register, handleSubmit, control, formState: { errors } } = useForm<ClassFormValues>({
+    resolver: zodResolver(classSchema),
+    defaultValues: { classTeacherId: '' },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async (data: ClassFormValues) => {
     setIsLoading(true);
 
     try {
       const created = await classService.createClass({
-        className: formData.className,
-        sectionName: formData.sectionName,
-        maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
-        classTeacherId: formData.classTeacherId || undefined,
+        className: data.className,
+        sectionName: data.sectionName,
+        maxLimit: data.maxLimit ? parseInt(data.maxLimit) : undefined,
+        classTeacherId: data.classTeacherId || undefined,
       });
 
+      // If a teacher was assigned, also flip their isClassTeacher flag
+      if (data.classTeacherId) {
+        await teacherService.updateTeacherDetails(data.classTeacherId, { isClassTeacher: true });
+      }
+
+      toast.success(`Class ${data.className}-${data.sectionName} created successfully`);
       router.push(created?.id ? `/dashboard/admin/class/${created.id}` : '/dashboard/admin/class');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create class');
+      toast.error(err.response?.data?.message || 'Failed to create class');
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-2xl">
+    <div className="max-w-4xl mx-auto px-6 py-8 animate-in fade-in duration-700 pb-20">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 mb-8">
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={() => router.back()}
-          className="rounded-xl h-10 w-10"
+          className="rounded-xl h-10 w-10 border border-border/50 shadow-sm"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Create New Class</h1>
-          <p className="text-sm text-muted-foreground mt-1">Add a new class section to your school</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Create New Class</h2>
+          <p className="text-sm text-muted-foreground mt-1">Add a new class section to the institution</p>
         </div>
       </div>
 
-      {/* Form Card */}
-      <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
-          <CardTitle className="text-lg font-bold tracking-tight">Class Information</CardTitle>
-          <CardDescription className="text-xs font-medium mt-1">
-            Fill in the details to create a new class section
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-8">
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-sm text-red-600">
-              {error}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                 <BookOpen className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold tracking-tight">Class Information</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Define the grade and section identifier</CardDescription>
+              </div>
             </div>
-          )}
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <FG label="Class Name" required error={errors.className?.message}>
+                <Input {...register('className')} className="rounded-xl" placeholder="e.g., Class 1" />
+              </FG>
+              
+              <FG label="Section Name" required error={errors.sectionName?.message}>
+                <Input {...register('sectionName')} className="rounded-xl" placeholder="e.g., A, B, C" />
+              </FG>
+              
+              <FG label="Max Student Limit" error={errors.maxLimit?.message}>
+                <Input type="number" {...register('maxLimit')} className="rounded-xl" placeholder="e.g., 45" />
+              </FG>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Class Name */}
-            <div className="space-y-2">
-              <Label htmlFor="className" className="text-xs font-bold uppercase tracking-widest">
-                Class Name *
-              </Label>
-              <Input
-                id="className"
-                value={formData.className}
-                onChange={(e) => setFormData({ ...formData, className: e.target.value })}
-                placeholder="e.g., Class 1, Class 10"
-                className="rounded-xl h-10"
-                required
+              {/* Teacher picker — replaces the raw UUID input */}
+              <Controller
+                name="classTeacherId"
+                control={control}
+                render={({ field }) => (
+                  <TeacherSelectDropdown
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                  />
+                )}
               />
-              <p className="text-xs text-muted-foreground">The grade/class name (e.g. Class 1)</p>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Section Name */}
-            <div className="space-y-2">
-              <Label htmlFor="sectionName" className="text-xs font-bold uppercase tracking-widest">
-                Section Name *
-              </Label>
-              <Input
-                id="sectionName"
-                value={formData.sectionName}
-                onChange={(e) => setFormData({ ...formData, sectionName: e.target.value })}
-                placeholder="e.g., A, B, C"
-                className="rounded-xl h-10"
-                required
-              />
-              <p className="text-xs text-muted-foreground">The section identifier (e.g. A)</p>
-            </div>
+        {/* Info */}
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8 flex flex-row items-center gap-3">
+             <Fingerprint className="text-primary h-6 w-6" />
+             <div>
+                <CardTitle className="text-[14px] font-bold tracking-tight">Class Creation Guidelines</CardTitle>
+             </div>
+          </CardHeader>
+          <CardContent className="p-6">
+              <ul className="space-y-2 text-sm text-muted-foreground font-medium leading-relaxed">
+                <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-primary/60 rounded-full"/> Each record represents a unique class + section combination.</li>
+                <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-primary/60 rounded-full"/> The combination of Class Name + Section Name must be unique.</li>
+                <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-primary/60 rounded-full"/> Selecting a class teacher will also mark them as a class teacher in the staff registry.</li>
+              </ul>
+          </CardContent>
+        </Card>
 
-            {/* Max Limit */}
-            <div className="space-y-2">
-              <Label htmlFor="maxLimit" className="text-xs font-bold uppercase tracking-widest">
-                Max Student Limit
-              </Label>
-              <Input
-                id="maxLimit"
-                type="number"
-                value={formData.maxLimit}
-                onChange={(e) => setFormData({ ...formData, maxLimit: e.target.value })}
-                placeholder="e.g., 45"
-                className="rounded-xl h-10"
-                min="1"
-              />
-              <p className="text-xs text-muted-foreground">Maximum number of students allowed in this section</p>
-            </div>
-
-            {/* Class Teacher ID */}
-            <div className="space-y-2">
-              <Label htmlFor="classTeacherId" className="text-xs font-bold uppercase tracking-widest">
-                Class Teacher ID
-              </Label>
-              <Input
-                id="classTeacherId"
-                value={formData.classTeacherId}
-                onChange={(e) => setFormData({ ...formData, classTeacherId: e.target.value })}
-                placeholder="Teacher UUID (optional)"
-                className="rounded-xl h-10"
-              />
-              <p className="text-xs text-muted-foreground">Optional: UUID of the teacher assigned as class teacher</p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 justify-end pt-6 border-t border-border/50">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                className="rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="rounded-xl"
-              >
-                <Plus className="mr-2 h-4 w-4" />
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-4 pt-4">
+            <Button type="button" variant="outline" onClick={() => router.back()} className="px-6 h-12 rounded-xl text-xs font-bold uppercase tracking-widest">Cancel</Button>
+            <Button type="submit" disabled={isLoading} className="px-10 h-12 rounded-xl text-xs font-bold uppercase tracking-widest shadow-sm">
                 {isLoading ? 'Creating...' : 'Create Class'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Info Card */}
-      <Card className="rounded-2xl border-border shadow-sm bg-blue-50/50 border-blue-200/50">
-        <CardContent className="p-6">
-          <h3 className="font-bold text-foreground mb-2">Class Creation Guidelines</h3>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>✓ Each record represents a unique class + section combination (e.g., Class 1 – A)</li>
-            <li>✓ Max limit is the maximum number of students allowed in this section</li>
-            <li>✓ Class Teacher ID is optional; you can assign one later from the Teachers section</li>
-            <li>✓ The combination of Class Name + Section Name must be unique for your school</li>
-          </ul>
-        </CardContent>
-      </Card>
+            </Button>
+        </div>
+      </form>
     </div>
   );
 }
-

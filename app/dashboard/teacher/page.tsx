@@ -6,10 +6,10 @@ import { StatsRow } from '../../../components/dashboard/StatsRow';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
 import { cn } from '../../../lib/utils';
-import { ClipboardCheck, FilePlus, PenTool } from 'lucide-react';
+import { ClipboardCheck, FilePlus, PenTool, RefreshCw } from 'lucide-react';
 
 export default function TeacherDashboard() {
-  const { data: summary, isLoading } = useTeacherDashboard();
+  const { data: summary, isLoading, refetch } = useTeacherDashboard();
 
   const actions = [
     { label: 'Mark Attendance', icon: ClipboardCheck, onClick: () => {}, variant: 'default' as const },
@@ -19,9 +19,20 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Teacher Dashboard</h1>
-        <p className="text-gray-500 mt-1">Manage your classes and students</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Teacher Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage your classes and students</p>
+        </div>
+        <div>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm text-sm font-semibold hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <StatsRow stats={summary?.kpis} isLoading={isLoading} />
@@ -42,9 +53,9 @@ export default function TeacherDashboard() {
                     <div className="p-4 bg-white rounded-lg border border-gray-100 shadow-sm hover:border-amber-200 transition-colors">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="text-xs font-bold text-amber-600 uppercase mb-1">{cls.time}</p>
-                          <h4 className="text-lg font-bold text-gray-900">{cls.name}</h4>
-                          <p className="text-sm text-gray-500">{cls.room}</p>
+                          <p className="text-xs font-bold text-accent uppercase mb-1">{cls.time}</p>
+                          <h4 className="text-lg font-bold text-foreground">{cls.name}</h4>
+                          <p className="text-sm text-muted-foreground">{cls.room}</p>
                         </div>
                         <button className="text-[10px] bg-gray-100 px-2 py-1 rounded-full font-bold">START CLASS</button>
                       </div>

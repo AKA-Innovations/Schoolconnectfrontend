@@ -98,7 +98,7 @@ export const classService = {
     limit?: number;
     className?: string;
   }): Promise<ClassListResponse> => {
-    const response = await api.get('/school/classes');
+    const response = await api.get('/school/classes/details');
     const rawClasses = response.data;
     let all: ClassDetails[] = Array.isArray(rawClasses) ? rawClasses : Array.isArray(rawClasses?.data) ? rawClasses.data : [];
 
@@ -122,13 +122,13 @@ export const classService = {
 
   /** POST /school/class */
   createClass: async (data: CreateClassPayload): Promise<ClassDetails> => {
-    const response = await api.post('/school/class', data);
+    const response = await api.post('/school/class/add', data);
     return response.data;
   },
 
   /** PUT /school/class/:classDtlsId */
   updateClass: async (classDtlsId: number, data: UpdateClassPayload): Promise<ClassDetails> => {
-    const response = await api.put(`/school/class/${classDtlsId}`, data);
+    const response = await api.put(`/school/class/update/${classDtlsId}`, data);
     return response.data;
   },
 

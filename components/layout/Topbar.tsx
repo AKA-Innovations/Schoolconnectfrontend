@@ -2,10 +2,14 @@
 
 import React from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Bell, Search, User, ChevronDown } from 'lucide-react';
+import { Bell, Search, User, ChevronDown, Menu } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export function Topbar() {
+type TopbarProps = {
+  onMobileMenuClick?: () => void;
+};
+
+export function Topbar({ onMobileMenuClick }: TopbarProps) {
   const { user, role } = useAuthStore();
 
   const roleLabels: Record<string, string> = {
@@ -22,10 +26,19 @@ export function Topbar() {
         background: 'hsl(var(--background))',
         borderBottom: '1px solid hsl(var(--border))',
       }}
-      className="h-16 flex items-center justify-between px-8 sticky top-0 z-40 subtle-shadow"
+      className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 subtle-shadow"
     >
+      <button
+        type="button"
+        onClick={onMobileMenuClick}
+        className="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border bg-card text-foreground shadow-sm"
+        aria-label="Open sidebar"
+      >
+        <Menu size={18} />
+      </button>
+
       {/* Search */}
-      <div className="flex items-center flex-1 max-w-md group">
+      <div className="hidden sm:flex items-center flex-1 max-w-md group ml-3 lg:ml-0">
         <div className="relative w-full">
           <Search
             style={{ color: 'hsl(var(--muted-foreground))' }}
@@ -46,16 +59,16 @@ export function Topbar() {
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 ml-auto">
         {/* Notification bell */}
         <button
           style={{ color: 'hsl(var(--muted-foreground))' }}
-          className="relative p-2 rounded-lg hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] transition-colors"
+          className="relative p-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors"
         >
           <Bell size={20} />
           <span
             style={{ background: 'hsl(var(--destructive))' }}
-            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-[hsl(var(--background))]"
+            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-background"
           />
         </button>
 
@@ -63,7 +76,7 @@ export function Topbar() {
 
         {/* User profile pill */}
         <div
-          className="flex items-center gap-3 cursor-pointer group p-1 pr-3 rounded-full hover:bg-[hsl(var(--accent))] transition-colors"
+          className="flex items-center gap-3 cursor-pointer group p-1 pr-3 rounded-full hover:bg-accent transition-colors"
         >
           {/* Avatar */}
           <div className="relative">
@@ -94,7 +107,7 @@ export function Topbar() {
           <ChevronDown
             size={16}
             style={{ color: 'hsl(var(--muted-foreground))' }}
-            className="ml-1 group-hover:text-[hsl(var(--foreground))] transition-colors"
+            className="ml-1 group-hover:text-foreground transition-colors"
           />
         </div>
       </div>

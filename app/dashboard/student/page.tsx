@@ -7,10 +7,10 @@ import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { cn } from '../../../lib/utils';
-import { BookOpen, FileText, Calendar, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { BookOpen, FileText, Calendar, CheckCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function StudentDashboard() {
-  const { data: summary, isLoading } = useStudentDashboard();
+  const { data: summary, isLoading, refetch } = useStudentDashboard();
 
   const actions = [
     { label: 'View Schedule', icon: Calendar, onClick: () => {}, variant: 'default' as const },
@@ -20,27 +20,38 @@ export default function StudentDashboard() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4 text-amber-500" />;
-      case 'submitted': return <CheckCircle className="h-4 w-4 text-blue-500" />;
-      case 'graded': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      default: return <Clock className="h-4 w-4 text-gray-500" />;
+      case 'pending': return <Clock className="h-4 w-4 text-warning" />;
+      case 'submitted': return <CheckCircle className="h-4 w-4 text-secondary" />;
+      case 'graded': return <CheckCircle className="h-4 w-4 text-success" />;
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pending': return <Badge variant="outline" className="text-amber-600 border-amber-600">Pending</Badge>;
-      case 'submitted': return <Badge variant="outline" className="text-blue-600 border-blue-600">Submitted</Badge>;
-      case 'graded': return <Badge className="bg-green-100 text-green-800">Graded</Badge>;
+      case 'pending': return <Badge variant="outline" className="text-warning border-warning">Pending</Badge>;
+      case 'submitted': return <Badge variant="outline" className="text-secondary border-secondary">Submitted</Badge>;
+      case 'graded': return <Badge className="bg-success/10 text-success">Graded</Badge>;
       default: return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Student Dashboard</h1>
-        <p className="text-gray-500 mt-1">Track your academic progress and assignments</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Student Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Track your academic progress and assignments</p>
+        </div>
+        <div>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm text-sm font-semibold hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4 text-slate-600" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <StatsRow stats={summary?.kpis} isLoading={isLoading} />
@@ -54,32 +65,32 @@ export default function StudentDashboard() {
             <div className="space-y-4">
               {isLoading ? (
                 [1, 2, 3, 4].map(i => (
-                  <div key={i} className="flex items-center space-x-4 p-4 border border-gray-100 rounded-lg">
-                    <div className="h-10 w-10 bg-gray-100 rounded animate-pulse" />
+                  <div key={i} className="flex items-center space-x-4 p-4 border border-border rounded-lg">
+                    <div className="h-10 w-10 bg-muted rounded animate-pulse" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-100 rounded animate-pulse" />
-                      <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+                      <div className="h-4 bg-muted rounded animate-pulse" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
                     </div>
                   </div>
                 ))
               ) : (
                 summary?.assignments.map((assignment) => (
-                  <div key={assignment.id} className="flex items-center space-x-4 p-4 border border-gray-100 rounded-lg hover:border-blue-200 transition-colors">
+                  <div key={assignment.id} className="flex items-center space-x-4 p-4 border border-border rounded-lg hover:border-primary-hover transition-colors">
                     <div className="flex-shrink-0">
                       {getStatusIcon(assignment.status)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {assignment.title}
                         </p>
                         {getStatusBadge(assignment.status)}
                       </div>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         {assignment.subject} • Due: {assignment.dueDate}
                       </p>
                       {assignment.grade && (
-                        <p className="text-sm font-semibold text-green-600">
+                        <p className="text-sm font-semibold text-success">
                           Grade: {assignment.grade}
                         </p>
                       )}

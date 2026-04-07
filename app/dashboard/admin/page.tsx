@@ -8,11 +8,11 @@ import { TeacherManagement } from '@/components/admin/TeacherManagement';
 import { StudentManagement } from '@/components/admin/StudentManagement';
 import { SchoolManagement } from '@/components/admin/SchoolManagement';
 import { AdminOverviewTab } from '@/components/admin/AdminOverviewTab';
-import { Users, GraduationCap, Building2 } from 'lucide-react';
+import { Users, GraduationCap, Building2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminDashboard() {
-  const { data: summary, isLoading } = useAdminDashboard();
+  const { data: summary, isLoading, refetch } = useAdminDashboard();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>('overview');
@@ -33,8 +33,17 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background antialiased selection:bg-primary/10">
-      <div className="max-w-7xl mx-auto px-6 py-0 space-y-6">
+    <div className="bg-transparent antialiased selection:bg-primary/10 py-8">
+      <div className="max-w-7xl mx-auto px-6 space-y-6">
+        <div className="flex justify-end">
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm text-sm font-semibold hover:bg-slate-50"
+          >
+            <RefreshCw className="h-4 w-4 text-slate-600" />
+            Refresh
+          </button>
+        </div>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <AnimatePresence mode="wait">
 

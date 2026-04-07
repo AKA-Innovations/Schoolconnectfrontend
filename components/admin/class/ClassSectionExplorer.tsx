@@ -38,7 +38,7 @@ export function ClassSectionExplorer() {
   }, [uniqueClassNames, selectedClassName]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">Class & Section Explorer</h2>
@@ -48,8 +48,8 @@ export function ClassSectionExplorer() {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Sidebar - Classes List */}
-        <Card className="rounded-2xl border-border shadow-sm lg:col-span-1 h-fit">
-          <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
+        <Card className="erp-card overflow-hidden lg:col-span-1 h-fit">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
             <CardTitle className="text-lg font-bold tracking-tight">Classes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">

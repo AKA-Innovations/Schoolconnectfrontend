@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Camera, Trash2, User, RefreshCw, Phone, Calendar, BookOpen, Heart, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Camera, Trash2, User, RefreshCw, Phone, Calendar, BookOpen, Heart, MapPin, ShieldCheck, PowerOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { useStudent, useUpdateStudentStatus, useUploadStudentImage, useDeleteStudentImage } from '@/hooks/useStudents';
 import { PersonalTab } from '@/components/admin/student/tabs/PersonalTab';
 import { AcademicTab } from '@/components/admin/student/tabs/AcademicTab';
@@ -36,7 +37,8 @@ function ProfileImageSection({ studentId, profileImageUrl }: { studentId: string
     const file = e.target.files?.[0];
     if (!file) return;
     uploadMutation.mutate(file, {
-      onError: () => alert('Upload failed.'),
+      onSuccess: () => toast.success('Profile image updated'),
+      onError: () => toast.error('Upload failed.'),
     });
     e.target.value = '';
   };
@@ -44,7 +46,8 @@ function ProfileImageSection({ studentId, profileImageUrl }: { studentId: string
   const handleDelete = () => {
     if (!confirm('Delete profile image?')) return;
     deleteMutation.mutate(undefined, {
-      onError: () => alert('Delete failed.'),
+      onSuccess: () => toast.success('Profile image removed'),
+      onError: () => toast.error('Delete failed.'),
     });
   };
 
@@ -92,7 +95,10 @@ export default function StudentProfilePage() {
 
   const toggleStatus = () => {
     const next = student?.status === 'Active' ? 'Inactive' : 'Active';
-    statusMutation.mutate(next);
+    statusMutation.mutate(next, {
+      onSuccess: () => toast.success(`Student marked as ${next}`),
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update status'),
+    });
   };
 
   if (isLoading) {
@@ -129,8 +135,7 @@ export default function StudentProfilePage() {
   ];
 
   return (
-    <div className=" m-4 my-4  space-y-6 animate-in fade-in duration-500">
-
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header / Profile Card */}
       <Card className="overflow-hidden border-border shadow-sm">
         <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
@@ -177,6 +182,24 @@ export default function StudentProfilePage() {
             )}
           </div>
           <div className="absolute top-4 right-4 flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleStatus}
+              disabled={statusMutation.isPending}
+              className={cn(
+                'rounded-xl h-10 px-4 shadow-sm border font-bold text-[11px] uppercase tracking-widest flex items-center gap-2 transition-all',
+                student.status === 'Active'
+                  ? 'border-red-200 text-red-600 hover:bg-red-50 bg-background/50'
+                  : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 bg-background/50'
+              )}
+              title={student.status === 'Active' ? 'Deactivate student' : 'Activate student'}
+            >
+              <PowerOff className="h-3.5 w-3.5" />
+              {statusMutation.isPending
+                ? 'Updating…'
+                : student.status === 'Active' ? 'Deactivate' : 'Activate'}
+            </Button>
             <Button variant="secondary" size="icon" onClick={() => refetch()}
               className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
               title="Refresh">

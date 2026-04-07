@@ -9,6 +9,8 @@ import {
   UpdateClassPayload,
   ClassSummary,
 } from '@/services/class.service';
+import { teacherService } from '@/services/teacher.service';
+import { teacherKeys } from '@/hooks/useTeachers';
 
 // ─── Query key factories ──────────────────────────────────────────────────────
 
@@ -94,3 +96,30 @@ export function useDeleteClass() {
     },
   });
 }
+
+/**
+ * Assign a teacher as class teacher.
+ * 1. Updates the class record (classTeacherId).
+ * 2. Updates the teacher record (isClassTeacher = true).
+ * Both teacher list and class caches are invalidated.
+ */
+export function useAssignClassTeacher(classDtlsId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ classTeacherId }: { classTeacherId: string | undefined }) => {
+      // 1 — Update the class
+      await classService.updateClass(classDtlsId, { classTeacherId });
+      // 2 — If a teacher was assigned, mark them as class teacher
+      if (classTeacherId) {
+        await teacherService.updateTeacherDetails(classTeacherId, { isClassTeacher: true });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: classKeys.all });
+      qc.invalidateQueries({ queryKey: classKeys.detail(classDtlsId) });
+      // Invalidate entire teacher list so the dropdown refreshes
+      qc.invalidateQueries({ queryKey: teacherKeys.all });
+    },
+  });
+}
+

@@ -30,6 +30,14 @@ export function useTeacher(id: string) {
 
 // ─── Mutations (all invalidate the relevant cache entries) ────────────────────
 
+export function useRegisterTeacher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => teacherService.registerTeacher(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teacherKeys.all }),
+  });
+}
+
 export function useUpdateTeacher(id: string) {
   const qc = useQueryClient();
   return useMutation({

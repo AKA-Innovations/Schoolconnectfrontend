@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/lib/providers";
+import { Toaster } from "sonner";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
 });
 
@@ -16,8 +13,6 @@ export const metadata: Metadata = {
   title: "School Management System",
   description: "School Management System",
 };
-
-import { Providers } from "@/lib/providers";
 
 export default function RootLayout({
   children,
@@ -27,10 +22,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${outfit.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">
+      <body className="h-full min-h-full flex flex-col overflow-hidden font-sans">
         <Providers>{children}</Providers>
+        <Toaster position="top-right" richColors theme="system" />
       </body>
     </html>
   );

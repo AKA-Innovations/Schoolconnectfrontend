@@ -57,7 +57,7 @@ export function TeacherTable({ teachers, isLoading, page, totalPages, onView, on
               <TableRow key={teacher.id} className="group transition-colors hover:bg-indigo-50/30 border-b border-slate-50">
                 <TableCell className="py-5 pl-8">
                   <div className="flex items-center gap-4">
-                    <div className="h-11 w-11 rounded-2xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
+                    <div className="h-11 w-11 rounded-2xl bg-primary hover:bg-primary-hover flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
                       {(teacher.firstName ?? '?').charAt(0)}{(teacher.lastName ?? '').charAt(0)}
                     </div>
                     <div className="flex flex-col">

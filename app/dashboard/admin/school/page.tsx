@@ -41,8 +41,8 @@ export default function SchoolProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
+    <div className="bg-transparent py-2">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
         <HeroCard school={school} isFetching={isFetching} onRefresh={refetch} schoolId={schoolId!} />
         <InfoGrid school={school} />
         <EditSection school={school} schoolId={schoolId!} />
@@ -90,13 +90,13 @@ function HeroCard({
               <Building2 className="h-12 w-12 text-primary/30" />
             )}
             <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300">
+              <button type="button" onClick={() => fileRef.current?.click()} 
+                className="text-primary-foreground text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-primary-hover">
                 <Camera className="h-3 w-3" />{busy ? 'Uploading…' : 'Upload'}
               </button>
               {school.profileUrl && (
                 <button type="button" onClick={handleDelete}
-                  className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200">
+                  className="text-destructive text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-destructive">
                   <Trash2 className="h-3 w-3" />Remove
                 </button>
               )}
@@ -115,8 +115,8 @@ function HeroCard({
             <span className={cn(
               'px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest border',
               school.isActive
-                ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                : 'bg-red-500/10 text-red-600 border-red-500/20'
+                ? 'bg-success/10 text-success border-success/20'
+                : 'bg-destructive/10 text-destructive border-destructive/20'
             )}>
               {school.isActive ? '● Active' : '● Inactive'}
             </span>
@@ -442,12 +442,12 @@ function OwnerForm({ school, schoolId }: { school: SchoolDetails; schoolId: stri
               )}
               <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                 <button type="button" onClick={() => fileRef.current?.click()}
-                  className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300">
+                  className="text-foreground/70 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-accent/90">
                   <Camera className="h-3 w-3" />{imgBusy ? 'Uploading…' : 'Upload'}
                 </button>
                 {o?.profileUrl && (
                   <button type="button" onClick={handleDeleteImg}
-                    className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200">
+                    className="text-destructive/50 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-destructive/70">
                     <Trash2 className="h-3 w-3" />Remove
                   </button>
                 )}

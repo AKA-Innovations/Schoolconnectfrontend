@@ -12,6 +12,7 @@ import { ClipboardCheck, Save, RefreshCw, CheckCircle2, XCircle, Clock, AlertCir
 import { cn } from '@/lib/utils';
 import { useStudentList } from '@/hooks/useStudents';
 import { useBulkAttendance, useFilterAttendance } from '@/hooks/useStudents';
+import { toast } from 'sonner';
 
 const statusOptions = ['Present', 'Absent', 'Late', 'HalfDay'] as const;
 type AttendanceStatus = typeof statusOptions[number];
@@ -35,7 +36,6 @@ export default function AttendancePage() {
   const [sectionName, setSectionName] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});
-  const [success, setSuccess] = useState(false);
 
   const { data: studentData, isLoading: studentsLoading } = useStudentList({
     className: className || undefined,
@@ -84,13 +84,17 @@ export default function AttendancePage() {
 
   const handleSubmit = () => {
     if (!date || students.length === 0) return;
-    const records = Object.entries(attendanceMap).map(([studentId, { status, remarks }]) => ({
+    const attendance = Object.entries(attendanceMap).map(([studentId, { status }]) => ({
       studentId,
-      status,
-      remarks: remarks || undefined,
+      attendanceStatus: status,
     }));
-    bulkMutation.mutate({ date, records }, {
-      onSuccess: () => { setSuccess(true); setTimeout(() => setSuccess(false), 3000); },
+    bulkMutation.mutate({ date, attendance }, {
+      onSuccess: () => {
+        toast.success('Attendance records synchronized successfully');
+      },
+      onError: (err: any) => {
+        toast.error(err.response?.data?.message || 'Failed to submit attendance');
+      }
     });
   };
 
@@ -108,12 +112,6 @@ export default function AttendancePage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Attendance Management</h1>
         <p className="text-sm text-muted-foreground">Mark and manage daily student attendance</p>
       </div>
-
-      {success && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-success/10 border border-success/20 text-success text-xs font-semibold">
-          <CheckCircle2 size={14} /> Attendance saved successfully
-        </div>
-      )}
 
       {/* Filters */}
       <Card className="border-border shadow-sm">

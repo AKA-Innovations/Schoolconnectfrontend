@@ -73,7 +73,7 @@ export function TeacherManagement() {
           <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
             <RefreshCw className={cn('h-4 w-4 text-slate-500', isFetching && 'animate-spin')} />
           </Button>
-          <Button onClick={() => setViewMode('add')} className="h-12 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all active:scale-95">
+          <Button onClick={() => setViewMode('add')} className="h-12 px-6 rounded-2xl bg-primary hover:bg-primary-hover shadow-xl shadow-indigo-200 transition-all active:scale-95">
             <Plus className="mr-2 h-5 w-5" />
             <span className="font-bold">Onboard Staff</span>
           </Button>

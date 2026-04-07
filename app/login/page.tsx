@@ -83,13 +83,14 @@ export default function LoginPage() {
         data = response.data;
       }
 
-      // Prefer authoritative schoolId from JWT payload (backend embeds schoolId in token)
+      // Prefer authoritative schoolId and userId from JWT payload (backend embeds them in token)
       const payload = parseJwt(data.accessToken);
       const tokenSchoolId = payload?.schoolId ?? null;
+      const backendUserId = payload?.sub;
 
       setAuth({
         user: {
-          id: data.userId ?? `user-${Math.random().toString(36).slice(2)}`,
+          id: backendUserId ?? data.userId ?? `user-${Math.random().toString(36).slice(2)}`,
           name: data.username,
           username: data.username,
           role: data.role as any,

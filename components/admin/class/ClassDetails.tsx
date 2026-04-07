@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useClass, useSectionsByClassName, useDeleteClass } from '@/hooks/useClasses';
 import { ArrowLeft, Edit2, Trash2, Users, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export function ClassDetails() {
   const params = useParams();
@@ -22,9 +23,10 @@ export function ClassDetails() {
   const handleDelete = () => {
     deleteClassMutation.mutate(classDtlsId, {
       onSuccess: () => {
+        toast.success('Class deleted successfully');
         router.push('/dashboard/admin/class');
       },
-      onError: () => alert('Failed to delete class'),
+      onError: () => toast.error('Failed to delete class'),
     });
   };
 
@@ -52,7 +54,7 @@ export function ClassDetails() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
