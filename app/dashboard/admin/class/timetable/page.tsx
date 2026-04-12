@@ -1,211 +1,331 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-  useTimetable, useCreateTimetableEntry,
-  useUpdateTimetableEntry, useDeleteTimetableEntry,
+  useTimetable, useCreateTimetableBulk, useDeleteTimetableEntry,
   usePeriodSlots, useSubjectDetails, useClassSectionLists,
 } from '@/hooks/useClasses';
-import { Plus, Trash2, Calendar, X, Save } from 'lucide-react';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload } from '@/types/class.types';
+import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** Key for a grid cell: "day|periodId" */
+function cellKey(day: string, periodId: number) { return `${day}|${periodId}`; }
+
+type DraftCell = { teacherClassId: number };
 
 export default function TimetablePage() {
-  const { data: entries = [], isLoading } = useTimetable();
-  const { data: periodSlots = [] } = usePeriodSlots();
-  const { data: subjectDetails = [] } = useSubjectDetails();
-  const { data: classSections = [] } = useClassSectionLists();
+  // ── Data fetching ──
+  const { data: allEntries = [], isLoading: loadingTimetable } = useTimetable({ session: CURRENT_SESSION });
+  const { data: periodSlots = [] }     = usePeriodSlots();
+  const { data: subjectDetails = [] }  = useSubjectDetails();
+  const { data: rawClassSections = [] } = useClassSectionLists();
 
-  const createMutation = useCreateTimetableEntry();
-  const updateMutation = useUpdateTimetableEntry();
-  const deleteMutation = useDeleteTimetableEntry();
+  const classSections: { id: number; className: string; sectionName: string }[] =
+    (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
 
-  const [selectedClass, setSelectedClass] = useState<number>(0);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({
-    classDtlsId: 0, periodSlotId: 0, subjectDtlsId: 0, dayOfWeek: '',
-  });
+  const bulkCreateMut = useCreateTimetableBulk();
+  const deleteMut     = useDeleteTimetableEntry();
 
+  // ── Local state ──
+  const [selectedClassName, setSelectedClassName]   = useState('');
+  const [selectedSectionName, setSelectedSectionName] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [drafts, setDrafts]     = useState<Record<string, DraftCell>>({});
+
+  // ── Derived data ──
   const sorted = useMemo(
-    () => [...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber),
+    () => [...periodSlots].sort((a: PeriodSlot, b: PeriodSlot) => a.periodNumber - b.periodNumber),
     [periodSlots],
   );
 
-  const filteredEntries = useMemo(
-    () => (selectedClass ? entries.filter((e) => e.classDtlsId === selectedClass) : entries),
-    [entries, selectedClass],
+  const classNames = useMemo(
+    () => Array.from(new Set(classSections.map((c) => c.className))).sort(),
+    [classSections],
   );
 
-  // group by day → slotId for the grid
-  const grid = useMemo(() => {
-    const map: Record<string, Record<number, typeof entries[number]>> = {};
-    DAYS.forEach((d) => { map[d] = {}; });
-    filteredEntries.forEach((e) => {
-      if (map[e.dayOfWeek]) map[e.dayOfWeek][e.periodSlotId] = e;
+  const sectionsForClass = useMemo(
+    () => classSections.filter((c) => c.className === selectedClassName).map((c) => c.sectionName).sort(),
+    [classSections, selectedClassName],
+  );
+
+  // Subject-detail mappings for the selected class+section
+  const mappingsForSection: SubjectDetail[] = useMemo(
+    () => subjectDetails.filter(
+      (sd: SubjectDetail) => sd.className === selectedClassName && sd.sectionName === selectedSectionName
+    ),
+    [subjectDetails, selectedClassName, selectedSectionName],
+  );
+
+  // Lookup: teacherClassId → SubjectDetail
+  const sdMap = useMemo(() => {
+    const m = new Map<number, SubjectDetail>();
+    (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(sd.id, sd));
+    return m;
+  }, [subjectDetails]);
+
+  const allEntriesArr: TimetableEntry[] = useMemo(
+    () => (Array.isArray(allEntries) ? allEntries : []),
+    [allEntries],
+  );
+
+  // teacherClassIds belonging to selected class+section
+  const sectionTcIds = useMemo(
+    () => new Set(mappingsForSection.map((m) => m.id)),
+    [mappingsForSection],
+  );
+
+  // Timetable entries for this section
+  const sectionEntries: TimetableEntry[] = useMemo(
+    () => allEntriesArr.filter((e) => sectionTcIds.has(e.teacherClassId)),
+    [allEntriesArr, sectionTcIds],
+  );
+
+  // "day|periodId" → existing TimetableEntry
+  const existingGrid = useMemo(() => {
+    const m: Record<string, TimetableEntry> = {};
+    sectionEntries.forEach((e) => { m[cellKey(e.dayOfWeek, e.periodId)] = e; });
+    return m;
+  }, [sectionEntries]);
+
+  // ── Conflict checker ──
+  // Checks if the teacher behind teacherClassId is already occupied at day+periodId
+  const teacherConflict = useCallback(
+    (teacherClassId: number, day: string, periodId: number): string | null => {
+      const sd = sdMap.get(teacherClassId);
+      if (!sd) return null;
+      const teacherId = sd.teacherId;
+
+      // Check existing timetable entries (other sections)
+      for (const entry of allEntriesArr) {
+        if (entry.dayOfWeek !== day || entry.periodId !== periodId) continue;
+        if (sectionTcIds.has(entry.teacherClassId)) continue; // same section — OK
+        const entrySd = sdMap.get(entry.teacherClassId);
+        if (entrySd && entrySd.teacherId === teacherId) {
+          return `${entrySd.teacherName || 'Teacher'} already teaches ${entrySd.subjectName} in ${entrySd.className}-${entrySd.sectionName}`;
+        }
+      }
+
+      // Check within drafts for same teacher at same period+day but different cell
+      const thisKey = cellKey(day, periodId);
+      for (const [key, draft] of Object.entries(drafts)) {
+        if (key === thisKey) continue;
+        const [dDay, dPeriod] = key.split('|');
+        if (dDay !== day || Number(dPeriod) !== periodId) continue;
+        const dSd = sdMap.get(draft.teacherClassId);
+        if (dSd && dSd.teacherId === teacherId) {
+          return `${dSd.teacherName || 'Teacher'} already assigned at this period (draft)`;
+        }
+      }
+      return null;
+    },
+    [allEntriesArr, sdMap, sectionTcIds, drafts],
+  );
+
+  // ── Handlers ──
+  const handleDraftChange = (day: string, periodId: number, teacherClassId: number) => {
+    const key = cellKey(day, periodId);
+    setDrafts((prev) => {
+      if (!teacherClassId) {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: { teacherClassId } };
     });
-    return map;
-  }, [filteredEntries]);
+  };
 
-  // Subject-details scoped to selected class
-  const classSubjectDetails = useMemo(
-    () => (selectedClass ? subjectDetails.filter((sd) => sd.classDtlsId === selectedClass) : subjectDetails),
-    [subjectDetails, selectedClass],
-  );
+  const handleBulkSave = async () => {
+    const entries = Object.entries(drafts);
+    if (entries.length === 0) { toast.info('No changes to save'); return; }
 
-  const handleSave = async () => {
-    if (!form.classDtlsId || !form.periodSlotId || !form.dayOfWeek) {
-      toast.error('Class, period slot, and day are required');
-      return;
+    // Validate conflicts
+    for (const [key, draft] of entries) {
+      const [day, periodId] = key.split('|');
+      const conflict = teacherConflict(draft.teacherClassId, day, Number(periodId));
+      if (conflict) { toast.error(conflict); return; }
     }
+
+    const payload: CreateTimetablePayload[] = entries.map(([key, draft]) => {
+      const [day, periodId] = key.split('|');
+      return {
+        session: CURRENT_SESSION,
+        teacherClassId: draft.teacherClassId,
+        periodId: Number(periodId),
+        dayOfWeek: day,
+      };
+    });
+
     try {
-      await createMutation.mutateAsync({
-        classDtlsId: form.classDtlsId,
-        periodSlotId: form.periodSlotId,
-        subjectDtlsId: form.subjectDtlsId || undefined,
-        dayOfWeek: form.dayOfWeek,
-      });
-      toast.success('Timetable entry added');
-      resetForm();
+      await bulkCreateMut.mutateAsync(payload);
+      toast.success(`${payload.length} timetable entries saved`);
+      setDrafts({});
+      setEditMode(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save');
+      toast.error(err.response?.data?.message || 'Failed to save timetable entries');
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMut.mutateAsync(id);
       toast.success('Entry removed');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete');
     }
   };
 
-  const resetForm = () => {
-    setShowAdd(false);
-    setForm({ classDtlsId: selectedClass || 0, periodSlotId: 0, subjectDtlsId: 0, dayOfWeek: '' });
-  };
+  const discardDrafts = () => { setDrafts({}); setEditMode(false); };
 
-  const selectedClassName = classSections.find((c) => c.id === selectedClass);
+  const hasClass = selectedClassName && selectedSectionName;
+  const draftCount = Object.keys(drafts).length;
+
+  // Conflict summary for UI
+  const conflictMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const [key, draft] of Object.entries(drafts)) {
+      const [day, periodId] = key.split('|');
+      const c = teacherConflict(draft.teacherClassId, day, Number(periodId));
+      if (c) m[key] = c;
+    }
+    return m;
+  }, [drafts, teacherConflict]);
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Timetable</h1>
-          <p className="text-muted-foreground mt-1">Build and manage weekly timetables for each class</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Select value={selectedClass ? String(selectedClass) : ''} onValueChange={(v) => setSelectedClass(Number(v))}>
-            <SelectTrigger className="rounded-xl w-[220px]">
-              <SelectValue placeholder="Filter by class…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">All Classes</SelectItem>
-              {classSections.map((cs) => (
-                <SelectItem key={cs.id} value={String(cs.id)}>
-                  {cs.className} — {cs.sectionName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => { setShowAdd(true); setForm({ classDtlsId: selectedClass || 0, periodSlotId: 0, subjectDtlsId: 0, dayOfWeek: '' }); }} className="rounded-xl">
-            <Plus className="h-4 w-4 mr-2" /> Add Entry
-          </Button>
-        </div>
+    <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Timetable</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Weekly timetable for session {CURRENT_SESSION}
+        </p>
       </div>
 
-      {/* Quick add form */}
-      {showAdd && (
-        <Card className="erp-card border-l-4 border-l-green-500">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class / Section *</Label>
-                <Select value={form.classDtlsId ? String(form.classDtlsId) : ''} onValueChange={(v) => setForm({ ...form, classDtlsId: Number(v) })}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {classSections.map((cs) => (
-                      <SelectItem key={cs.id} value={String(cs.id)}>{cs.className} — {cs.sectionName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Day *</Label>
-                <Select value={form.dayOfWeek} onValueChange={(v) => setForm({ ...form, dayOfWeek: v })}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select day" /></SelectTrigger>
-                  <SelectContent>
-                    {DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Period Slot *</Label>
-                <Select value={form.periodSlotId ? String(form.periodSlotId) : ''} onValueChange={(v) => setForm({ ...form, periodSlotId: Number(v) })}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {sorted.map((s) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        #{s.periodNumber} {s.startTime}–{s.endTime}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject (optional)</Label>
-                <Select value={form.subjectDtlsId ? String(form.subjectDtlsId) : ''} onValueChange={(v) => setForm({ ...form, subjectDtlsId: Number(v) })}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">— None —</SelectItem>
-                    {classSubjectDetails.map((sd) => (
-                      <SelectItem key={sd.id} value={String(sd.id)}>
-                        {sd.subjectName} ({sd.teacherName || sd.teacherId})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* Class + Section selectors */}
+      <Card className="erp-card">
+        <CardContent className="p-6 flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1.5 min-w-44">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Class</Label>
+            <select
+              value={selectedClassName}
+              onChange={(e) => { setSelectedClassName(e.target.value); setSelectedSectionName(''); setEditMode(false); setDrafts({}); }}
+              className="h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select class…</option>
+              {classNames.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-40">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section</Label>
+            <select
+              value={selectedSectionName}
+              onChange={(e) => { setSelectedSectionName(e.target.value); setEditMode(false); setDrafts({}); }}
+              className="h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={!selectedClassName}
+            >
+              <option value="">Select section…</option>
+              {sectionsForClass.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          {hasClass && (
+            <div className="flex items-center gap-2 ml-auto">
+              {editMode ? (
+                <>
+                  <Button
+                    onClick={handleBulkSave}
+                    disabled={draftCount === 0 || bulkCreateMut.isPending || Object.keys(conflictMap).length > 0}
+                    className="rounded-xl"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {bulkCreateMut.isPending ? 'Saving…' : `Save ${draftCount} entries`}
+                  </Button>
+                  <Button variant="ghost" onClick={discardDrafts} className="rounded-xl">
+                    <X className="h-4 w-4 mr-2" /> Discard
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setEditMode(true)} className="rounded-xl">
+                  <Plus className="h-4 w-4 mr-2" /> Edit Timetable
+                </Button>
+              )}
             </div>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={handleSave} disabled={createMutation.isPending} className="rounded-xl">
-                <Save className="h-4 w-4 mr-2" /> Add
-              </Button>
-              <Button variant="ghost" onClick={resetForm} className="rounded-xl">
-                <X className="h-4 w-4 mr-2" /> Cancel
-              </Button>
-            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Subject-Teacher legend */}
+      {hasClass && mappingsForSection.length > 0 && (
+        <Card className="erp-card">
+          <CardHeader className="py-4 px-6 border-b border-border/50 bg-muted/10">
+            <CardTitle className="text-sm font-bold">Subject Mappings — {selectedClassName} {selectedSectionName}</CardTitle>
+            <CardDescription className="text-xs">
+              {mappingsForSection.length} subject-teacher assignments available
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 flex flex-wrap gap-2">
+            {mappingsForSection.map((m) => (
+              <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 border border-border/40 text-xs">
+                <span className="font-bold text-foreground">{m.subjectName}</span>
+                <span className="text-muted-foreground">— {m.teacherName || m.teacherId}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {/* Timetable grid */}
-      {isLoading ? (
-        <Card className="erp-card animate-pulse">
-          <CardContent className="p-6"><div className="h-64 bg-muted rounded" /></CardContent>
-        </Card>
+      {hasClass && mappingsForSection.length === 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 flex items-center gap-3 text-amber-700 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          No subject-teacher mappings exist for {selectedClassName}-{selectedSectionName}. Create them in Subject Mapping first.
+        </div>
+      )}
+
+      {/* Conflict warnings */}
+      {Object.keys(conflictMap).length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-1">
+          <div className="flex items-center gap-2 text-amber-700 font-bold text-sm">
+            <AlertTriangle className="h-4 w-4" /> Conflicts detected — fix before saving
+          </div>
+          {Object.entries(conflictMap).map(([key, msg]) => {
+            const [day, periodId] = key.split('|');
+            const slot = sorted.find((s) => s.id === Number(periodId));
+            return (
+              <p key={key} className="text-xs text-amber-600 ml-6">
+                {day} Period #{slot?.periodNumber}: {msg}
+              </p>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Timetable Grid */}
+      {!hasClass ? (
+        <div className="py-24 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+          <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-[11px] font-bold uppercase tracking-widest">Select a class and section to view the timetable</p>
+        </div>
+      ) : loadingTimetable ? (
+        <Card className="erp-card animate-pulse"><CardContent className="p-6"><div className="h-64 bg-muted rounded" /></CardContent></Card>
       ) : sorted.length === 0 ? (
         <div className="py-16 text-center">
           <Calendar className="h-10 w-10 mx-auto mb-3 opacity-20" />
-          <p className="text-sm font-bold text-muted-foreground">No period slots defined</p>
-          <p className="text-xs text-muted-foreground mt-1">Create period slots first before building the timetable</p>
+          <p className="text-sm font-bold text-muted-foreground">No period slots defined yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Create period slots first in the Period Slots page</p>
         </div>
       ) : (
         <Card className="erp-card overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[800px]">
+              <table className="w-full border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-muted/30">
-                    <th className="py-3 px-4 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-r border-border/40 w-[100px]">
+                    <th className="py-3 px-4 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-r border-border/40 w-[110px]">
                       Period
                     </th>
                     {DAYS.map((d) => (
@@ -220,26 +340,33 @@ export default function TimetablePage() {
                     <tr key={slot.id}>
                       <td className="py-2 px-4 border-b border-r border-border/30 text-xs whitespace-nowrap">
                         <div className="font-bold">#{slot.periodNumber}</div>
-                        <div className="text-muted-foreground">{slot.startTime}–{slot.endTime}</div>
+                        <div className="text-muted-foreground">{slot.startTime} – {slot.endTime}</div>
                       </td>
                       {DAYS.map((day) => {
-                        const entry = grid[day]?.[slot.id];
+                        const key    = cellKey(day, slot.id);
+                        const existing = existingGrid[key];
+                        const draft    = drafts[key];
+                        const conflict = conflictMap[key];
+
                         return (
-                          <td key={day} className="py-2 px-3 border-b border-r border-border/30 text-center align-top min-w-[120px]">
-                            {entry ? (
-                              <div className="group relative">
-                                <div className="text-xs font-semibold text-primary">{entry.subjectName || '—'}</div>
-                                {entry.teacherName && (
-                                  <div className="text-[10px] text-muted-foreground">{entry.teacherName}</div>
-                                )}
-                                <Button
-                                  variant="ghost" size="icon"
-                                  onClick={() => handleDelete(entry.id)}
-                                  className="h-5 w-5 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
+                          <td key={day} className={cn(
+                            'py-2 px-2 border-b border-r border-border/30 text-center align-top min-w-[130px]',
+                            conflict && 'bg-amber-50',
+                          )}>
+                            {existing ? (
+                              <ExistingCell
+                                entry={existing}
+                                sd={sdMap.get(existing.teacherClassId)}
+                                onDelete={handleDelete}
+                                isDeleting={deleteMut.isPending}
+                              />
+                            ) : editMode ? (
+                              <DraftSelect
+                                value={draft?.teacherClassId ?? 0}
+                                mappings={mappingsForSection}
+                                onChange={(tcId) => handleDraftChange(day, slot.id, tcId)}
+                                conflict={conflict}
+                              />
                             ) : (
                               <span className="text-muted-foreground/30 text-xs">—</span>
                             )}
@@ -253,6 +380,69 @@ export default function TimetablePage() {
             </div>
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function ExistingCell({
+  entry, sd, onDelete, isDeleting,
+}: {
+  entry: TimetableEntry;
+  sd?: SubjectDetail;
+  onDelete: (id: number) => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <div className="group relative py-1">
+      <div className="text-xs font-semibold text-primary">{sd?.subjectName || `#${entry.teacherClassId}`}</div>
+      {sd?.teacherName && (
+        <div className="text-[10px] text-muted-foreground mt-0.5">{sd.teacherName}</div>
+      )}
+      <Button
+        variant="ghost" size="icon"
+        onClick={() => onDelete(entry.id)}
+        disabled={isDeleting}
+        className="h-5 w-5 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
+function DraftSelect({
+  value, mappings, onChange, conflict,
+}: {
+  value: number;
+  mappings: SubjectDetail[];
+  onChange: (tcId: number) => void;
+  conflict?: string;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={cn(
+          'w-full h-8 text-[11px] px-1.5 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring',
+          conflict ? 'border-amber-400 bg-amber-50' : value ? 'border-primary/40 bg-primary/5' : 'border-input',
+        )}
+      >
+        <option value="">—</option>
+        {mappings.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.subjectName} — {m.teacherName || m.teacherId}
+          </option>
+        ))}
+      </select>
+      {value > 0 && !conflict && (
+        <Check className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-500 pointer-events-none" />
+      )}
+      {conflict && (
+        <AlertTriangle className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-amber-500 pointer-events-none" />
       )}
     </div>
   );

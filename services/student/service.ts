@@ -132,6 +132,7 @@ export const studentService = {
 
   filterAttendance: async (params: AttendanceFilterParams): Promise<AttendanceRecord[]> => {
     const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params });
-    return res.data?.data ?? res.data ?? [];
+    const data = res.data?.data ?? res.data;
+    return Array.isArray(data) ? data : [];
   },
 };

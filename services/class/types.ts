@@ -14,5 +14,6 @@ export type {
   CreatePeriodSlotPayload,
   TimetableEntry,
   CreateTimetablePayload,
+  TimetableFilterParams,
   ClassSectionItem,
 } from '../../types/class.types';

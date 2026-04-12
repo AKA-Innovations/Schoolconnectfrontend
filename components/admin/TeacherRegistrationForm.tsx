@@ -13,9 +13,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { teacherService } from '@/services/teacher.service';
+import { useCreateSubjectDetail, useDeleteSubjectDetail } from '@/hooks/useClasses';
+import { CURRENT_SESSION } from '@/lib/constants';
 import { TeacherRegistrationData, TeacherClass } from '@/types/roles';
 import { useAuthStore } from '@/store/authStore';
-import { useClassSectionLists, useClassList } from '@/hooks/useClasses';
+import { useClassSectionLists, useClassList, useSubjectOptions } from '@/hooks/useClasses';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -45,32 +47,48 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
   // Fetch available class-sections for dropdowns
   const { data: classSections = [] } = useClassSectionLists();
   const { data: classNames = [] } = useClassList();
+  const createSubjectMut = useCreateSubjectDetail();
+  const deleteSubjectMut = useDeleteSubjectDetail();
 
   const [formData, setFormData] = useState<TeacherRegistrationData>(() => ({
-    username: initialData?.username ?? '',
-    password: '',
-    schoolId: initialData?.schoolId ?? schoolId ?? '',
-    employeeId: initialData?.employeeId ?? '',
-    isPrincipal: initialData?.isPrincipal ?? false,
-    isCoordinator: initialData?.isCoordinator ?? false,
-    isClassTeacher: initialData?.isClassTeacher ?? false,
-    isSubjectTeacher: initialData?.isSubjectTeacher ?? false,
-    firstName: initialData?.firstName ?? '',
-    lastName: initialData?.lastName ?? '',
-    dateOfBirth: initialData?.dateOfBirth
-      ? new Date(initialData.dateOfBirth).toISOString().slice(0, 10)
-      : '',
-    gender: initialData?.gender ?? '',
-    mobileNumber: initialData?.mobileNumber ?? '',
-    alternateMobileNumber: initialData?.alternateMobileNumber ?? '',
-    emailId: initialData?.emailId ?? '',
-    joiningDate: initialData?.schoolRecords?.[0]?.joiningDate
-      ? new Date(initialData.schoolRecords[0].joiningDate).toISOString().slice(0, 10)
-      : '',
-    employeeEmail: initialData?.employeeEmail ?? initialData?.schoolRecords?.[0]?.employeeEmail ?? '',
-    classes: initialData?.classes ?? [],
-  }));
+  username: initialData?.user?.username ?? '',   // ✅ FIXED
+  password: '',
+  schoolId: initialData?.schoolId ?? schoolId ?? '',
+  employeeId: initialData?.employeeId ?? '',
 
+  isPrincipal: initialData?.isPrincipal ?? false,
+  isCoordinator: initialData?.isCoordinator ?? false,
+  isClassTeacher: initialData?.isClassTeacher ?? false,
+  isSubjectTeacher: initialData?.isSubjectTeacher ?? false,
+
+  firstName: initialData?.firstName ?? '',
+  lastName: initialData?.lastName ?? '',
+
+  dateOfBirth: initialData?.dateOfBirth
+    ? new Date(initialData.dateOfBirth).toISOString().slice(0, 10)
+    : '',
+
+  gender: initialData?.gender ?? '',
+  mobileNumber: initialData?.mobileNumber ?? '',
+  alternateMobileNumber: initialData?.alternateMobileNumber ?? '',
+  emailId: initialData?.emailId ?? '',
+
+  // ✅ FIXED (correct source)
+  joiningDate: initialData?.schoolRecord?.joiningDate
+    ? new Date(initialData.schoolRecord.joiningDate)
+        .toISOString()
+        .slice(0, 10)
+    : '',
+
+  // ✅ FIXED (correct source)
+  employeeEmail:
+    initialData?.schoolRecord?.employeeEmail ??
+    initialData?.employeeEmail ??
+    '',
+
+  classes: initialData?.classes ?? [],
+}));
+console.log('INITIAL DATA 👉', initialData);
   // ─── Class Teacher Assignment state ──────────────────────────────────────
   const [classTeacherClassId, setClassTeacherClassId] = useState<number | null>(
     initialData?.classTeacherAssignment?.classDtlsId ?? null
@@ -93,6 +111,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
     sectionName: '',
     subjectName: '',
   });
+  const { data: subjectOptions = [] } = useSubjectOptions();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -204,12 +223,9 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           const toAdd = coordinatorClasses.filter((className) => !prevClassNames.includes(className));
           const toRemove = prevClassNames.filter((className) => !coordinatorClasses.includes(className));
           await Promise.all([
-            ...toAdd.flatMap((className) => {
-              const matchingSections = classSections.filter((c: any) => c.className === className);
-              return matchingSections.map((section: any) =>
-                teacherService.addCoordinatorClass({ teacherId: initialData.id, classDtlsId: section.id }),
-              );
-            }),
+            ...toAdd.map((className) =>
+              teacherService.addCoordinatorClass({ session: CURRENT_SESSION, teacherId: initialData.id, className }),
+            ),
             ...toRemove.flatMap((className) => {
               const mappings = (initialData?.coordinatorMappings ?? []).filter((m: any) => {
                 const mappedClassName = m.className ?? classSections.find((c: any) => c.id === m.classDtlsId)?.className;
@@ -222,6 +238,34 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           await Promise.all(
             initialData.coordinatorMappings.map((m: any) => teacherService.removeCoordinatorClass(m.id))
           );
+        }
+
+        // 4. Sync pedagogical mappings (subject-dtls) with backend
+        // Existing mappings for this teacher are in initialData.classes (each may have .id)
+        try {
+          const existing: any[] = initialData?.classes ?? [];
+          const desired: any[] = formData.classes ?? [];
+
+          // Add new mappings that don't exist yet (use react-query mutations)
+          const toAdd = desired.filter((d) => !existing.some((ex) => (
+            ex.className === d.className && ex.sectionName === d.sectionName && ex.subjectName === d.subjectName
+          )));
+          const toRemove = existing.filter((ex) => !desired.some((d) => (
+            ex.className === d.className && ex.sectionName === d.sectionName && ex.subjectName === d.subjectName
+          )));
+
+          await Promise.all(toAdd.map((d) => createSubjectMut.mutateAsync({
+            session: CURRENT_SESSION,
+            teacherId: initialData.id,
+            className: d.className,
+            sectionName: d.sectionName,
+            subjectName: d.subjectName,
+          })));
+
+          await Promise.all(toRemove.map((ex) => ex.id ? deleteSubjectMut.mutateAsync(ex.id) : Promise.resolve()));
+        } catch (err) {
+          console.error('Failed syncing pedagogical mappings', err);
+          toast.error('Failed to sync pedagogical mappings. Please try updating mappings separately.');
         }
 
         toast.success('Teacher profile updated successfully');
@@ -237,7 +281,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           ...rest,
           classTeacherClass: cs ? { className: cs.className, sectionName: cs.sectionName } : undefined,
           coordinatorClasses: formData.isCoordinator
-            ? coordinatorClasses
+            ? coordinatorClasses.map((className) => ({ className, session: CURRENT_SESSION }))
             : undefined,
         };
 
@@ -362,7 +406,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
           <CardContent className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <FG label="School ID" required>
-                <Input name="schoolId" required value={formData.schoolId} onChange={handleInputChange} className="rounded-xl" placeholder="School UUID" />
+                <Input name="schoolId" required value={formData.schoolId} disabled={isEditMode} onChange={handleInputChange} className="rounded-xl" placeholder="School UUID" />
               </FG>
               <FG label="Employee ID" required>
                 <Input name="employeeId" required value={formData.employeeId} onChange={handleInputChange} className="rounded-xl" placeholder="Employee Code" />
@@ -527,17 +571,49 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
             <div className="p-4 bg-muted/5 rounded-2xl border border-border/50 flex flex-wrap gap-4 items-end mb-6">
               <div className="flex-1 min-w-30">
                 <FG label="Grade">
-                  <Input placeholder="Grade (e.g. 10)" value={newClass.className} onChange={e => setNewClass({ ...newClass, className: e.target.value })} className="rounded-xl" />
+                  <select
+                    value={newClass.className}
+                    onChange={(e) => setNewClass((p) => ({ ...p, className: e.target.value, sectionName: '', subjectName: '' }))}
+                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select class</option>
+                    {classNames.map((cn) => (
+                      <option key={cn} value={cn}>{cn}</option>
+                    ))}
+                  </select>
                 </FG>
               </div>
               <div className="flex-1 min-w-20">
                 <FG label="Section">
-                  <Input placeholder="Section (e.g. A)" value={newClass.sectionName} onChange={e => setNewClass({ ...newClass, sectionName: e.target.value })} className="rounded-xl" />
+                  <select
+                    value={newClass.sectionName}
+                    onChange={(e) => setNewClass((p) => ({ ...p, sectionName: e.target.value }))}
+                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={!newClass.className}
+                  >
+                    <option value="">{newClass.className ? 'Select section' : 'Select class first'}</option>
+                    {classSections
+                      .filter((cs: any) => cs.className === newClass.className)
+                      .map((cs: any) => (
+                        <option key={cs.id} value={cs.sectionName}>{cs.sectionName}</option>
+                      ))}
+                  </select>
                 </FG>
               </div>
               <div className="flex-2 min-w-37.5">
                 <FG label="Subject">
-                  <Input placeholder="Subject" value={newClass.subjectName} onChange={e => setNewClass({ ...newClass, subjectName: e.target.value })} className="rounded-xl" />
+                  <select
+                    value={newClass.subjectName}
+                    onChange={(e) => setNewClass((p) => ({ ...p, subjectName: e.target.value }))}
+                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select subject</option>
+                    {subjectOptions
+                      .filter((s: any) => String(s.className) === String(newClass.className))
+                      .map((s: any) => (
+                        <option key={s.id ?? s.subjectName} value={s.subjectName}>{s.subjectName}</option>
+                      ))}
+                  </select>
                 </FG>
               </div>
               <Button type="button" onClick={addClass} className="h-10 w-10 p-0 rounded-xl">

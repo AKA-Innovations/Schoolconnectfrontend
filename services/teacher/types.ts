@@ -1,6 +1,7 @@
 export type {
   Address,
   ClassTeacherAssignmentDetails,
+  CoordinatorClassMapping,
   SchoolRecord,
   Teacher,
   TeacherClass,
@@ -15,12 +16,4 @@ export interface ClassTeacherAssignment {
   className: string;
   sectionName: string;
   schoolId: string;
-}
-
-export interface CoordinatorClassMapping {
-  id?: number;
-  teacherId: string;
-  classDtlsId: number;
-  className?: string;
-  sectionName?: string;
 }

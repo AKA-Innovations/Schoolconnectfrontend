@@ -262,7 +262,7 @@ export default function ClassRoomPage() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right pr-6">
-                                <Link href={`/dashboard/admin/student/${s.id}`}>
+                                <Link href={`/dashboard/teacher/students/${s.id}`}>
                                   <Button variant="ghost" size="sm" className="rounded-xl h-8 px-3 text-xs font-bold opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all">
                                     View <ArrowRight size={12} className="ml-1" />
                                   </Button>

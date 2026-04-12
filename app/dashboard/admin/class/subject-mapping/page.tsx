@@ -13,6 +13,7 @@ import {
   useSubjectDetails, useCreateSubjectDetail,
   useUpdateSubjectDetail, useDeleteSubjectDetail,
   useSubjectOptions, useClassSectionLists,
+  useClassList,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -26,9 +27,18 @@ export default function SubjectDetailsPage() {
   const { data: mappings = [], isLoading } = useSubjectDetails();
   const { data: subjects = [] } = useSubjectOptions();
   const { data: classSections = [] } = useClassSectionLists();
+  const { data: uniqueClasses = [] } = useClassList();
+  
   const schoolId = useAuthStore((s) => s.schoolId);
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
   const teachers = teachersData?.data ?? [];
+
+  // id → display name lookup used in the table
+  const teacherNameMap = React.useMemo(() => {
+    const m = new Map<string, string>();
+    teachers.forEach((t) => m.set(t.id, `${t.firstName} ${t.lastName}`.trim()));
+    return m;
+  }, [teachers]);
 
   const createMutation = useCreateSubjectDetail();
   const updateMutation = useUpdateSubjectDetail();
@@ -42,16 +52,19 @@ export default function SubjectDetailsPage() {
 
   // Available subjects filtered to the selected class-section
   const selectedSection = classSections.find((cs) => cs.id === form.classSectionId);
-  const availableSubjects = subjects.filter(
-    (s) => !selectedSection || s.className === `${selectedSection.className}-${selectedSection.sectionName}`,
-  );
+  const availableSubjects = subjects.filter((s) => {
+  if (!selectedSection) return false;
+
+  return String(s.className) === String(selectedSection.className);
+});
 
   const filtered = mappings.filter((m) => {
     const q = search.toLowerCase();
+    const resolvedName = teacherNameMap.get(m.teacherId) || m.teacherName || m.teacherId;
     return (
       m.className.toLowerCase().includes(q) ||
       m.sectionName.toLowerCase().includes(q) ||
-      (m.teacherName ?? '').toLowerCase().includes(q) ||
+      resolvedName.toLowerCase().includes(q) ||
       m.subjectName.toLowerCase().includes(q)
     );
   });
@@ -221,7 +234,7 @@ export default function SubjectDetailsPage() {
                       <td className="py-3 px-6">
                         <Badge variant="secondary" className="rounded-lg">{m.className} — {m.sectionName}</Badge>
                       </td>
-                      <td className="py-3 px-6 text-sm font-semibold">{m.teacherName || m.teacherId}</td>
+                      <td className="py-3 px-6 text-sm font-semibold">{teacherNameMap.get(m.teacherId) || m.teacherName || m.teacherId}</td>
                       <td className="py-3 px-6 text-sm">{m.subjectName || '—'}</td>
                       <td className="py-3 px-6 text-right">
                         <div className="flex justify-end gap-1">

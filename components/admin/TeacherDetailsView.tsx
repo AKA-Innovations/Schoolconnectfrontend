@@ -11,11 +11,14 @@ import { useTeacher, useUpdateTeacher, useUploadTeacherImage, useDeleteTeacherIm
   useAddAddress, useUpdateAddress, useDeleteAddress,
   useAddClass, useUpdateClass, useDeleteClass,
   useUpdateSchoolRecord } from '@/hooks/useTeachers';
+import { useSubjectDetails, useCreateSubjectDetail, useDeleteSubjectDetail, useSubjectOptions, useClassSectionLists } from '@/hooks/useClasses';
 import { Teacher, Address, TeacherClass, SchoolRecord } from '@/types/roles';
+import { SubjectDetail } from '@/types/class.types';
+import { CURRENT_SESSION } from '@/lib/constants';
 import {
   ArrowLeft, Save, Plus, Trash2, MapPin, BookOpen, Briefcase,
   Users, Mail, Phone, Calendar, ShieldCheck, Activity,
-  Edit2, CheckCircle2, Camera, RefreshCw
+  Edit2, CheckCircle2, Camera, RefreshCw, GraduationCap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -119,11 +122,12 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
         <div className="overflow-x-auto pb-2">
           <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
             {[
-              { id: 'personal',   label: 'Identity'      },
-              { id: 'employment', label: 'Employment'    },
-              { id: 'classes',    label: 'Classes'       },
-              { id: 'addresses',  label: 'Addresses'     },
-              { id: 'extended',   label: 'Extended Data' },
+              { id: 'personal',     label: 'Identity'      },
+              { id: 'employment',   label: 'Employment'    },
+              { id: 'pedagogical',  label: 'Pedagogical'   },
+              { id: 'classes',      label: 'Classes'       },
+              { id: 'addresses',    label: 'Addresses'     },
+              { id: 'extended',     label: 'Extended Data' },
             ].map(tab => (
               <TabsTrigger key={tab.id} value={tab.id}
                 className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
@@ -133,11 +137,12 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
           </TabsList>
         </div>
         <div className="mt-6">
-          <TabsContent value="personal"   className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} /></TabsContent>
-          <TabsContent value="employment" className="mt-0"><EmploymentForm teacher={teacher} teacherId={teacherId} /></TabsContent>
-          <TabsContent value="classes"    className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} /></TabsContent>
-          <TabsContent value="addresses"  className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} /></TabsContent>
-          <TabsContent value="extended"   className="mt-0"><ExtendedDataSection teacher={teacher} teacherId={teacherId} /></TabsContent>
+          <TabsContent value="personal"    className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} /></TabsContent>
+          <TabsContent value="employment"  className="mt-0"><EmploymentForm teacher={teacher} teacherId={teacherId} /></TabsContent>
+          <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} /></TabsContent>
+          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} /></TabsContent>
+          <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} /></TabsContent>
+          <TabsContent value="extended"    className="mt-0"><ExtendedDataSection teacher={teacher} teacherId={teacherId} /></TabsContent>
         </div>
       </Tabs>
     </div>
@@ -644,6 +649,155 @@ function ExtendedDataSection({ teacher, teacherId }: { teacher: Teacher; teacher
             />
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Pedagogical Mapping Section (GET/POST/DELETE /class/subject-dtls) ───────
+
+function PedagogicalSection({ teacherId }: { teacherId: string }) {
+  const { data: allDetails, isLoading } = useSubjectDetails();
+  const { data: subjectOptsData } = useSubjectOptions();
+  const { data: classSectionsData } = useClassSectionLists();
+  const createMutation = useCreateSubjectDetail();
+  const deleteMutation = useDeleteSubjectDetail();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newMapping, setNewMapping] = useState({ className: '', sectionName: '', subjectName: '' });
+
+  const mappings: SubjectDetail[] = (allDetails ?? []).filter((d: SubjectDetail) => d.teacherId === teacherId);
+
+  const classNames: string[] = Array.from(new Set(
+    (classSectionsData?.classSections ?? classSectionsData ?? []).map((s: any) => String(s.className))
+  )).sort() as string[];
+
+  const sectionsForClass: string[] = Array.from(new Set(
+    (classSectionsData?.classSections ?? classSectionsData ?? [])
+      .filter((s: any) => String(s.className) === newMapping.className)
+      .map((s: any) => String(s.sectionName))
+  )).sort() as string[];
+
+  const subjectNamesForClass: string[] = Array.from(new Set(
+    (subjectOptsData ?? [])
+      .filter((s: any) => String(s.className) === newMapping.className)
+      .map((s: any) => String(s.subjectName))
+  )).sort() as string[];
+
+  const handleAdd = () => {
+    if (!newMapping.className || !newMapping.sectionName || !newMapping.subjectName) {
+      alert('Please select class, section, and subject.'); return;
+    }
+    createMutation.mutate(
+      { session: CURRENT_SESSION, teacherId, ...newMapping },
+      {
+        onSuccess: () => { setShowAdd(false); setNewMapping({ className: '', sectionName: '', subjectName: '' }); },
+        onError: (err: any) => alert(err.response?.data?.message || 'Failed to create mapping.'),
+      }
+    );
+  };
+
+  const handleDelete = (id: number) => {
+    if (!confirm('Remove this pedagogical mapping?')) return;
+    deleteMutation.mutate(id, {
+      onError: (err: any) => alert(err.response?.data?.message || 'Failed to delete mapping.'),
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+        <div>
+          <CardTitle className="text-xl font-bold tracking-tight">Pedagogical Mapping</CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-1">
+            Subject assignments for the current session ({CURRENT_SESSION}).
+          </CardDescription>
+        </div>
+        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
+          onClick={() => setShowAdd(v => !v)}>
+          <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Mapping'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-8 space-y-6">
+        {showAdd && (
+          <div className="p-6 rounded-2xl border border-primary/20 bg-primary/5 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-primary/70">New Mapping</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class *</Label>
+                <select
+                  value={newMapping.className}
+                  onChange={e => setNewMapping({ className: e.target.value, sectionName: '', subjectName: '' })}
+                  className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  <option value="">Select class</option>
+                  {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Section *</Label>
+                <select
+                  value={newMapping.sectionName}
+                  onChange={e => setNewMapping(p => ({ ...p, sectionName: e.target.value, subjectName: '' }))}
+                  className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={!newMapping.className}>
+                  <option value="">Select section</option>
+                  {sectionsForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
+                <select
+                  value={newMapping.subjectName}
+                  onChange={e => setNewMapping(p => ({ ...p, subjectName: e.target.value }))}
+                  className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={!newMapping.className}>
+                  <option value="">Select subject</option>
+                  {subjectNamesForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button size="sm" className="rounded-xl" onClick={handleAdd} disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Saving…' : 'Add Mapping'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => <div key={i} className="h-28 rounded-2xl bg-muted/20 animate-pulse" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {mappings.map((m: SubjectDetail) => (
+              <div key={m.id} className="p-5 rounded-2xl bg-muted/5 border border-border/50 group hover:border-primary/40 hover:bg-background transition-all relative">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600/70 group-hover:scale-110 transition-transform">
+                    <GraduationCap className="h-5 w-5" />
+                  </div>
+                  <Button size="icon" variant="ghost"
+                    className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => handleDelete(m.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <h4 className="font-bold text-foreground/80">{m.className} — {m.sectionName}</h4>
+                <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-1.5">{m.subjectName}</p>
+                {m.session && (
+                  <p className="text-[9px] text-muted-foreground/50 mt-1">Session: {m.session}</p>
+                )}
+              </div>
+            ))}
+            {mappings.length === 0 && !showAdd && (
+              <div className="col-span-full py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+                <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p className="text-[10px] font-bold uppercase tracking-widest">No pedagogical mappings yet.</p>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

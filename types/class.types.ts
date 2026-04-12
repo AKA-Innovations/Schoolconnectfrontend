@@ -114,23 +114,24 @@ export interface CreatePeriodSlotPayload {
 
 export interface TimetableEntry {
   id: number;
-  classDtlsId: number;
-  periodSlotId: number;
-  subjectDtlsId?: number;
+  session: string;
+  teacherClassId: number;   // ClassSubjectDtls.id
+  periodId: number;         // PeriodSlots.id
   dayOfWeek: string;
-  className?: string;
-  sectionName?: string;
-  subjectName?: string;
-  teacherName?: string;
-  startTime?: string;
-  endTime?: string;
+  schoolId?: string;
 }
 
 export interface CreateTimetablePayload {
-  classDtlsId: number;
-  periodSlotId: number;
-  subjectDtlsId?: number;
+  session: string;
+  teacherClassId: number;
+  periodId: number;
   dayOfWeek: string;
+}
+
+export interface TimetableFilterParams {
+  session?: string;
+  teacherClassId?: number;
+  dayOfWeek?: string;
 }
 
 // ─── Class Section Lists ─────────────────────────────────────────────────────

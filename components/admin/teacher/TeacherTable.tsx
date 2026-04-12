@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Eye, Edit, Trash2, Users } from 'lucide-react';
+import { Eye, Edit, UserCheck, UserX, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,11 +17,11 @@ type Props = {
   totalPages: number;
   onView: (t: Teacher) => void;
   onEdit: (t: Teacher) => void;
-  onDelete: (id: string) => void;
+  onToggleStatus: (id: string, isActive: boolean) => void;
   onPageChange: (p: number) => void;
 };
 
-export function TeacherTable({ teachers, isLoading, page, totalPages, onView, onEdit, onDelete, onPageChange }: Props) {
+export function TeacherTable({ teachers, isLoading, page, totalPages, onView, onEdit, onToggleStatus, onPageChange }: Props) {
   return (
     <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-slate-200/40 overflow-hidden bg-white">
       <CardContent className="p-0">
@@ -97,9 +97,15 @@ export function TeacherTable({ teachers, isLoading, page, totalPages, onView, on
                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onEdit(teacher)}>
                       <Edit size={16} className="text-slate-400" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-500" onClick={() => onDelete(teacher.id)}>
-                      <Trash2 size={16} />
-                    </Button>
+                    {teacher.status === 'active' ? (
+                      <Button variant="ghost" size="icon" title="Deactivate" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onToggleStatus(teacher.id, false)}>
+                        <UserX size={16} />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" title="Activate" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-500" onClick={() => onToggleStatus(teacher.id, true)}>
+                        <UserCheck size={16} />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

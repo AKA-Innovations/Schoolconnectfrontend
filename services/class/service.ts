@@ -100,28 +100,38 @@ export const classService = {
     teacherName?: string;
     schoolId?: string;
   }): Promise<ClassTeacherListResponse> => {
-    // Use class-section-lists and filter for entries with classTeacherId
     const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
       params: { schoolId: params?.schoolId },
     });
     const raw = response.data;
-    let all: ClassDetails[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+    const all: any[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.data)
+      ? raw.data
+      : [];
 
-    // Filter to entries with a class teacher
+    // Only entries that have a class teacher assigned
     let teacherEntries: ClassTeacher[] = all
       .filter((c) => c.classTeacherId)
       .map((c) => ({
         className: c.className,
         sectionName: c.sectionName,
-        maxLimit: c.maxLimit,
+        maxLimit: c.maxLimit ?? null,
         classTeacherId: c.classTeacherId,
-        teacherName: null,
-        teacherMobile: null,
+        teacherName: c.classTeacherName ?? null,
+        teacherMobile: c.classTeacherMobileNumber ?? null,
       }));
 
     if (params?.className) {
       const q = params.className.toLowerCase();
       teacherEntries = teacherEntries.filter((r) => r.className.toLowerCase().includes(q));
+    }
+
+    if (params?.teacherName) {
+      const q = params.teacherName.toLowerCase();
+      teacherEntries = teacherEntries.filter((r) => r.teacherName?.toLowerCase().includes(q));
     }
 
     return buildPage(teacherEntries, params?.page, params?.limit);
@@ -232,7 +242,7 @@ export const classService = {
 
   // ─── Timetable ────────────────────────────────────────────────────────────
 
-  getTimetable: async (params?: { classDtlsId?: number }): Promise<TimetableEntry[]> => {
+  getTimetable: async (params?: { session?: string; teacherClassId?: number; dayOfWeek?: string }): Promise<TimetableEntry[]> => {
     const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE, { params });
     return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
   },
@@ -240,6 +250,14 @@ export const classService = {
   createTimetableEntry: async (data: CreateTimetablePayload): Promise<TimetableEntry> => {
     const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, data);
     return res.data;
+  },
+
+  createTimetableBulk: async (data: CreateTimetablePayload[]): Promise<TimetableEntry[]> => {
+    // Backend only accepts single creates, so fire them in parallel
+    const results = await Promise.all(
+      data.map((entry) => api.post(API_ENDPOINTS.CLASS.TIMETABLE, entry).then((r) => r.data))
+    );
+    return results;
   },
 
   updateTimetableEntry: async (id: number, data: Partial<CreateTimetablePayload>): Promise<TimetableEntry> => {

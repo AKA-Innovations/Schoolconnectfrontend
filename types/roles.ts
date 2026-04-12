@@ -14,6 +14,8 @@ export interface User {
   isSubjectTeacher?: boolean;
   /** The class this teacher is assigned to as class teacher (first match) */
   classTeacherClass?: { className: string; sectionName: string } | null;
+  /** Class names this coordinator is responsible for */
+  coordinatorClasses?: string[];
 }
 
 export interface AuthState {
@@ -23,6 +25,13 @@ export interface AuthState {
   schoolId: string | null;
 }
 
+export interface CoordinatorClassMapping {
+  id: number;
+  className: string;
+  session: string;
+  schoolId?: string;
+}
+
 export interface Teacher {
   id: string;
   name?: string;
@@ -30,6 +39,7 @@ export interface Teacher {
   lastName: string;
   email?: string;
   emailId: string;
+  coordinatorMappings?: CoordinatorClassMapping[];
   employeeEmail: string;
   subject?: string;
   phone?: string;

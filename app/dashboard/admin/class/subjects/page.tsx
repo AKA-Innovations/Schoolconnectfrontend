@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,56 +9,117 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  useSubjectOptions, useCreateSubjectOption,
-  useUpdateSubjectOption, useDeleteSubjectOption,
-  useClassSectionLists,
+  useSubjectOptions,
+  useCreateSubjectOption,
+  useDeleteSubjectOption,
+  useClassList,
 } from '@/hooks/useClasses';
-import { Plus, Pencil, Trash2, BookOpen, Search, X, Save } from 'lucide-react';
+import { Plus, Trash2, BookOpen, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
 
 export default function SubjectsPage() {
   const { data: subjects = [], isLoading } = useSubjectOptions();
-  const { data: classSections = [] } = useClassSectionLists();
+  const { data: uniqueclasses = [] } = useClassList();
+
   const createMutation = useCreateSubjectOption();
-  const updateMutation = useUpdateSubjectOption();
   const deleteMutation = useDeleteSubjectOption();
 
   const [search, setSearch] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ subjectName: '', className: '', session: CURRENT_SESSION });
 
-  const filtered = subjects.filter((s) => {
-    const q = search.toLowerCase();
-    return (
-      s.subjectName.toLowerCase().includes(q) ||
-      (s.className ?? '').toLowerCase().includes(q)
-    );
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
+  const [form, setForm] = useState({
+    className: '',
+    session: CURRENT_SESSION,
+    subjects: [] as string[],
   });
 
-  const handleSave = async () => {
-    if (!form.subjectName.trim() || !form.className.trim()) {
-      toast.error('Subject name and class are required');
+  const [subjectInput, setSubjectInput] = useState('');
+
+  // 🔍 Filter
+  const filtered = subjects.filter((s: any) => {
+    const q = search.toLowerCase();
+
+    const matchesSearch =
+      s.subjectName?.toLowerCase().includes(q) ||
+      (s.className ?? '').toLowerCase().includes(q);
+
+    const matchesClass = selectedClass
+      ? s.className === selectedClass
+      : true;
+
+    return matchesSearch && matchesClass;
+  });
+
+  // 📄 Pagination
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+
+  const paginatedData = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedClass]);
+
+  // ➕ Add subject
+  const addSubject = () => {
+    const value = subjectInput.trim();
+    if (!value) return;
+
+    if (form.subjects.includes(value)) {
+      toast.error('Subject already added');
       return;
     }
+
+    setForm({ ...form, subjects: [...form.subjects, value] });
+    setSubjectInput('');
+  };
+
+  // ❌ Remove subject
+  const removeSubject = (sub: string) => {
+    setForm({
+      ...form,
+      subjects: form.subjects.filter((s) => s !== sub),
+    });
+  };
+
+  // 💾 Save
+  const handleSave = async () => {
+    if (!form.className.trim() || form.subjects.length === 0) {
+      toast.error('Class and at least one subject are required');
+      return;
+    }
+
     try {
-      if (editId) {
-        await updateMutation.mutateAsync({ id: editId, data: form });
-        toast.success('Subject updated');
-      } else {
-        await createMutation.mutateAsync(form);
-        toast.success('Subject created');
-      }
-      setForm({ subjectName: '', className: '', session: CURRENT_SESSION });
+      await createMutation.mutateAsync({
+        session: form.session,
+        className: form.className,
+        subjects: form.subjects,
+      });
+
+      toast.success('Subjects created');
+
+      setForm({
+        className: '',
+        session: CURRENT_SESSION,
+        subjects: [],
+      });
+      setSubjectInput('');
       setShowAdd(false);
-      setEditId(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save subject');
+      toast.error(err.response?.data?.message || 'Failed to save subjects');
     }
   };
 
+  // 🗑 Delete
   const handleDelete = async (id: number) => {
     try {
       await deleteMutation.mutateAsync(id);
@@ -68,117 +129,203 @@ export default function SubjectsPage() {
     }
   };
 
-  const startEdit = (s: any) => {
-    setEditId(s.id);
-    setForm({ subjectName: s.subjectName, className: s.className ?? '', session: s.session ?? CURRENT_SESSION });
-    setShowAdd(true);
-  };
-
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+    <div className="p-6 lg:p-8 space-y-6">
+      
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Subject Management</h1>
-          <p className="text-muted-foreground mt-1">Manage available subjects for your school</p>
+          <h1 className="text-3xl font-bold">Subject Management</h1>
+          <p className="text-muted-foreground">Manage subjects class-wise</p>
         </div>
-        <Button onClick={() => { setShowAdd(true); setEditId(null); setForm({ subjectName: '', className: '', session: CURRENT_SESSION }); }} className="rounded-xl">
-          <Plus className="h-4 w-4 mr-2" /> Add Subject
+
+        <Button onClick={() => setShowAdd(true)} className="rounded-xl">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Subjects
         </Button>
       </div>
 
-      {/* Add/Edit form */}
+      {/* Add Form */}
       {showAdd && (
-        <Card className="erp-card border-l-4 border-l-primary">
-          <CardContent className="p-6">
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[200px] space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject Name *</Label>
-                <Input value={form.subjectName} onChange={(e) => setForm({ ...form, subjectName: e.target.value })}
-                  placeholder="e.g. Mathematics" className="rounded-xl" />
-              </div>
-              <div className="flex-1 min-w-[150px] space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class — Section *</Label>
-                <Select value={form.className} onValueChange={(v) => setForm({ ...form, className: v })}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select class-section" /></SelectTrigger>
-                  <SelectContent>
-                    {classSections.map((cs) => (
-                      <SelectItem key={cs.id} value={`${cs.className}-${cs.sectionName}`}>
-                        {cs.className} — {cs.sectionName}
+        <Card>
+          <CardContent className="p-6 space-y-4">
+
+            {/* Class */}
+            <div>
+              <Label>Class *</Label>
+              <Select
+                value={form.className}
+                onValueChange={(v) => setForm({ ...form, className: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueclasses?.length ? (
+                    uniqueclasses.map((cls: string) => (
+                      <SelectItem key={cls} value={cls}>
+                        Class {cls}
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    ))
+                  ) : (
+                    <SelectItem disabled value="loading">
+                      Loading...
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Subjects */}
+            <div>
+              <Label>Subjects *</Label>
               <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending} className="rounded-xl">
-                  <Save className="h-4 w-4 mr-2" /> {editId ? 'Update' : 'Create'}
-                </Button>
-                <Button variant="ghost" onClick={() => { setShowAdd(false); setEditId(null); }} className="rounded-xl">
-                  <X className="h-4 w-4" />
-                </Button>
+                <Input
+                  value={subjectInput}
+                  onChange={(e) => setSubjectInput(e.target.value)}
+                  placeholder="Enter subject"
+                />
+                <Button onClick={addSubject}>Add</Button>
               </div>
+
+              <div className="flex flex-wrap gap-2 mt-2">
+                {form.subjects.map((sub) => (
+                  <Badge key={sub} className="flex items-center gap-1">
+                    {sub}
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => removeSubject(sub)}
+                    />
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button onClick={handleSave}>
+                Save
+              </Button>
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search subjects..." className="pl-9 rounded-xl" />
+      {/* Search + Filters */}
+      <div className="flex flex-wrap gap-3">
+
+        {/* Search */}
+        <div className="relative max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search subjects..."
+            className="pl-9"
+          />
+        </div>
+
+        {/* Class Filter */}
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by class" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Classes</SelectItem>
+            {uniqueclasses?.map((cls: string) => (
+              <SelectItem key={cls} value={cls}>
+                Class {cls}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Reset */}
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setSearch('');
+            setSelectedClass('');
+          }}
+        >
+          Reset
+        </Button>
       </div>
 
       {/* Table */}
-      <Card className="erp-card">
+      <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/50 bg-muted/20">
-                  <th className="text-left py-3 px-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">#</th>
-                  <th className="text-left py-3 px-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Subject Name</th>
-                  <th className="text-left py-3 px-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Class</th>
-                  <th className="text-right py-3 px-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Actions</th>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="p-3 text-left">#</th>
+                <th className="p-3 text-left">Subject</th>
+                <th className="p-3 text-left">Class</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className="p-4">Loading...</td>
                 </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  [1, 2, 3].map((i) => (
-                    <tr key={i} className="border-b border-border/30">
-                      <td colSpan={4} className="py-4 px-6"><div className="h-5 bg-muted rounded animate-pulse" /></td>
-                    </tr>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-16 text-center">
-                      <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                      <p className="text-sm font-bold text-muted-foreground">No subjects found</p>
+              ) : paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center py-10">
+                    <BookOpen className="mx-auto mb-2 opacity-20" />
+                    No subjects found
+                  </td>
+                </tr>
+              ) : (
+                paginatedData.map((s: any, idx: number) => (
+                  <tr key={s.id} className="border-b">
+                    <td className="p-3">{idx + 1}</td>
+                    <td className="p-3 font-medium">{s.subjectName}</td>
+                    <td className="p-3">{s.className}</td>
+                    <td className="p-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(s.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
-                ) : (
-                  filtered.map((s, idx) => (
-                    <tr key={s.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                      <td className="py-3 px-6 text-sm text-muted-foreground">{idx + 1}</td>
-                      <td className="py-3 px-6 text-sm font-semibold">{s.subjectName}</td>
-                      <td className="py-3 px-6 text-sm"><Badge variant="secondary" className="rounded-lg">{s.className || '—'}</Badge></td>
-                      <td className="py-3 px-6 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => startEdit(s)} className="h-8 w-8 rounded-lg">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)}
-                            disabled={deleteMutation.isPending}
-                            className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          <div className="flex justify-between items-center p-4">
+            <p className="text-sm">
+              Page {currentPage} of {totalPages || 1}
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+              >
+                Prev
+              </Button>
+
+              <Button
+                variant="outline"
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
           </div>
+
         </CardContent>
       </Card>
     </div>

@@ -217,7 +217,7 @@ export function useFilterAttendance(params: AttendanceFilterParams) {
   return useQuery({
     queryKey: attendanceKeys.filter(params),
     queryFn: () => studentService.filterAttendance(params),
-    enabled: !!(params.className && params.sectionName && params.date),
+    enabled: !!(params.className && params.date),
   });
 }
 

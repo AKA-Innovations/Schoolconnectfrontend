@@ -62,6 +62,12 @@ function mapBackendTeacher(t: any): Teacher {
     isCoordinator: t.isCoordinator ?? false,
     isClassTeacher: t.isClassTeacher ?? false,
     isSubjectTeacher: t.isSubjectTeacher ?? false,
+    coordinatorMappings: (t.coordinatorMappings ?? []).map((m: any): CoordinatorClassMapping => ({
+      id: m.id,
+      className: m.className ?? '',
+      session: m.session ?? '',
+      schoolId: m.schoolId,
+    })),
     classTeacherAssignment: mapClassTeacherAssignment(t),
     profileImageUrl: t.profileImageUrl,
     addresses: (t.addresses ?? []).map((a: any): Address => ({
@@ -261,7 +267,7 @@ export const teacherService = {
   },
 
   // ─── Coordinator-Class Mapping ─────────────────────────────────────────────
-  addCoordinatorClass: async (data: { teacherId: string; classDtlsId: number }): Promise<any> => {
+  addCoordinatorClass: async (data: { session: string; teacherId: string; className: string }): Promise<any> => {
     const response = await api.post(API_ENDPOINTS.TEACHER.COORDINATOR_CLASS, data);
     return response.data;
   },

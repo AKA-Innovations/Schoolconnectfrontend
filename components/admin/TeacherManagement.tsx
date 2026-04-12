@@ -7,7 +7,7 @@ import { Teacher, TeacherFilterParams } from '@/types/roles';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useTeacherList, useDeleteTeacher } from '@/hooks/useTeachers';
+import { useTeacherList, useToggleTeacherStatus } from '@/hooks/useTeachers';
 import { TeacherRegistrationForm } from '@/components/admin/TeacherRegistrationForm';
 import { TeacherDetailsView } from '@/components/admin/TeacherDetailsView';
 import { TeacherFilterBar } from '@/components/admin/teacher/TeacherFilterBar';
@@ -26,7 +26,7 @@ export function TeacherManagement() {
   const queryFilters: TeacherFilterParams = { ...filters, firstName: debouncedSearch || undefined };
 
   const { data, isLoading, isFetching, refetch } = useTeacherList(queryFilters);
-  const deleteMutation = useDeleteTeacher(queryFilters);
+  const toggleMutation = useToggleTeacherStatus(queryFilters);
 
   const teachers = data?.data ?? [];
   const totalPages = Math.ceil((data?.total ?? 0) / (filters.pageSize || 10));
@@ -36,10 +36,11 @@ export function TeacherManagement() {
     setFilters({ page: 1, pageSize: 10, schoolId: schoolId || '' });
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Remove this staff member from the directory?')) return;
-    deleteMutation.mutate(id, {
-      onError: () => alert('Could not remove staff member. Please try again.'),
+  const handleToggleStatus = (id: string, isActive: boolean) => {
+    const action = isActive ? 'activate' : 'deactivate';
+    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this staff member?`)) return;
+    toggleMutation.mutate({ id, isActive }, {
+      onError: () => alert(`Could not ${action} staff member. Please try again.`),
     });
   };
 
@@ -95,7 +96,7 @@ export function TeacherManagement() {
         totalPages={totalPages}
         onView={t => { setSelectedTeacher(t); setViewMode('details'); }}
         onEdit={t => { setSelectedTeacher(t); setViewMode('add'); }}
-        onDelete={handleDelete}
+        onToggleStatus={handleToggleStatus}
         onPageChange={p => setFilters(f => ({ ...f, page: p }))}
       />
     </div>

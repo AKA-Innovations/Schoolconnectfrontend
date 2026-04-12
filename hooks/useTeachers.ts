@@ -131,6 +131,17 @@ export function useDeleteTeacher(filters: TeacherFilterParams) {
   });
 }
 
+export function useToggleTeacherStatus(filters: TeacherFilterParams) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      teacherService.updateTeacherDetails(id, { isActive } as any),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: teacherKeys.all });
+    },
+  });
+}
+
 // ─── Class Teacher Assignment ────────────────────────────────────────────────
 
 export function useAddClassTeacher() {

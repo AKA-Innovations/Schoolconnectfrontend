@@ -10,6 +10,7 @@ import {
   CreateSubjectDetailPayload,
   CreatePeriodSlotPayload,
   CreateTimetablePayload,
+  TimetableFilterParams,
   UpdateClassPayload,
   ClassSummary,
 } from '@/services/class.service';
@@ -307,13 +308,13 @@ export function useDeletePeriodSlot() {
 
 export const timetableKeys = {
   all: ['timetable'] as const,
-  byClass: (classDtlsId: number) => ['timetable', classDtlsId] as const,
+  filtered: (params?: TimetableFilterParams) => ['timetable', params] as const,
 };
 
-export function useTimetable(classDtlsId?: number) {
+export function useTimetable(params?: TimetableFilterParams) {
   return useQuery({
-    queryKey: classDtlsId ? timetableKeys.byClass(classDtlsId) : timetableKeys.all,
-    queryFn: () => classService.getTimetable(classDtlsId ? { classDtlsId } : undefined),
+    queryKey: timetableKeys.filtered(params),
+    queryFn: () => classService.getTimetable(params),
   });
 }
 
@@ -321,6 +322,14 @@ export function useCreateTimetableEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateTimetablePayload) => classService.createTimetableEntry(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
+  });
+}
+
+export function useCreateTimetableBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateTimetablePayload[]) => classService.createTimetableBulk(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
   });
 }

@@ -103,11 +103,12 @@ export default function LoginPage() {
       document.cookie = `auth-token=${data.accessToken}; path=/; SameSite=Strict`;
       document.cookie = `user-role=${data.role}; path=/; SameSite=Strict`;
 
-      // If teacher, enrich auth store with sub-role flags from GET /teacher/:id
-      if (data.role === 'teacher' && backendUserId) {
+      // If teacher or subject_coordinator, enrich auth store with sub-role flags
+      if ((data.role === 'teacher' || data.role === 'subject_coordinator') && backendUserId) {
         try {
           const teacherDetails = await teacherService.getTeacherById(backendUserId);
           const assignedClass = teacherDetails.classTeacherAssignment ?? null;
+          const coordinatorClasses = (teacherDetails.coordinatorMappings ?? []).map((m) => m.className);
           setAuth({
             user: {
               ...userObj,
@@ -118,6 +119,7 @@ export default function LoginPage() {
               classTeacherClass: assignedClass
                 ? { className: assignedClass.className, sectionName: assignedClass.sectionName }
                 : null,
+              coordinatorClasses: coordinatorClasses.length > 0 ? coordinatorClasses : undefined,
             },
             token: data.accessToken,
           });

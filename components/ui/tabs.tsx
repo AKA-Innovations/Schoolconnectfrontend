@@ -3,6 +3,7 @@ import { cn } from "../../lib/utils"
 
 interface TabsProps {
   value?: string
+  defaultValue?: string
   onValueChange?: (value: string) => void
   children?: React.ReactNode
   className?: string
@@ -13,9 +14,19 @@ const TabsContext = React.createContext<{
   onValueChange: (value: string) => void
 }>({ value: "", onValueChange: () => {} })
 
-const Tabs: React.FC<TabsProps> = ({ value = "", onValueChange = () => {}, children, className }) => {
+const Tabs: React.FC<TabsProps> = ({ value, defaultValue = "", onValueChange, children, className }) => {
+  const [internalValue, setInternalValue] = React.useState(defaultValue)
+  const activeValue = value !== undefined ? value : internalValue
+
+  const handleChange = React.useCallback((newValue: string) => {
+    if (value === undefined) {
+      setInternalValue(newValue)
+    }
+    onValueChange?.(newValue)
+  }, [value, onValueChange])
+
   return (
-    <TabsContext.Provider value={{ value, onValueChange }}>
+    <TabsContext.Provider value={{ value: activeValue, onValueChange: handleChange }}>
       <div className={cn("w-full", className)}>{children}</div>
     </TabsContext.Provider>
   )
