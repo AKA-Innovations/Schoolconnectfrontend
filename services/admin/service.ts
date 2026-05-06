@@ -1,5 +1,4 @@
 import api from '../../lib/api';
-import { mockAdminSummary } from '../../lib/mockData';
 import { API_ENDPOINTS } from '../config';
 import type {
   AdminSummary,
@@ -12,40 +11,63 @@ import type {
   Teacher,
 } from './types';
 
-const DEV_MODE = false; // Toggle for mock vs real API
-
 export const adminService = {
   getSummary: async (schoolId: string): Promise<AdminSummary> => {
-    if (DEV_MODE) {
-      return new Promise((resolve) => setTimeout(() => resolve(mockAdminSummary), 800));
-    }
-    const [schoolRes, teachersRes] = await Promise.all([
+    const [schoolRes, teachersRes, studentsRes, classesRes] = await Promise.all([
       api.get(API_ENDPOINTS.SCHOOL.BY_ID(schoolId)),
-      api.get(API_ENDPOINTS.TEACHER.LIST, { params: { schoolId, pageSize: 1 } }),
+      api.get(API_ENDPOINTS.TEACHER.LIST, { params: { schoolId, pageSize: 5 } }),
+      api.get(API_ENDPOINTS.STUDENT.LIST, { params: { schoolId, limit: 5 } }),
+      api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, { params: { schoolId } }),
     ]);
 
-    const school = schoolRes.data;
-    const teacherCount: number = teachersRes.data?.pagination?.totalItemsCount ?? 0;
+    // Defensive data extraction: common in this backend to wrap objects in 'data'
+    const schoolDataRaw = schoolRes.data?.data || schoolRes.data;
+    const teacherDataRaw = teachersRes.data?.data || teachersRes.data;
+    const studentDataRaw = studentsRes.data?.data || studentsRes.data;
+    const classesDataRaw = classesRes.data?.data || classesRes.data;
 
-    const ownerName = school.ownerDetails
-      ? `${school.ownerDetails.firstName} ${school.ownerDetails.lastName}`
+    const teacherCount = teacherDataRaw?.pagination?.totalItemsCount ?? teacherDataRaw?.totalItems ?? teacherDataRaw?.items?.length ?? 0;
+    const studentCount = studentDataRaw?.pagination?.totalItemsCount ?? studentDataRaw?.totalItems ?? studentDataRaw?.items?.length ?? 0;
+    const classCount = Array.isArray(classesDataRaw) ? classesDataRaw.length : 0;
+
+    const ownerName = schoolDataRaw?.ownerDetails
+      ? `${schoolDataRaw.ownerDetails.firstName} ${schoolDataRaw.ownerDetails.lastName}`
       : '—';
+
+    // Map backend teachers to Summary Teacher type
+    const mappedTeachers = (teacherDataRaw?.items || []).map((t: any) => ({
+      id: t.id,
+      name: `${t.firstName} ${t.lastName}`,
+      subject: t.subject || 'Faculty',
+      status: 'active',
+    }));
+
+    // Map backend students to Summary Student type
+    const mappedStudents = (studentDataRaw?.items || []).map((s: any) => ({
+      id: s.id,
+      name: `${s.firstName} ${s.lastName}`,
+      grade: s.grade || '—',
+      class: s.className || '—',
+      status: 'active',
+    }));
 
     return {
       kpis: [
         { label: 'Total Teachers', value: teacherCount, trendType: 'neutral', iconName: 'Users' },
+        { label: 'Total Students', value: studentCount, trendType: 'neutral', iconName: 'GraduationCap' },
+        { label: 'Total Classes', value: classCount, trendType: 'neutral', iconName: 'Building2' },
       ],
       school: {
-        id: school.id,
-        name: school.name,
+        id: schoolDataRaw?.id || schoolId,
+        name: schoolDataRaw?.name || 'School Profile',
         principal: ownerName,
-        totalStudents: 0,
+        totalStudents: studentCount,
         totalTeachers: teacherCount,
-        totalClasses: 0,
+        totalClasses: classCount,
       },
-      teachers: [],
-      students: [],
-      classes: [],
+      teachers: mappedTeachers,
+      students: mappedStudents,
+      classes: Array.isArray(classesDataRaw) ? classesDataRaw.slice(0, 5) : [],
       recentData: [],
     };
   },
@@ -55,25 +77,6 @@ export const adminService = {
     limit = 20,
     filters?: AdminTeacherFilters,
   ): Promise<AdminTeacherListResponse> => {
-    if (DEV_MODE) {
-      let teachers = [...mockAdminSummary.teachers];
-      if (filters) {
-        if (filters.schoolId && filters.schoolId !== 'all') {
-          const filtered = teachers.filter((t) => t.schoolId === filters.schoolId);
-          if (filtered.length > 0) teachers = filtered;
-        }
-        if (filters.subject) teachers = teachers.filter((t) => t.subject?.toLowerCase().includes(filters.subject!.toLowerCase()));
-        if (filters.status) teachers = teachers.filter((t) => t.status === filters.status);
-      }
-      const start = (page - 1) * limit;
-      const end = start + limit;
-      return new Promise((resolve) => setTimeout(() => resolve({
-        teachers: teachers.slice(start, end),
-        total: teachers.length,
-        page,
-        limit,
-      }), 500));
-    }
     const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
     if (filters) {
       if (filters.schoolId) params.append('schoolId', filters.schoolId);
@@ -85,50 +88,21 @@ export const adminService = {
   },
 
   addTeacher: async (teacher: Omit<Teacher, 'id'>) => {
-    if (DEV_MODE) {
-      const newTeacher = { ...teacher, id: Date.now().toString() } as Teacher;
-      mockAdminSummary.teachers.push(newTeacher);
-      return new Promise((resolve) => setTimeout(() => resolve(newTeacher), 500));
-    }
     const response = await api.post(API_ENDPOINTS.ADMIN.TEACHERS, teacher);
     return response.data;
   },
 
   updateTeacher: async (id: string, teacher: Partial<Teacher>) => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.teachers.findIndex((t) => t.id === id);
-      if (index !== -1) {
-        mockAdminSummary.teachers[index] = { ...mockAdminSummary.teachers[index], ...teacher };
-        return new Promise((resolve) => setTimeout(() => resolve(mockAdminSummary.teachers[index]), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.put(API_ENDPOINTS.ADMIN.TEACHER_BY_ID(id), teacher);
     return response.data;
   },
 
   deleteTeacher: async (id: string) => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.teachers.findIndex((t) => t.id === id);
-      if (index !== -1) {
-        mockAdminSummary.teachers.splice(index, 1);
-        return new Promise((resolve) => setTimeout(() => resolve({ success: true }), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.delete(API_ENDPOINTS.ADMIN.TEACHER_BY_ID(id));
     return response.data;
   },
 
   assignClassesToTeacher: async (teacherId: string, classIds: string[]) => {
-    if (DEV_MODE) {
-      const teacher = mockAdminSummary.teachers.find((t) => t.id === teacherId);
-      if (teacher) {
-        mockAdminSummary.classes.filter((c) => classIds.includes(c.id)).map((c) => c.name);
-        return new Promise((resolve) => setTimeout(() => resolve(teacher), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.put(API_ENDPOINTS.ADMIN.TEACHER_CLASSES(teacherId), { classIds });
     return response.data;
   },
@@ -138,26 +112,6 @@ export const adminService = {
     limit = 20,
     filters?: AdminStudentFilters,
   ): Promise<AdminStudentListResponse> => {
-    if (DEV_MODE) {
-      let students = [...mockAdminSummary.students];
-      if (filters) {
-        if (filters.schoolId && filters.schoolId !== 'all') {
-          const filtered = students.filter((s) => s.schoolId === filters.schoolId);
-          if (filtered.length > 0) students = filtered;
-        }
-        if (filters.grade) students = students.filter((s) => s.grade === filters.grade);
-        if (filters.class) students = students.filter((s) => s.class.toLowerCase().includes(filters.class!.toLowerCase()));
-        if (filters.status) students = students.filter((s) => s.status === filters.status);
-      }
-      const start = (page - 1) * limit;
-      const end = start + limit;
-      return new Promise((resolve) => setTimeout(() => resolve({
-        students: students.slice(start, end),
-        total: students.length,
-        page,
-        limit,
-      }), 500));
-    }
     const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
     if (filters) {
       if (filters.schoolId) params.append('schoolId', filters.schoolId);
@@ -170,47 +124,21 @@ export const adminService = {
   },
 
   addStudent: async (student: Omit<Student, 'id'>) => {
-    if (DEV_MODE) {
-      const newStudent = { ...student, id: Date.now().toString() };
-      mockAdminSummary.students.push(newStudent);
-      return new Promise((resolve) => setTimeout(() => resolve(newStudent), 500));
-    }
     const response = await api.post(API_ENDPOINTS.ADMIN.STUDENTS, student);
     return response.data;
   },
 
   updateStudent: async (id: string, student: Partial<Student>) => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.students.findIndex((s) => s.id === id);
-      if (index !== -1) {
-        mockAdminSummary.students[index] = { ...mockAdminSummary.students[index], ...student };
-        return new Promise((resolve) => setTimeout(() => resolve(mockAdminSummary.students[index]), 500));
-      }
-      throw new Error('Student not found');
-    }
     const response = await api.put(API_ENDPOINTS.ADMIN.STUDENT_BY_ID(id), student);
     return response.data;
   },
 
   deleteStudent: async (id: string) => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.students.findIndex((s) => s.id === id);
-      if (index !== -1) {
-        mockAdminSummary.students.splice(index, 1);
-        return new Promise((resolve) => setTimeout(() => resolve({ success: true }), 500));
-      }
-      throw new Error('Student not found');
-    }
     const response = await api.delete(API_ENDPOINTS.ADMIN.STUDENT_BY_ID(id));
     return response.data;
   },
 
   getClasses: async (schoolId?: string) => {
-    if (DEV_MODE) {
-      let classes = mockAdminSummary.classes;
-      if (schoolId) classes = classes.filter((c) => c.schoolId === schoolId);
-      return new Promise((resolve) => setTimeout(() => resolve(classes), 500));
-    }
     const params = schoolId ? `?schoolId=${schoolId}` : '';
     const response = await api.get(`${API_ENDPOINTS.ADMIN.CLASSES}${params}`);
     return response.data;

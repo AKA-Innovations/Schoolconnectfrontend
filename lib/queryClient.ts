@@ -3,8 +3,8 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000, // React Query v5 uses gcTime instead of cacheTime
+      staleTime: Infinity, // Data is never considered stale automatically
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,

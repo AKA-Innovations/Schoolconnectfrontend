@@ -34,8 +34,13 @@ export function middleware(request: NextRequest) {
     const targetBase = roleRoutes[role];
     
     if (targetBase && !pathname.startsWith(targetBase)) {
-      // Redirect to correct dashboard if trying to access unauthorized dashboard
-      return NextResponse.redirect(new URL(targetBase, request.url));
+      // Allow teachers to access the coordinator dashboard (page contents have their own sub-role guards)
+      if (role === 'teacher' && pathname.startsWith('/dashboard/coordinator')) {
+        // Let it pass
+      } else {
+        // Redirect to correct dashboard if trying to access unauthorized dashboard
+        return NextResponse.redirect(new URL(targetBase, request.url));
+      }
     }
   }
 

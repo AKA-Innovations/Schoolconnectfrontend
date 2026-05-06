@@ -16,12 +16,12 @@ import { cn } from '@/lib/utils';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuthStore } from '@/store/authStore';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
 
 export default function ClassRoomPage() {
-  const user = useAuthStore((s) => s.user);
-  const isClassTeacher = user?.isClassTeacher ?? false;
-  const assignedClass = user?.classTeacherClass ?? null;
+  const { user, isClassTeacher, assignedClass, isSyncing } = useTeacherProfile();
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('students');
@@ -74,6 +74,19 @@ export default function ClassRoomPage() {
     { id: 'attendance', label: 'Attendance', icon: <ClipboardCheck size={13} /> },
     { id: 'academics', label: 'Academics', icon: <BookOpen size={13} /> },
   ];
+
+  // ── Syncing state ────────────────────────────────────────────────────────
+  if (isSyncing && !assignedClass) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] gap-4 transition-all">
+        <Loader2 className="h-10 w-10 text-primary animate-spin" />
+        <div className="text-center space-y-1">
+          <p className="text-sm font-bold text-foreground">Verifying Class Teacher Permissions</p>
+          <p className="text-xs text-muted-foreground">Synchronizing your assignment details...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Not a class teacher → show access-denied card ──────────────────────────
   if (!isClassTeacher || !assignedClass) {

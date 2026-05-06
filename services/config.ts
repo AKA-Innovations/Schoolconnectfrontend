@@ -1,11 +1,11 @@
 export const API_ENDPOINTS = {
   ADMIN: {
-    TEACHERS: '/admin/teachers',
-    TEACHER_BY_ID: (id: string) => `/admin/teachers/${id}`,
-    TEACHER_CLASSES: (teacherId: string) => `/admin/teachers/${teacherId}/classes`,
-    STUDENTS: '/admin/students',
-    STUDENT_BY_ID: (id: string) => `/admin/students/${id}`,
-    CLASSES: '/admin/classes',
+    TEACHERS: '/teacher',
+    TEACHER_BY_ID: (id: string) => `/teacher/${id}`,
+    TEACHER_CLASSES: (teacherId: string) => `/teacher/${teacherId}/classes`,
+    STUDENTS: '/student',
+    STUDENT_BY_ID: (id: string) => `/student/${id}`,
+    CLASSES: '/class/class-dtls',
   },
   SCHOOL: {
     BY_ID: (id: string) => `/school/${id}`,

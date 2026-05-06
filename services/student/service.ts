@@ -1,5 +1,4 @@
 import api from '../../lib/api';
-import { mockStudentSummary } from '../../lib/mockData';
 import { API_ENDPOINTS } from '../config';
 import type {
   AttendanceFilterParams,
@@ -23,8 +22,26 @@ import type {
 } from './types';
 
 export const studentService = {
-  getSummary: async (): Promise<StudentSummary> =>
-    new Promise((resolve) => setTimeout(() => resolve(mockStudentSummary), 800)),
+  getSummary: async (studentId?: string): Promise<StudentSummary> => {
+    if (!studentId) throw new Error('Student ID is required');
+
+    // Fetch recent attendance
+    const attendance = await studentService.filterAttendance({ studentId, limit: 10 });
+    
+    return {
+      kpis: [
+        { label: 'Attendance Rate', value: '—', trendType: 'neutral', iconName: 'Calendar' },
+        { label: 'Upcoming Tasks', value: 0, trendType: 'neutral', iconName: 'ClipboardList' },
+      ],
+      assignments: [], // Academic tasks not yet centralized in one endpoint
+      attendance: attendance.map(a => ({
+        date: a.date,
+        status: a.status.toLowerCase() as any,
+        subject: a.subjectName || 'General',
+      })),
+      recentData: [],
+    };
+  },
 
   register: async (data: RegisterStudentPayload) => {
     const res = await api.post(API_ENDPOINTS.STUDENT.REGISTER, data);
@@ -33,6 +50,15 @@ export const studentService = {
 
   list: async (filters: StudentListFilters = {}): Promise<StudentListResponse> => {
     const res = await api.get(API_ENDPOINTS.STUDENT.LIST, { params: filters });
+    
+    // Normalize backend 'academicDtls' to frontend 'academics'
+    if (res.data?.items) {
+      res.data.items = res.data.items.map((item: any) => ({
+        ...item,
+        academics: item.academicDtls ?? item.academics ?? [],
+      }));
+    }
+    
     return res.data;
   },
 
@@ -132,7 +158,35 @@ export const studentService = {
 
   filterAttendance: async (params: AttendanceFilterParams): Promise<AttendanceRecord[]> => {
     const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params });
-    const data = res.data?.data ?? res.data;
-    return Array.isArray(data) ? data : [];
+    const rawData = res.data?.data ?? res.data;
+    
+    console.log('Raw Attendance API Response:', res.data);
+
+    // Note: Backend has a misspelling 'attendence'. We handle both 'attendence' and 'attendance'
+    const records = Array.isArray(rawData) 
+      ? rawData 
+      : (rawData?.attendence || rawData?.attendance || rawData?.data?.attendence || rawData?.items || []);
+
+    return records.map((r: any) => {
+      const rawStatus = r.attendanceStatus || r.status || 'Present';
+      const normalizedStatus = (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()) as any;
+      
+      const mappedRecord = {
+        id: r.recordId || r.id,
+        recordId: r.recordId || r.id,
+        studentId: r.studentId, // May be undefined in some GET responses
+        date: params.date || r.attendanceDate || '',
+        status: normalizedStatus,
+        attendanceStatus: rawStatus,
+        studentName: r.studentName,
+        studentRollNumber: r.studentRollNumber,
+        firstName: r.studentName?.split(' ')[0] || '',
+        lastName: r.studentName?.split(' ').slice(1).join(' ') || '',
+        rollNumber: r.studentRollNumber || '—',
+      };
+
+      console.log(`[Mapping] Record ${mappedRecord.recordId}: Roll ${mappedRecord.studentRollNumber}, Status ${mappedRecord.status}`);
+      return mappedRecord;
+    });
   },
 };
