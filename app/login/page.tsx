@@ -66,23 +66,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const isDev = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-      let data: { accessToken: string; role: string; username: string; userId?: string; schoolId?: string | null };
-
-      if (isDev) {
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        const role = username.includes('principal') ? 'principal' : username.includes('teacher') ? 'teacher' : 'school_admin';
-        data = {
-          accessToken: `mock-token-${Math.random().toString(36).slice(2)}`,
-          role,
-          username,
-          userId: `mock-user-${Math.random().toString(36).slice(2)}`,
-          schoolId: 'school-123',
-        };
-      } else {
-        const response = await api.post('/auth/login', { username, password });
-        data = response.data;
-      }
+      const response = await api.post('/auth/login', { username, password });
+      const data: { accessToken: string; role: string; username: string; userId?: string; schoolId?: string | null } = response.data;
 
       // Prefer authoritative schoolId and userId from JWT payload (backend embeds them in token)
       const payload = parseJwt(data.accessToken);
@@ -263,23 +248,7 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Dev Helper - Only visible in DEV_MODE */}
-              {process.env.NEXT_PUBLIC_DEV_MODE === 'true' && (
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 text-center mb-4">Quick Auth (Dev)</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {['admin', 'teacher'].map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => { setUsername(`${role}@test.com`); setPassword('password'); }}
-                        className="px-4 py-2 text-xs rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium capitalize"
-                      >
-                        {role}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </CardContent>
           </Card>
         </div>

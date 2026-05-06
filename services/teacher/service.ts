@@ -1,5 +1,4 @@
 import api from '../../lib/api';
-import { mockAdminSummary, mockTeacherSummary } from '../../lib/mockData';
 import { API_ENDPOINTS } from '../config';
 import type {
   Address,
@@ -36,13 +35,20 @@ function mapClassTeacherAssignment(t: any): ClassTeacherAssignmentDetails | null
   };
 }
 
-function mapBackendTeacher(t: any): Teacher {
+function mapBackendTeacher(t: any): Teacher & { role: 'teacher', name: string, username: string } {
   const schoolRecord = t.schoolRecord ?? {};
+  const firstName = t.firstName ?? '';
+  const lastName = t.lastName ?? '';
+  
   return {
     id: t.id,
-    firstName: t.firstName ?? '',
-    lastName: t.lastName ?? '',
+    role: 'teacher',
+    name: `${firstName} ${lastName}`.trim() || t.username || 'Teacher',
+    username: t.username || t.emailId || '',
+    firstName,
+    lastName,
     emailId: t.emailId,
+    // ... existing fields ...
     employeeEmail: schoolRecord.employeeEmail ?? t.emailId,
     mobileNumber: t.mobileNumber,
     alternateMobileNumber: t.alternateMobileNumber,
@@ -58,17 +64,17 @@ function mapBackendTeacher(t: any): Teacher {
     joiningDate: schoolRecord.joiningDate ?? '',
     dateOfBirth: t.dateOfBirth ?? '',
     gender: t.gender ?? '',
-    isPrincipal: t.isPrincipal ?? false,
-    isCoordinator: t.isCoordinator ?? false,
-    isClassTeacher: t.isClassTeacher ?? false,
-    isSubjectTeacher: t.isSubjectTeacher ?? false,
-    coordinatorMappings: (t.coordinatorMappings ?? []).map((m: any): CoordinatorClassMapping => ({
+    isPrincipal: !!t.isPrincipal,
+    isCoordinator: !!t.isCoordinator,
+    isClassTeacher: !!t.isClassTeacher || (t.classTeacherClasses && t.classTeacherClasses.length > 0) || !!t.classTeacherAssignment || !!t.classTeacherClass,
+    isSubjectTeacher: !!t.isSubjectTeacher || (t.classes && t.classes.length > 0),
+    coordinatorMappings: (t.coordinatorClasses ?? t.coordinatorMappings ?? []).map((m: any): CoordinatorClassMapping => ({
       id: m.id,
       className: m.className ?? '',
       session: m.session ?? '',
       schoolId: m.schoolId,
     })),
-    classTeacherAssignment: mapClassTeacherAssignment(t),
+    classTeacherClass: mapClassTeacherAssignment(t),
     profileImageUrl: t.profileImageUrl,
     addresses: (t.addresses ?? []).map((a: any): Address => ({
       id: a.id,
@@ -95,56 +101,52 @@ function mapBackendTeacher(t: any): Teacher {
   };
 }
 
-const DEV_MODE = false;
-
 export const teacherService = {
-  getSummary: async (): Promise<TeacherSummary> => {
-    if (DEV_MODE) {
-      return new Promise((resolve) => setTimeout(() => resolve(mockTeacherSummary), 800));
+  getSummary: async (userId?: string): Promise<TeacherSummary> => {
+    if (!userId) {
+      throw new Error('User ID is required for teacher summary');
     }
-    return new Promise((resolve) => setTimeout(() => resolve(mockTeacherSummary), 800));
+
+    const response = await api.get(API_ENDPOINTS.TEACHER.BY_ID(userId));
+    const teacherData = response.data?.data || response.data;
+    
+    const details = teacherData?.data || teacherData;
+    
+    // The backend provides classes in two lists: as a class teacher and as a coordinator
+    const coordinatorClasses = (details.coordinatorClasses || []).map((c: any) => ({
+      id: `coord-${c.id}`,
+      name: c.className || 'Unnamed Class',
+      subject: 'Coordinator',
+      time: '—',
+      room: '—',
+    }));
+
+    const classTeacherClasses = (teacherData.classTeacherClasses || []).map((c: any) => ({
+      id: `ct-${c.id}`,
+      name: `${c.className} ${c.sectionName}`,
+      subject: 'Class Teacher',
+      time: '—',
+      room: '—',
+    }));
+
+    const mappedClasses = [...coordinatorClasses, ...classTeacherClasses];
+
+    return {
+      kpis: [
+        { label: 'Assigned Classes', value: mappedClasses.length, trendType: 'neutral', iconName: 'Users' },
+        { label: 'Total Mappings', value: mappedClasses.length, trendType: 'neutral', iconName: 'BookOpen' },
+      ],
+      classes: mappedClasses,
+      recentData: [],
+    };
   },
 
   registerTeacher: async (data: TeacherRegistrationData): Promise<any> => {
-    if (DEV_MODE) {
-      const newTeacher: Teacher = {
-        ...data,
-        id: Math.random().toString(36).substr(2, 9),
-        status: 'active',
-        employeeEmail: data.employeeEmail || data.emailId,
-        mobileNumber: data.mobileNumber || '',
-        joiningDate: data.joiningDate || new Date().toISOString(),
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        emailId: data.emailId || '',
-        schoolId: data.schoolId || '1',
-        employeeId: data.employeeId || 'EMP-NEW',
-        dateOfBirth: data.dateOfBirth || '',
-        gender: data.gender || '',
-        isPrincipal: data.isPrincipal || false,
-        isCoordinator: data.isCoordinator || false,
-        isClassTeacher: data.isClassTeacher || false,
-        isSubjectTeacher: data.isSubjectTeacher || false,
-        classes: data.classes || [],
-        addresses: [],
-        schoolRecords: [],
-      };
-      mockAdminSummary.teachers.push(newTeacher);
-      return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: newTeacher }), 500));
-    }
     const response = await api.post(API_ENDPOINTS.TEACHER.REGISTER, data);
     return response.data;
   },
 
   updateTeacherDetails: async (id: string, data: TeacherUpdateDetails): Promise<any> => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.teachers.findIndex((t) => t.id === id);
-      if (index !== -1) {
-        mockAdminSummary.teachers[index] = { ...mockAdminSummary.teachers[index], ...data };
-        return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: mockAdminSummary.teachers[index] }), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.put(API_ENDPOINTS.TEACHER.DETAILS(id), data);
     return response.data;
   },
@@ -166,14 +168,6 @@ export const teacherService = {
   },
 
   deleteTeacher: async (id: string): Promise<any> => {
-    if (DEV_MODE) {
-      const index = mockAdminSummary.teachers.findIndex((t) => t.id === id);
-      if (index !== -1) {
-        mockAdminSummary.teachers.splice(index, 1);
-        return new Promise((resolve) => setTimeout(() => resolve({ success: true }), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.put(API_ENDPOINTS.TEACHER.DETAILS(id), { isActive: false });
     return response.data;
   },
@@ -214,27 +208,6 @@ export const teacherService = {
   },
 
   listTeachers: async (params: TeacherFilterParams): Promise<{ data: Teacher[], total: number }> => {
-    if (DEV_MODE) {
-      let teachers = [...mockAdminSummary.teachers];
-      if (params.schoolId) teachers = teachers.filter((t) => t.schoolId === params.schoolId);
-      if (params.subjectName) teachers = teachers.filter((t) =>
-        t.classes.some((c) => c.subjectName?.toLowerCase().includes(params.subjectName!.toLowerCase()))
-      );
-      if (params.firstName) teachers = teachers.filter((t) =>
-        t.firstName.toLowerCase().includes(params.firstName!.toLowerCase()) ||
-        t.lastName.toLowerCase().includes(params.firstName!.toLowerCase())
-      );
-
-      const page = params.page || 1;
-      const pageSize = params.pageSize || 10;
-      const start = (page - 1) * pageSize;
-      const end = start + pageSize;
-
-      return new Promise((resolve) => setTimeout(() => resolve({
-        data: teachers.slice(start, end),
-        total: teachers.length,
-      }), 500));
-    }
     const response = await api.get(API_ENDPOINTS.TEACHER.LIST, { params });
     const raw = response.data;
     return {
@@ -244,13 +217,6 @@ export const teacherService = {
   },
 
   getTeacherById: async (id: string): Promise<Teacher> => {
-    if (DEV_MODE) {
-      const teacher = mockAdminSummary.teachers.find((t) => t.id === id);
-      if (teacher) {
-        return new Promise((resolve) => setTimeout(() => resolve(teacher), 500));
-      }
-      throw new Error('Teacher not found');
-    }
     const response = await api.get(API_ENDPOINTS.TEACHER.BY_ID(id));
     return mapBackendTeacher(response.data?.data ?? response.data);
   },

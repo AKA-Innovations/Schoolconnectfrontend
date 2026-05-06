@@ -140,4 +140,5 @@ export interface ClassSectionItem {
   id: number;
   className: string;
   sectionName: string;
+  session?: string;
 }

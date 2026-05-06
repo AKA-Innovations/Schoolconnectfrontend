@@ -43,6 +43,7 @@ const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     { name: 'Period Slots', href: '/dashboard/admin/class/period-slots', icon: Clock },
     { name: 'Timetable', href: '/dashboard/admin/class/timetable', icon: Calendar },
     { name: 'Class Teachers', href: '/dashboard/admin/class/teachers', icon: Users2 },
+    { name: 'Attendance', href: '/dashboard/admin/attendance', icon: ClipboardCheck },
     { name: 'School Profile', href: '/dashboard/admin/school', icon: Building2 },
     { name: 'My Profile', href: '/dashboard/admin/profile', icon: UserCog },
   ],
@@ -62,7 +63,10 @@ const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     { name: 'Attendance', href: '/dashboard/teacher/attendance', icon: ClipboardCheck, requiresTeacherRole: 'isClassTeacher' },
     { name: 'Schedule', href: '/dashboard/teacher/schedule', icon: Calendar },
     // Coordinator workspace items — only visible to coordinators
-    { name: 'Coordinator', href: '/dashboard/teacher/coordinator', icon: Compass, requiresTeacherRole: 'isCoordinator' },
+    { name: 'Attendance (Coord)', href: '/dashboard/coordinator/attendance', icon: ClipboardCheck, requiresTeacherRole: 'isCoordinator' },
+    { name: 'Coordinator Layout', href: '/dashboard/teacher/coordinator', icon: Compass, requiresTeacherRole: 'isCoordinator' },
+    { name: 'Subject Mapping', href: '/dashboard/coordinator/subject-mapping', icon: Grid3X3, requiresTeacherRole: 'isCoordinator' },
+    { name: 'Edit Schedule', href: '/dashboard/coordinator/timetable', icon: Calendar, requiresTeacherRole: 'isCoordinator' },
   ],
   subject_coordinator: [
     { name: 'Dashboard', href: '/dashboard/coordinator', icon: LayoutDashboard },
@@ -71,7 +75,7 @@ const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     { name: 'Students', href: '/dashboard/coordinator/students', icon: GraduationCap },
     { name: 'Attendance', href: '/dashboard/coordinator/attendance', icon: ClipboardCheck },
     { name: 'Timetable', href: '/dashboard/coordinator/timetable', icon: Calendar },
-    { name: 'Subjects', href: '/dashboard/coordinator/subjects', icon: Layers },
+    { name: 'Subject Mapping', href: '/dashboard/coordinator/subject-mapping', icon: Grid3X3 },
   ],
   student: [],
   parent: [],

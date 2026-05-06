@@ -163,10 +163,14 @@ export interface CreateAddressPayload {
 
 export interface AttendanceRecord {
   id?: number;
-  studentId: string;
+  recordId?: number; // From Swagger GET
+  studentId?: string; // Missing in Swagger GET but present in PUT/POST
   date: string;
-  status: 'Present' | 'Absent' | 'Late' | 'HalfDay';
+  status: 'Present' | 'Absent' | 'Late' | 'HalfDay'; // Unified TitleCase status
+  attendanceStatus?: string; // Raw status from Swagger
   remarks?: string;
+  studentName?: string; // From Swagger GET
+  studentRollNumber?: string; // From Swagger GET
   firstName?: string;
   lastName?: string;
   rollNumber?: string;
@@ -183,10 +187,13 @@ export interface AttendanceFilterParams {
   studentId?: string;
   className?: string;
   sectionName?: string;
+  session?: string;
+  teacherId?: string;
   date?: string;
   fromDate?: string;
   toDate?: string;
   status?: string;
+  limit?: number;
 }
 
 export type { StudentSummary };

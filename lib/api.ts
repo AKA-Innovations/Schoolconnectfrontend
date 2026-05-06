@@ -28,15 +28,15 @@ const api = axios.create({
   },
 });
 
+import { useAuthStore } from '../store/authStore';
+
 // Request interceptor to attach token
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const authStorage = localStorage.getItem('auth-storage');
-    if (authStorage) {
-      const { state } = JSON.parse(authStorage);
-      if (state.token) {
-        config.headers.Authorization = `Bearer ${state.token}`;
-      }
+    // Read directly from Zustand's in-memory state instead of parsing localStorage string every request.
+    const token = useAuthStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
   }
   return config;
