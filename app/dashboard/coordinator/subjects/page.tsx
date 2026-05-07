@@ -16,20 +16,17 @@ import { Layers, Plus, Trash2, Save, X } from 'lucide-react';
 
 export default function CoordinatorSubjectsPage() {
   const user = useAuthStore((s) => s.user);
-  const schoolId = useAuthStore((s) => s.schoolId) ?? '';
-  const coordinatorClasses = user?.coordinatorClasses ?? [];
-
-  const { data: allClassSections = [] } = useClassSectionLists();
-  const { data: subjectDetails = [], isLoading } = useSubjectDetails();
-  const { data: subjectOptions = [] } = useSubjectOptions();
-  const { data: teachersData } = useTeacherList({ schoolId, page: 1, pageSize: 500 });
-  const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
 
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
       : allClassSections,
-    [allClassSections, coordinatorClasses],
+    [allClassSections, coordClassNames],
   );
 
   const [selectedId, setSelectedId] = useState<number>(0);
@@ -37,8 +34,8 @@ export default function CoordinatorSubjectsPage() {
 
   const sectionSubjects = useMemo(() => {
     if (!selectedSection) {
-      return coordinatorClasses.length > 0
-        ? subjectDetails.filter((sd) => coordinatorClasses.includes(sd.className))
+      return coordClassNames.length > 0
+        ? subjectDetails.filter((sd) => coordClassNames.includes(String(sd.className)))
         : subjectDetails;
     }
     return subjectDetails.filter(
@@ -93,7 +90,7 @@ export default function CoordinatorSubjectsPage() {
             <Layers className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Subject Mapping</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Subject Mapping</h1>
             <p className="text-muted-foreground mt-1 text-sm">Assign subject teachers to class-sections</p>
           </div>
         </div>

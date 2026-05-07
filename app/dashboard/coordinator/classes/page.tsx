@@ -17,12 +17,18 @@ export default function CoordinatorClassesPage() {
   const { data: subjectDetails = [] } = useSubjectDetails();
   const { data: timetableEntries = [] } = useTimetable();
 
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   // Scope to coordinator's assigned classes
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
       : allClassSections,
-    [allClassSections, coordinatorClasses],
+    [allClassSections, coordClassNames],
   );
 
   // Group by className
@@ -44,8 +50,8 @@ export default function CoordinatorClassesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Managed Classes</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {coordinatorClasses.length > 0
-              ? `You coordinate: ${coordinatorClasses.join(', ')}`
+            {coordClassNames.length > 0
+              ? `You coordinate: ${coordClassNames.join(', ')}`
               : 'All classes overview'}
           </p>
         </div>

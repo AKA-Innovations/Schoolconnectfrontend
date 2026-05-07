@@ -49,7 +49,8 @@ export const studentService = {
   },
 
   list: async (filters: StudentListFilters = {}): Promise<StudentListResponse> => {
-    const res = await api.get(API_ENDPOINTS.STUDENT.LIST, { params: filters });
+    const { schoolId, ...rest } = filters;
+    const res = await api.get(API_ENDPOINTS.STUDENT.LIST, { params: rest });
     
     // Normalize backend 'academicDtls' to frontend 'academics'
     if (res.data?.items) {
@@ -157,7 +158,8 @@ export const studentService = {
   },
 
   filterAttendance: async (params: AttendanceFilterParams): Promise<AttendanceRecord[]> => {
-    const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params });
+    const { schoolId, ...rest } = params;
+    const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params: rest });
     const rawData = res.data?.data ?? res.data;
     
     console.log('Raw Attendance API Response:', res.data);

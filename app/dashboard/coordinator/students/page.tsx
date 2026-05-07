@@ -16,11 +16,17 @@ export default function CoordinatorStudentsPage() {
   const coordinatorClasses = user?.coordinatorClasses ?? [];
 
   const { data: allClassSections = [] } = useClassSectionLists();
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
       : allClassSections,
-    [allClassSections, coordinatorClasses],
+    [allClassSections, coordClassNames],
   );
 
   const [selectedId, setSelectedId] = useState<number>(0);
@@ -58,8 +64,8 @@ export default function CoordinatorStudentsPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Students</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              {coordinatorClasses.length > 0
-                ? `Students in: ${coordinatorClasses.join(', ')}`
+              {coordClassNames.length > 0
+                ? `Students in: ${coordClassNames.join(', ')}`
                 : 'All students'}
             </p>
           </div>

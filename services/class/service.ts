@@ -46,9 +46,7 @@ export const classService = {
     className?: string;
     schoolId?: string;
   }): Promise<ClassListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
-      params: { schoolId: params?.schoolId },
-    });
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
     const rawClasses = response.data;
     let all: ClassDetails[] = Array.isArray(rawClasses) ? rawClasses : Array.isArray(rawClasses?.data) ? rawClasses.data : [];
 
@@ -61,9 +59,7 @@ export const classService = {
   },
 
   getClass: async (classDtlsId: number, schoolId?: string): Promise<ClassDetails> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
-      params: { schoolId },
-    });
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
     const raw = response.data;
     const all: ClassDetails[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
     const found = all.find((r) => r.id === classDtlsId);
@@ -87,7 +83,7 @@ export const classService = {
 
   getSectionsByClassName: async (className: string, schoolId?: string): Promise<string[]> => {
     const response = await api.get(API_ENDPOINTS.CLASS.SECTIONS, {
-      params: { className, schoolId },
+      params: { className },
     });
     const raw = response.data;
     return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
@@ -100,9 +96,7 @@ export const classService = {
     teacherName?: string;
     schoolId?: string;
   }): Promise<ClassTeacherListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
-      params: { schoolId: params?.schoolId },
-    });
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
     const raw = response.data;
     const all: any[] = Array.isArray(raw)
       ? raw
@@ -156,24 +150,24 @@ export const classService = {
   // ─── Class API endpoints (new /class/* routes) ─────────────────────────────
 
   getClassList: async (schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASSES, { params: { schoolId } });
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASSES);
     const raw = res.data;
     return Array.isArray(raw) ? raw : raw?.classes ?? raw?.data ?? [];
   },
 
   getSections: async (className: string, schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SECTIONS, { params: { className, schoolId } });
+    const res = await api.get(API_ENDPOINTS.CLASS.SECTIONS, { params: { className } });
     const raw = res.data;
     return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
   },
 
   getCombinations: async (schoolId?: string): Promise<any[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.COMBINATIONS, { params: { schoolId } });
+    const res = await api.get(API_ENDPOINTS.CLASS.COMBINATIONS);
     return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
   },
 
   getClassSectionLists: async (schoolId?: string): Promise<ClassSectionItem[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, { params: { schoolId } });
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
     return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
   },
 

@@ -34,26 +34,32 @@ export default function CoordinatorSubjectMappingPage() {
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
   const teachers = teachersData?.data ?? [];
 
+  // Normalize coordinator classes to strings for robust filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   // Filter lists based on what coordinator is allowed to manage
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0 
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
-      : allClassSections, // If empty, assume they somehow got here, fallback safely
-    [allClassSections, coordinatorClasses]
+    () => coordClassNames.length > 0 
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
+      : allClassSections,
+    [allClassSections, coordClassNames]
   );
   
   const subjects = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allSubjects.filter((s) => coordinatorClasses.includes(s.className))
+    () => coordClassNames.length > 0
+      ? allSubjects.filter((s) => coordClassNames.includes(String(s.className)))
       : allSubjects,
-    [allSubjects, coordinatorClasses]
+    [allSubjects, coordClassNames]
   );
 
   const mappings = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allMappings.filter((m) => coordinatorClasses.includes(m.className))
+    () => coordClassNames.length > 0
+      ? allMappings.filter((m) => coordClassNames.includes(String(m.className)))
       : allMappings,
-    [allMappings, coordinatorClasses]
+    [allMappings, coordClassNames]
   );
 
   // id → display name lookup used in the table
@@ -153,7 +159,7 @@ export default function CoordinatorSubjectMappingPage() {
             <Layers className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Teacher-Subject Mapping</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Teacher-Subject Mapping</h1>
             <p className="text-muted-foreground mt-1">Assign teachers to subjects for {coordinatorClasses.join(', ')}</p>
           </div>
         </div>

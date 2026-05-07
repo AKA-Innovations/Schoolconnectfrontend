@@ -14,8 +14,8 @@ export function useTeacherList(filters: TeacherFilterParams) {
   return useQuery({
     queryKey: teacherKeys.list(filters),
     queryFn: () => teacherService.listTeachers(filters),
-    enabled: !!filters.schoolId,
-    placeholderData: (prev) => prev, // keep previous data visible while new page loads
+    enabled: true, // School ID is not required for this endpoint
+    placeholderData: (prev) => prev,
   });
 }
 

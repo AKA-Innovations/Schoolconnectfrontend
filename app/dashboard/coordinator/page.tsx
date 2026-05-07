@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { useClassSectionLists, useSubjectDetails, useTimetable } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
-import { Compass, Users, BookOpen, Calendar, GraduationCap, ChevronRight } from 'lucide-react';
+import { teacherService } from '@/services/teacher.service';
+import { Compass, Users, BookOpen, Calendar, GraduationCap, ChevronRight, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CoordinatorDashboard() {
@@ -19,20 +20,64 @@ export default function CoordinatorDashboard() {
   const { data: timetableEntries = [] }                            = useTimetable();
   const { data: teachersData }                                     = useTeacherList({ schoolId: schoolId ?? '', page: 1, pageSize: 500 });
   const allTeachers = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const token = useAuthStore((s) => s.token);
+
+  // Background Sync: Refresh coordinator classes on mount (same as attendance page)
+  React.useEffect(() => {
+    if (user?.id && token) {
+      const syncProfile = async () => {
+        setIsSyncing(true);
+        try {
+          const details = await teacherService.getTeacherById(user.id);
+          const newMappings = details.coordinatorMappings ?? [];
+          
+          const currentIds = coordinatorClasses.map(c => (typeof c === 'object' ? c.id : c)).sort();
+          const newIds = newMappings.map(m => m.id).sort();
+
+          if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+            setAuth({
+              user: { ...user, coordinatorClasses: newMappings },
+              token: token
+            });
+          }
+        } catch (err) {
+          console.error('Failed to sync coordinator profile:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      syncProfile();
+    }
+  }, [user?.id, token, setAuth]);
+
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => {
+    const names = coordinatorClasses.map(c => typeof c === 'object' ? c.className : c).filter(Boolean);
+    console.log('Coordinator Classes from Store:', coordinatorClasses);
+    console.log('Normalized Class Names:', names);
+    return names;
+  }, [coordinatorClasses]);
 
   // Scope to coordinator's assigned classes
   const mySections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
-      : allClassSections,
-    [allClassSections, coordinatorClasses],
+    () => {
+      console.log('All Class Sections available:', allClassSections);
+      const filtered = coordClassNames.length > 0
+        ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
+        : allClassSections;
+      console.log('Filtered Sections:', filtered);
+      return filtered;
+    },
+    [allClassSections, coordClassNames],
   );
 
   const mySubjectDetails = useMemo(
-    () => coordinatorClasses.length > 0
-      ? subjectDetails.filter((sd) => coordinatorClasses.includes(sd.className))
+    () => coordClassNames.length > 0
+      ? subjectDetails.filter((sd) => coordClassNames.includes(String(sd.className)))
       : subjectDetails,
-    [subjectDetails, coordinatorClasses],
+    [subjectDetails, coordClassNames],
   );
 
   const mySdIds = useMemo(() => new Set(mySubjectDetails.map((sd) => sd.id)), [mySubjectDetails]);
@@ -88,10 +133,13 @@ export default function CoordinatorDashboard() {
           <Compass className="h-6 w-6 text-purple-500" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Coordinator Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            Coordinator Dashboard
+            {isSyncing && <RefreshCw className="h-4 w-4 animate-spin text-primary opacity-50" />}
+          </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {coordinatorClasses.length > 0
-              ? `Scope: ${coordinatorClasses.join(' · ')}`
+            {coordClassNames.length > 0
+              ? `Scope: ${coordClassNames.join(' · ')}`
               : 'Academic coordination overview'}
           </p>
         </div>
@@ -208,95 +256,6 @@ export default function CoordinatorDashboard() {
           </Card>
         </div>
       )}
-    </div>
-  );
-}
-
-import React from 'react';
-import { useCoordinatorDashboard } from '../../../hooks/useCoordinatorDashboard';
-import { StatsRow } from '../../../components/dashboard/StatsRow';
-import { QuickActions } from '../../../components/dashboard/QuickActions';
-import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
-import { Layers, BookOpen, Users, ClipboardList } from 'lucide-react';
-
-export default function CoordinatorDashboard() {
-  const { data: summary, isLoading } = useCoordinatorDashboard();
-
-  const actions = [
-    { label: 'Create Assessment', icon: ClipboardList, onClick: () => {}, variant: 'default' as const },
-    { label: 'Update Curriculum', icon: BookOpen, onClick: () => {} },
-    { label: 'Assign Teacher', icon: Users, onClick: () => {} },
-  ];
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Coordinator Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Academic and department coordination</p>
-      </div>
-
-      <StatsRow stats={summary?.kpis} isLoading={isLoading} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Department Subjects</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex-1 space-y-4 p-8 pt-6">
-              {isLoading ? (
-                [1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded animate-pulse" />)
-              ) : (
-                summary?.subjects.map((sub) => (
-                  <div key={sub.id} className="p-4 bg-card rounded-lg border border-border">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-primary/10 rounded text-primary">
-                          <Layers size={20} />
-                        </div>
-                          <h4 className="font-bold text-foreground">{sub.name}</h4>
-                      </div>
-                      <span className="text-sm font-bold text-primary">{sub.progress}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-primary h-2 rounded-full transition-all duration-1000" 
-                        style={{ width: `${sub.progress}%` }} 
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-8">
-          <QuickActions actions={actions} />
-          
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader>
-              <CardTitle className="text-lg">Assessment Monitor</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-secondary" />
-                  <p className="text-sm font-medium">Mid-terms (Locked)</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  <p className="text-sm font-medium">Monthly Quiz Oct (Active)</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-border" />
-                  <p className="text-sm font-medium">Final Exams (Draft)</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

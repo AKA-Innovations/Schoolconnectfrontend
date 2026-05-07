@@ -39,6 +39,7 @@ export default function CoordinatorAttendancePage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});
+  const [lastSyncedKey, setLastSyncedKey] = useState('');
 
   // Background Sync: Refresh coordinator classes on mount
   useEffect(() => {
@@ -319,7 +320,7 @@ export default function CoordinatorAttendancePage() {
           <div className="flex items-center gap-3">
             <LayoutGrid className="h-7 w-7 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Coordinator Dashboard</h1>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Coordinator Dashboard</h1>
               <p className="text-sm text-muted-foreground">Monitor and manage attendance across your {scopedSections.length} supervised classes</p>
             </div>
           </div>

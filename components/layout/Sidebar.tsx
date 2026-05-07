@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '../../lib/utils';
 import {
   School, Users, BarChart3, Settings, CreditCard,
@@ -10,79 +10,19 @@ import {
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
   Sparkles, Building2, UserCog, Grid3X3, Users2, Menu,
-  Clock, Compass,
+  Clock, Compass, X
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { Role } from '../../types/roles';
 import { useTeacherRoles } from '../../lib/permissions';
+import { baseSidebarLinks, SidebarLink, isLinkActive } from '../../lib/navigation';
 
-interface SidebarLink {
-  name: string;
-  href: string;
-  icon: any;
-  /** Only show this link if a teacher sub-role condition is met */
-  requiresTeacherRole?: 'isClassTeacher' | 'isSubjectTeacher' | 'isCoordinator' | 'isPrincipal';
-}
-
-const baseSidebarLinks: Record<Role, SidebarLink[]> = {
-  super_admin: [
-    { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-    { name: 'Schools', href: '/dashboard/admin/schools', icon: School },
-    { name: 'Users', href: '/dashboard/admin/users', icon: Users },
-    { name: 'Reports', href: '/dashboard/admin/reports', icon: BarChart3 },
-    { name: 'Billing', href: '/dashboard/admin/billing', icon: CreditCard },
-    { name: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
-  ],
-  school_admin: [
-    { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-    { name: 'Teachers', href: '/dashboard/admin?tab=teachers', icon: Users },
-    { name: 'Students', href: '/dashboard/admin/students', icon: GraduationCap },
-    { name: 'Classes', href: '/dashboard/admin/class/dashboard', icon: BookOpen },
-    { name: 'Subjects', href: '/dashboard/admin/class/subjects', icon: Layers },
-    { name: 'Subject Mapping', href: '/dashboard/admin/class/subject-mapping', icon: Grid3X3 },
-    { name: 'Period Slots', href: '/dashboard/admin/class/period-slots', icon: Clock },
-    { name: 'Timetable', href: '/dashboard/admin/class/timetable', icon: Calendar },
-    { name: 'Class Teachers', href: '/dashboard/admin/class/teachers', icon: Users2 },
-    { name: 'Attendance', href: '/dashboard/admin/attendance', icon: ClipboardCheck },
-    { name: 'School Profile', href: '/dashboard/admin/school', icon: Building2 },
-    { name: 'My Profile', href: '/dashboard/admin/profile', icon: UserCog },
-  ],
-  principal: [
-    { name: 'Dashboard', href: '/dashboard/principal', icon: LayoutDashboard },
-    { name: 'Teachers', href: '/dashboard/principal/teachers', icon: Users },
-    { name: 'Students', href: '/dashboard/principal/students', icon: GraduationCap },
-    { name: 'Timetable', href: '/dashboard/principal/timetable', icon: Calendar },
-    { name: 'Announcements', href: '/dashboard/principal/announcements', icon: MessageSquare },
-    { name: 'Reports', href: '/dashboard/principal/reports', icon: BarChart3 },
-  ],
-  teacher: [
-    { name: 'Dashboard', href: '/dashboard/teacher', icon: LayoutDashboard },
-    { name: 'My Profile', href: '/dashboard/teacher/profile', icon: UserCog },
-    { name: 'My Classes', href: '/dashboard/teacher/classes', icon: BookOpen },
-    { name: 'My Classroom', href: '/dashboard/teacher/classroom', icon: Users2, requiresTeacherRole: 'isClassTeacher' },
-    { name: 'Attendance', href: '/dashboard/teacher/attendance', icon: ClipboardCheck, requiresTeacherRole: 'isClassTeacher' },
-    { name: 'Schedule', href: '/dashboard/teacher/schedule', icon: Calendar },
-    // Coordinator workspace items — only visible to coordinators
-    { name: 'Attendance (Coord)', href: '/dashboard/coordinator/attendance', icon: ClipboardCheck, requiresTeacherRole: 'isCoordinator' },
-    { name: 'Coordinator Layout', href: '/dashboard/teacher/coordinator', icon: Compass, requiresTeacherRole: 'isCoordinator' },
-    { name: 'Subject Mapping', href: '/dashboard/coordinator/subject-mapping', icon: Grid3X3, requiresTeacherRole: 'isCoordinator' },
-    { name: 'Edit Schedule', href: '/dashboard/coordinator/timetable', icon: Calendar, requiresTeacherRole: 'isCoordinator' },
-  ],
-  subject_coordinator: [
-    { name: 'Dashboard', href: '/dashboard/coordinator', icon: LayoutDashboard },
-    { name: 'Managed Classes', href: '/dashboard/coordinator/classes', icon: BookOpen },
-    { name: 'Teachers', href: '/dashboard/coordinator/teachers', icon: Users },
-    { name: 'Students', href: '/dashboard/coordinator/students', icon: GraduationCap },
-    { name: 'Attendance', href: '/dashboard/coordinator/attendance', icon: ClipboardCheck },
-    { name: 'Timetable', href: '/dashboard/coordinator/timetable', icon: Calendar },
-    { name: 'Subject Mapping', href: '/dashboard/coordinator/subject-mapping', icon: Grid3X3 },
-  ],
-  student: [],
-  parent: [],
+type SidebarProps = {
+  onClose?: () => void;
 };
 
-export function Sidebar() {
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { role, clearAuth } = useAuthStore();
   const teacherRoles = useTeacherRoles();
   const [collapsed, setCollapsed] = React.useState(false);
@@ -101,12 +41,12 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-visible transition-all duration-300',
+        'relative shrink-0 h-full overflow-visible transition-all duration-300',
         collapsed ? 'w-20' : 'w-72'
       )}
     >
       <aside
-        className="flex flex-col h-full w-full relative overflow-hidden text-white border-r"
+        className="flex flex-col h-full w-full relative overflow-hidden text-white lg:border-r"
         style={{ background: 'linear-gradient(180deg, #0f172a 0%, #0b1220 50%, #020617 100%)' }}
       >
         {/* Glow */}
@@ -119,12 +59,21 @@ export function Sidebar() {
           </div>
 
           {showLabels && (
-            <div>
-              <div className="text-white font-bold text-lg">SkoolConnect</div>
-              <div className="text-[10px] text-white/60 uppercase tracking-[0.35em] font-bold mt-1">
+            <div className="flex-1">
+              <div className="text-white font-bold text-lg leading-tight">SkoolConnect</div>
+              <div className="text-[10px] text-white/60 uppercase tracking-[0.35em] font-bold mt-0.5">
                 {role ? role.replace('_', ' ') : 'School'}
               </div>
             </div>
+          )}
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-2 rounded-xl bg-white/5 text-white/50 hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
           )}
         </div>
 
@@ -133,7 +82,7 @@ export function Sidebar() {
           {showLabels && <p className="px-5 text-[10px] uppercase tracking-[0.3em] font-bold text-white/20 mb-4">Core</p>}
 
           {links.map((link) => {
-            const active = link.href === '/' ? pathname === '/' : pathname?.startsWith(link.href);
+            const active = isLinkActive(link, pathname || '', new URLSearchParams(searchParams?.toString()));
             const Icon = link.icon;
 
             return (

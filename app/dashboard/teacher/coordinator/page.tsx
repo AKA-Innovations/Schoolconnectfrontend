@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -45,11 +45,17 @@ export default function CoordinatorWorkspacePage() {
   const { data: teachersData }          = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
 
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
       : allClassSections,
-    [allClassSections, coordinatorClasses],
+    [allClassSections, coordClassNames],
   );
 
   const createSubjectDetail  = useCreateSubjectDetail();
@@ -154,8 +160,8 @@ export default function CoordinatorWorkspacePage() {
 
   const currentCT = allTeachers.find((t: any) => t.id === (selectedSection as any)?.classTeacherId);
 
-  const allCoordSubjects = coordinatorClasses.length > 0
-    ? subjectDetails.filter((sd) => coordinatorClasses.includes(sd.className))
+  const allCoordSubjects = coordClassNames.length > 0
+    ? subjectDetails.filter((sd) => coordClassNames.includes(String(sd.className)))
     : subjectDetails;
   const allCoordSdIds    = new Set(allCoordSubjects.map((sd) => sd.id));
   const allCoordTT       = timetableEntries.filter((e) => allCoordSdIds.has(e.teacherClassId));
@@ -256,8 +262,8 @@ export default function CoordinatorWorkspacePage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Coordinator Workspace</h1>
             <p className="text-muted-foreground mt-0.5 text-sm">
-              {coordinatorClasses.length > 0
-                ? `Managing: ${coordinatorClasses.join(', ')}`
+              {coordClassNames.length > 0
+                ? `Managing: ${coordClassNames.join(', ')}`
                 : 'Academic coordination overview'}
             </p>
           </div>

@@ -208,7 +208,9 @@ export const teacherService = {
   },
 
   listTeachers: async (params: TeacherFilterParams): Promise<{ data: Teacher[], total: number }> => {
-    const response = await api.get(API_ENDPOINTS.TEACHER.LIST, { params });
+    // Remove schoolId from params as it's handled by the backend token
+    const { schoolId, ...rest } = params;
+    const response = await api.get(API_ENDPOINTS.TEACHER.LIST, { params: rest });
     const raw = response.data;
     return {
       data: (raw.items || []).map(mapBackendTeacher),

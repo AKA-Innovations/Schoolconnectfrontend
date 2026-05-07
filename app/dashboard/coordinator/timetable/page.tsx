@@ -35,12 +35,18 @@ export default function CoordinatorTimetablePage() {
   const allClassSections: { id: number; className: string; sectionName: string }[] =
     (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
 
+  // Normalize coordinator classes to strings for robust filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   // Filter class sections to only the ones they coordinate
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
-      : allClassSections, // fallback if empty
-    [allClassSections, coordinatorClasses]
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
+      : allClassSections,
+    [allClassSections, coordClassNames]
   );
   
   const bulkCreateMut = useCreateTimetableBulk();
@@ -213,9 +219,9 @@ export default function CoordinatorTimetablePage() {
     <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Class Schedule</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Class Schedule</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Weekly timetable for {coordinatorClasses.length > 0 ? coordinatorClasses.join(', ') : 'managed classes'}
+          Weekly timetable for {coordClassNames.length > 0 ? coordClassNames.join(', ') : 'managed classes'}
         </p>
       </div>
 
