@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CURRENT_SESSION } from '../lib/constants';
 import {
   classService,
   ClassListResponse,
@@ -196,10 +197,12 @@ export const subjectOptionKeys = {
   all: ['subject-options'] as const,
 };
 
-export function useSubjectOptions() {
+export function useSubjectOptions(className?: string) {
+  const schoolId = useAuthStore((s) => s.schoolId);
   return useQuery({
-    queryKey: subjectOptionKeys.all,
-    queryFn: () => classService.getSubjectOptions(),
+    queryKey: ['subject-options', schoolId, className],
+    queryFn: () => classService.getSubjectOptions(schoolId || '', className),
+    enabled: !!schoolId,
   });
 }
 
@@ -234,10 +237,11 @@ export const subjectDetailKeys = {
   all: ['subject-details'] as const,
 };
 
-export function useSubjectDetails() {
+export function useSubjectDetails(teacherId?: string) {
   return useQuery({
-    queryKey: subjectDetailKeys.all,
-    queryFn: () => classService.getSubjectDetails(),
+    queryKey: [...subjectDetailKeys.all, teacherId],
+    queryFn: () => classService.getSubjectDetails(teacherId ? { teacherId, session: CURRENT_SESSION } : {}),
+    enabled: true,
   });
 }
 
@@ -308,7 +312,8 @@ export function useDeletePeriodSlot() {
 
 export const timetableKeys = {
   all: ['timetable'] as const,
-  filtered: (params?: TimetableFilterParams) => ['timetable', params] as const,
+  filtered: (params?: TimetableFilterParams) => ['timetable', 'list', params] as const,
+  fetch: (params?: any) => ['timetable', 'fetch', params] as const,
 };
 
 export function useTimetable(params?: TimetableFilterParams) {
@@ -348,5 +353,13 @@ export function useDeleteTimetableEntry() {
   return useMutation({
     mutationFn: (id: number) => classService.deleteTimetableEntry(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
+  });
+}
+
+export function useFetchTimetable(params: any) {
+  return useQuery({
+    queryKey: timetableKeys.fetch(params),
+    queryFn: () => classService.fetchTimetable(params),
+    enabled: !!params?.session,
   });
 }

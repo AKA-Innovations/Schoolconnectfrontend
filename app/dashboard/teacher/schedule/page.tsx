@@ -3,37 +3,44 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
-import { useTimetable, usePeriodSlots } from '@/hooks/useClasses';
-import { Calendar, Clock, BookOpen } from 'lucide-react';
+import { useFetchTimetable, usePeriodSlots } from '@/hooks/useClasses';
+import { Calendar, Clock, BookOpen, Plus, ClipboardList, BookMarked, BarChart3 } from 'lucide-react';
+import { HomeworkFormModal } from '@/components/academic/homework/HomeworkFormModal';
+import { ClassworkFormModal } from '@/components/academic/classwork/ClassworkFormModal';
+import { ProgressFormModal } from '@/components/academic/teaching-progress/ProgressFormModal';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { toast } from 'sonner';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function TeacherSchedulePage() {
   const user = useAuthStore((s) => s.user);
 
-  const { data: allEntries = [], isLoading: loadingTT } = useTimetable();
+  // Backend auto-detects teacher from JWT when role = 'teacher'
+  const { data: myEntries = [], isLoading: loadingTT } = useFetchTimetable({ session: CURRENT_SESSION });
   const { data: periodSlots = [], isLoading: loadingSlots } = usePeriodSlots();
-
   const isLoading = loadingTT || loadingSlots;
 
-  // Filter entries where the current teacher is assigned
-  const myEntries = useMemo(
-    () => allEntries.filter((e) => e.teacherName != null),
-    [allEntries],
-  );
+
+
+  const [hwModalOpen, setHwModalOpen] = React.useState(false);
+  const [cwModalOpen, setCwModalOpen] = React.useState(false);
+  const [progressModalOpen, setProgressModalOpen] = React.useState(false);
+  const [prefill, setPrefill] = React.useState<{ className: string; sectionName: string; subjectId: string } | undefined>();
 
   const sorted = useMemo(
     () => [...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber),
     [periodSlots],
   );
 
-  // Build grid: day → slotId → entry
+  // Build grid: day → periodNumber → entry
   const grid = useMemo(() => {
     const map: Record<string, Record<number, typeof myEntries[number]>> = {};
     DAYS.forEach((d) => { map[d] = {}; });
     myEntries.forEach((e) => {
-      if (map[e.dayOfWeek]) map[e.dayOfWeek][e.periodSlotId] = e;
+      if (map[e.dayOfWeek]) map[e.dayOfWeek][e.periodNumber] = e;
     });
     return map;
   }, [myEntries]);
@@ -42,12 +49,25 @@ export default function TeacherSchedulePage() {
   const todayName = DAYS[new Date().getDay() - 1] || 'Monday';
   const todayEntries = useMemo(
     () => myEntries.filter((e) => e.dayOfWeek === todayName).sort((a, b) => {
-      const slotA = periodSlots.find((s) => s.id === a.periodSlotId);
-      const slotB = periodSlots.find((s) => s.id === b.periodSlotId);
-      return (slotA?.periodNumber ?? 0) - (slotB?.periodNumber ?? 0);
+      return (a.periodNumber || 0) - (b.periodNumber || 0);
     }),
-    [myEntries, todayName, periodSlots],
+    [myEntries, todayName],
   );
+
+  const openHW = (e: any) => {
+    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setHwModalOpen(true);
+  };
+
+  const openCW = (e: any) => {
+    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setCwModalOpen(true);
+  };
+
+  const openProgress = (e: any) => {
+    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setProgressModalOpen(true);
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
@@ -73,11 +93,10 @@ export default function TeacherSchedulePage() {
           ) : (
             <div className="space-y-2">
               {todayEntries.map((entry) => {
-                const slot = periodSlots.find((s) => s.id === entry.periodSlotId);
                 return (
-                  <div key={entry.id} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div key={`${entry.dayOfWeek}-${entry.periodNumber}`} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
                     <div className="text-xs font-mono text-muted-foreground w-[100px]">
-                      {slot?.startTime} – {slot?.endTime}
+                      {entry.startTime} – {entry.endTime}
                     </div>
                     <div className="flex-1">
                       <span className="text-sm font-semibold">{entry.subjectName || '—'}</span>
@@ -85,9 +104,29 @@ export default function TeacherSchedulePage() {
                         {entry.className} {entry.sectionName}
                       </span>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      Period {slot?.periodNumber}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        size="icon" variant="ghost" className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                        onClick={() => openCW(entry)} title="Add Classwork"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                        onClick={() => openProgress(entry)} title="Update Progress"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="icon" variant="ghost" className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                        onClick={() => openHW(entry)} title="Assign Homework"
+                      >
+                        <BookMarked className="h-4 w-4" />
+                      </Button>
+                      <Badge variant="outline" className="text-[10px] ml-2">
+                        Period {entry.periodNumber}
+                      </Badge>
+                    </div>
                   </div>
                 );
               })}
@@ -131,13 +170,36 @@ export default function TeacherSchedulePage() {
                         <div className="text-muted-foreground">{slot.startTime}–{slot.endTime}</div>
                       </td>
                       {DAYS.map((day) => {
-                        const entry = grid[day]?.[slot.id];
+                        const entry = grid[day]?.[slot.periodNumber];
                         return (
                           <td key={day} className={`py-2 px-3 border-b border-r border-border/30 text-center align-top min-w-[120px] ${day === todayName ? 'bg-primary/[0.02]' : ''}`}>
                             {entry ? (
                               <div>
                                 <div className="text-xs font-semibold text-primary">{entry.subjectName || '—'}</div>
                                 <div className="text-[10px] text-muted-foreground">{entry.className} {entry.sectionName}</div>
+                                <div className="flex items-center justify-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => openCW(entry)}
+                                    className="p-1 rounded bg-teal-50 text-teal-600 hover:bg-teal-100 transition-colors"
+                                    title="Add Classwork"
+                                  >
+                                    <ClipboardList className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => openProgress(entry)}
+                                    className="p-1 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                    title="Update Progress"
+                                  >
+                                    <BarChart3 className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => openHW(entry)}
+                                    className="p-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                                    title="Assign Homework"
+                                  >
+                                    <BookMarked className="h-3 w-3" />
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <span className="text-muted-foreground/30 text-xs">—</span>
@@ -153,6 +215,39 @@ export default function TeacherSchedulePage() {
           </CardContent>
         </Card>
       )}
+
+      <HomeworkFormModal
+        open={hwModalOpen}
+        onOpenChange={setHwModalOpen}
+        editItem={null}
+        prefill={prefill}
+        onSuccess={() => {
+          setHwModalOpen(false);
+          toast.success('Homework assigned successfully');
+        }}
+      />
+
+      <ClassworkFormModal
+        open={cwModalOpen}
+        onOpenChange={setCwModalOpen}
+        editItem={null}
+        prefill={prefill}
+        onSuccess={() => {
+          setCwModalOpen(false);
+          toast.success('Classwork logged successfully');
+        }}
+      />
+
+      <ProgressFormModal
+        open={progressModalOpen}
+        onOpenChange={setProgressModalOpen}
+        editItem={null}
+        prefill={prefill}
+        onSuccess={() => {
+          setProgressModalOpen(false);
+          toast.success('Progress updated successfully');
+        }}
+      />
     </div>
   );
 }

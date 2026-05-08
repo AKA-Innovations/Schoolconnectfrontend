@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
               onClick={() => setMobileOpen(false)}
             />
-            
+
             {/* Drawer */}
             <motion.div
               initial={{ x: '-100%' }}

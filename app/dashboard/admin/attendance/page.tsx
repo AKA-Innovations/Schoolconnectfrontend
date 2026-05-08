@@ -10,7 +10,7 @@ import { useClassSectionLists } from '@/hooks/useClasses';
 import { useFilterAttendance, useStudentList, useBulkAttendance, useUpdateAttendance } from '@/hooks/useStudents';
 import {
   ShieldCheck, LayoutGrid, Search, Users, Save, ArrowLeft,
-  Filter, CheckCircle, XCircle, Clock, AlertTriangle
+  Filter, CheckCircle, XCircle, Clock, AlertTriangle, ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -92,7 +92,7 @@ export default function AdminAttendancePage() {
 
       if (existing) {
         if (existing.status !== newStatus) {
-          toUpdate.push({ recordId: existing.id, status: newStatus });
+          toUpdate.push({ recordId: existing.id ?? 0, status: newStatus });
         }
       } else {
         toAdd.push({ studentId: s.id, attendanceStatus: newStatus });

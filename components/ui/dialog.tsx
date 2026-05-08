@@ -93,10 +93,19 @@ const DialogTitle: React.FC<DialogTitleProps> = ({ className, children }) => {
   )
 }
 
+const DialogDescription: React.FC<{ className?: string; children?: React.ReactNode }> = ({ className, children }) => {
+  return (
+    <p className={cn("text-sm text-muted-foreground", className)}>
+      {children}
+    </p>
+  )
+}
+
 export {
   Dialog,
   DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 }

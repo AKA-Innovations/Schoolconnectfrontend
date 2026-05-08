@@ -80,9 +80,9 @@ export default function CoordinatorDashboard() {
     [subjectDetails, coordClassNames],
   );
 
-  const mySdIds = useMemo(() => new Set(mySubjectDetails.map((sd) => sd.id)), [mySubjectDetails]);
+  const mySdIds = useMemo(() => new Set(mySubjectDetails.map((sd) => String(sd.id))), [mySubjectDetails]);
   const myTimetableEntries = useMemo(
-    () => timetableEntries.filter((e) => mySdIds.has(e.teacherClassId)),
+    () => timetableEntries.filter((e) => mySdIds.has(String(e.teacherClassId))),
     [timetableEntries, mySdIds],
   );
 
@@ -119,7 +119,7 @@ export default function CoordinatorDashboard() {
       sections: [...new Set(data.sections)].sort(),
       subjects: [...data.subjects].sort(),
       timetabled: myTimetableEntries.filter((e) => {
-        const sd = mySubjectDetails.find((s) => s.id === e.teacherClassId);
+        const sd = mySubjectDetails.find((s) => String(s.id) === String(e.teacherClassId));
         return sd?.className === className;
       }).length,
     }));

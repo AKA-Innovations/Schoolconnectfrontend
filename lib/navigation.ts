@@ -70,6 +70,18 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       icon: ClipboardCheck,
     },
     { 
+      name: 'Academic Module', 
+      href: '/dashboard/admin/academic', 
+      icon: GraduationCap,
+      subLinks: [
+        { name: 'Chapters & Topics', href: '/dashboard/admin/academic?tab=chapters' },
+        { name: 'Homework', href: '/dashboard/admin/academic?tab=homework' },
+        { name: 'Classwork', href: '/dashboard/admin/academic?tab=classwork' },
+        { name: 'Progress', href: '/dashboard/admin/academic?tab=progress' },
+        { name: 'Study Material', href: '/dashboard/admin/academic?tab=materials' },
+      ]
+    },
+    { 
       name: 'School', 
       href: '/dashboard/admin/school', 
       icon: Building2,
@@ -129,6 +141,17 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Dashboard', href: '/dashboard/teacher/coordinator' },
         { name: 'Mapping', href: '/dashboard/coordinator/subject-mapping' },
         { name: 'Edit Timetable', href: '/dashboard/coordinator/timetable' },
+      ]
+    },
+    { 
+      name: 'Academic', 
+      href: '/dashboard/teacher/academic', 
+      icon: GraduationCap,
+      subLinks: [
+        { name: 'Homework', href: '/dashboard/teacher/academic?tab=homework' },
+        { name: 'Classwork', href: '/dashboard/teacher/academic?tab=classwork' },
+        { name: 'Progress', href: '/dashboard/teacher/academic?tab=progress' },
+        { name: 'Materials', href: '/dashboard/teacher/academic?tab=materials' },
       ]
     },
     { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog },

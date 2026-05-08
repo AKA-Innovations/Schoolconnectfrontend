@@ -20,7 +20,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 /** Key for a grid cell: "day|periodId" */
 function cellKey(day: string, periodId: number) { return `${day}|${periodId}`; }
 
-type DraftCell = { teacherClassId: number };
+type DraftCell = { teacherClassId: string };
 
 export default function CoordinatorTimetablePage() {
   const user = useAuthStore((s) => s.user);
@@ -84,8 +84,8 @@ export default function CoordinatorTimetablePage() {
 
   // Lookup: teacherClassId → SubjectDetail
   const sdMap = useMemo(() => {
-    const m = new Map<number, SubjectDetail>();
-    (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(sd.id, sd));
+    const m = new Map<string, SubjectDetail>();
+    (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(String(sd.id), sd));
     return m;
   }, [subjectDetails]);
 
@@ -96,13 +96,13 @@ export default function CoordinatorTimetablePage() {
 
   // teacherClassIds belonging to selected class+section
   const sectionTcIds = useMemo(
-    () => new Set(mappingsForSection.map((m) => m.id)),
+    () => new Set(mappingsForSection.map((m) => String(m.id))),
     [mappingsForSection],
   );
 
   // Timetable entries for this section
   const sectionEntries: TimetableEntry[] = useMemo(
-    () => allEntriesArr.filter((e) => sectionTcIds.has(e.teacherClassId)),
+    () => allEntriesArr.filter((e) => sectionTcIds.has(String(e.teacherClassId))),
     [allEntriesArr, sectionTcIds],
   );
 
@@ -116,22 +116,20 @@ export default function CoordinatorTimetablePage() {
   // ── Conflict checker ──
   // Checks if the teacher behind teacherClassId is already occupied at day+periodId
   const teacherConflict = useCallback(
-    (teacherClassId: number, day: string, periodId: number): string | null => {
+    (teacherClassId: string, day: string, periodId: number): string | null => {
       const sd = sdMap.get(teacherClassId);
       if (!sd) return null;
       const teacherId = sd.teacherId;
 
-      // Check existing timetable entries (across ALL sections)
       for (const entry of allEntriesArr) {
         if (entry.dayOfWeek !== day || entry.periodId !== periodId) continue;
-        if (sectionTcIds.has(entry.teacherClassId)) continue; // same section — OK
-        const entrySd = sdMap.get(entry.teacherClassId);
+        if (sectionTcIds.has(String(entry.teacherClassId))) continue;
+        const entrySd = sdMap.get(String(entry.teacherClassId));
         if (entrySd && entrySd.teacherId === teacherId) {
           return `${entrySd.teacherName || 'Teacher'} already teaches ${entrySd.subjectName} in ${entrySd.className}-${entrySd.sectionName}`;
         }
       }
 
-      // Check within drafts for same teacher at same period+day but different cell
       const thisKey = cellKey(day, periodId);
       for (const [key, draft] of Object.entries(drafts)) {
         if (key === thisKey) continue;
@@ -148,7 +146,7 @@ export default function CoordinatorTimetablePage() {
   );
 
   // ── Handlers ──
-  const handleDraftChange = (day: string, periodId: number, teacherClassId: number) => {
+  const handleDraftChange = (day: string, periodId: number, teacherClassId: string) => {
     const key = cellKey(day, periodId);
     setDrafts((prev) => {
       if (!teacherClassId) {
@@ -174,7 +172,7 @@ export default function CoordinatorTimetablePage() {
       const [day, periodId] = key.split('|');
       return {
         session: CURRENT_SESSION,
-        teacherClassId: draft.teacherClassId,
+        teacherClassId: draft.teacherClassId, // string UUID
         periodId: Number(periodId),
         dayOfWeek: day,
       };
@@ -374,13 +372,13 @@ export default function CoordinatorTimetablePage() {
                             {existing ? (
                               <ExistingCell
                                 entry={existing}
-                                sd={sdMap.get(existing.teacherClassId)}
+                                sd={sdMap.get(String(existing.teacherClassId))}
                                 onDelete={handleDelete}
                                 isDeleting={deleteMut.isPending}
                               />
                             ) : editMode ? (
                               <DraftSelect
-                                value={draft?.teacherClassId ?? 0}
+                                value={draft?.teacherClassId ?? ''}
                                 mappings={mappingsForSection}
                                 onChange={(tcId) => handleDraftChange(day, slot.id, tcId)}
                                 conflict={conflict}
@@ -434,16 +432,16 @@ function ExistingCell({
 function DraftSelect({
   value, mappings, onChange, conflict,
 }: {
-  value: number;
+  value: string;
   mappings: SubjectDetail[];
-  onChange: (tcId: number) => void;
+  onChange: (tcId: string) => void;
   conflict?: string;
 }) {
   return (
     <div className="relative">
       <select
         value={value || ''}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => onChange(e.target.value)}
         className={cn(
           'w-full h-8 text-[11px] px-1.5 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring',
           conflict ? 'border-amber-400 bg-amber-50' : value ? 'border-primary/40 bg-primary/5' : 'border-input',
@@ -451,12 +449,12 @@ function DraftSelect({
       >
         <option value="">—</option>
         {mappings.map((m) => (
-          <option key={m.id} value={m.id}>
+          <option key={m.id} value={String(m.id)}>
             {m.subjectName} — {m.teacherName || m.teacherId}
           </option>
         ))}
       </select>
-      {value > 0 && !conflict && (
+      {value && !conflict && (
         <Check className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-500 pointer-events-none" />
       )}
       {conflict && (

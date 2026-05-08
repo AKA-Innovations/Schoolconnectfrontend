@@ -61,8 +61,9 @@ export interface ClassSummary {
 // ─── Subject Options ─────────────────────────────────────────────────────────
 
 export interface SubjectOption {
-  id: number;
+  id: string; // UUID from backend
   subjectName: string;
+  subjectCode?: string;
   className?: string;
   session?: string;
   schoolId?: string;
@@ -71,18 +72,19 @@ export interface SubjectOption {
 export interface CreateSubjectOptionPayload {
   session: string;
   className: string;
-  subjectName: string;
+  subjects: { subjectName: string; subjectCode: string }[];
 }
 
 // ─── Teacher-Subject Mapping (subject-dtls) ──────────────────────────────────
 
 export interface SubjectDetail {
-  id: number;
+  id: string; // UUID from backend
   session: string;
   teacherId: string;
   className: string;
   sectionName: string;
   subjectName: string;
+  subjectId: string;
   teacherName?: string;
 }
 
@@ -115,23 +117,30 @@ export interface CreatePeriodSlotPayload {
 export interface TimetableEntry {
   id: number;
   session: string;
-  teacherClassId: number;   // ClassSubjectDtls.id
-  periodId: number;         // PeriodSlots.id
+  teacherClassId: string;   // ClassSubjectDtls.id (string UUID)
+  periodId: number;          // PeriodSlots.id
   dayOfWeek: string;
   schoolId?: string;
+  // Fields returned by the enriched /class/timetable/fetch endpoint
+  subjectName?: string;
+  className?: string;
+  sectionName?: string;
+  teacherName?: string;
+  periodNumber?: number;
 }
 
 export interface CreateTimetablePayload {
   session: string;
-  teacherClassId: number;
+  teacherClassId: string;   // ClassSubjectDtls.id (string UUID)
   periodId: number;
   dayOfWeek: string;
 }
 
 export interface TimetableFilterParams {
   session?: string;
-  teacherClassId?: number;
+  teacherClassId?: string;
   dayOfWeek?: string;
+  schoolId?: string;
 }
 
 // ─── Class Section Lists ─────────────────────────────────────────────────────
@@ -140,5 +149,9 @@ export interface ClassSectionItem {
   id: number;
   className: string;
   sectionName: string;
+  classTeacherId?: string | null;
+  classTeacherName?: string | null;
+  classTeacherMobileNumber?: string | null;
+  classTeacherProfileUrl?: string | null;
   session?: string;
 }

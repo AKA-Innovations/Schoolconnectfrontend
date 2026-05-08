@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,13 +11,9 @@ import Link from 'next/link';
 
 export default function TeacherClassesPage() {
   const user = useAuthStore((s) => s.user);
-  const { data: allSubjectDetails = [], isLoading } = useSubjectDetails();
-
-  // Filter to only this teacher's assignments
-  const mySubjectDetails = useMemo(
-    () => allSubjectDetails.filter((sd) => sd.teacherId === user?.id),
-    [allSubjectDetails, user?.id],
-  );
+  const { data: mySubjectDetails = [], isLoading } = useSubjectDetails(user?.id);
+  console.log('user:', user?.id);
+  console.log('My Subject Details:', mySubjectDetails);
 
   // Group by "className|sectionName"
   const grouped = useMemo(() => {

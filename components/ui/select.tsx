@@ -5,6 +5,7 @@ interface SelectProps {
   value?: string
   onValueChange?: (value: string) => void
   children?: React.ReactNode
+  disabled?: boolean
 }
 
 interface SelectTriggerProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'children'> {
@@ -18,6 +19,8 @@ interface SelectContentProps {
 interface SelectItemProps {
   value: string
   children?: React.ReactNode
+  disabled?: boolean
+  className?: string
 }
 
 interface SelectValueProps {

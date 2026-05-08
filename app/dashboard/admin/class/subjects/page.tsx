@@ -36,10 +36,11 @@ export default function SubjectsPage() {
   const [form, setForm] = useState({
     className: '',
     session: CURRENT_SESSION,
-    subjects: [] as string[],
+    subjects: [] as { subjectName: string; subjectCode: string }[],
   });
 
   const [subjectInput, setSubjectInput] = useState('');
+  const [subjectCodeInput, setSubjectCodeInput] = useState('');
 
   // 🔍 Filter
   const filtered = subjects.filter((s: any) => {
@@ -71,24 +72,20 @@ export default function SubjectsPage() {
 
   // ➕ Add subject
   const addSubject = () => {
-    const value = subjectInput.trim();
-    if (!value) return;
-
-    if (form.subjects.includes(value)) {
-      toast.error('Subject already added');
-      return;
+    const name = subjectInput.trim();
+    const code = subjectCodeInput.trim();
+    if (!name || !code) { toast.error('Both subject name and code are required'); return; }
+    if (form.subjects.some((s) => s.subjectName === name)) {
+      toast.error('Subject already added'); return;
     }
-
-    setForm({ ...form, subjects: [...form.subjects, value] });
+    setForm({ ...form, subjects: [...form.subjects, { subjectName: name, subjectCode: code }] });
     setSubjectInput('');
+    setSubjectCodeInput('');
   };
 
   // ❌ Remove subject
-  const removeSubject = (sub: string) => {
-    setForm({
-      ...form,
-      subjects: form.subjects.filter((s) => s !== sub),
-    });
+  const removeSubject = (name: string) => {
+    setForm({ ...form, subjects: form.subjects.filter((s) => s.subjectName !== name) });
   };
 
   // 💾 Save
@@ -113,6 +110,7 @@ export default function SubjectsPage() {
         subjects: [],
       });
       setSubjectInput('');
+      setSubjectCodeInput('');
       setShowAdd(false);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save subjects');
@@ -131,7 +129,7 @@ export default function SubjectsPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -179,27 +177,39 @@ export default function SubjectsPage() {
             {/* Subjects */}
             <div>
               <Label>Subjects *</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={subjectInput}
-                  onChange={(e) => setSubjectInput(e.target.value)}
-                  placeholder="Enter subject"
-                />
-                <Button onClick={addSubject}>Add</Button>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Input
+                    value={subjectInput}
+                    onChange={(e) => setSubjectInput(e.target.value)}
+                    placeholder="Subject name (e.g. Mathematics)"
+                    onKeyDown={(e) => e.key === 'Enter' && addSubject()}
+                  />
+                </div>
+                <div className="w-36">
+                  <Input
+                    value={subjectCodeInput}
+                    onChange={(e) => setSubjectCodeInput(e.target.value)}
+                    placeholder="Code (e.g. MATH)"
+                    onKeyDown={(e) => e.key === 'Enter' && addSubject()}
+                  />
+                </div>
+                <Button onClick={addSubject} type="button">Add</Button>
               </div>
 
               <div className="flex flex-wrap gap-2 mt-2">
                 {form.subjects.map((sub) => (
-                  <Badge key={sub} className="flex items-center gap-1">
-                    {sub}
+                  <Badge key={sub.subjectName} className="flex items-center gap-1">
+                    {sub.subjectName} <span className="opacity-60 text-[10px]">({sub.subjectCode})</span>
                     <X
                       className="h-3 w-3 cursor-pointer"
-                      onClick={() => removeSubject(sub)}
+                      onClick={() => removeSubject(sub.subjectName)}
                     />
                   </Badge>
                 ))}
               </div>
             </div>
+
 
             {/* Actions */}
             <div className="flex gap-2">

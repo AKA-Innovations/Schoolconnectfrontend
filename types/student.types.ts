@@ -87,6 +87,7 @@ export interface StudentListResponse {
 }
 
 export interface StudentListFilters {
+  schoolId?: string;
   firstName?: string;
   mobileNumber?: string;
   className?: string;
@@ -96,6 +97,7 @@ export interface StudentListFilters {
 }
 
 export interface RegisterStudentPayload {
+  schoolId?: string;
   username: string;
   password: string;
   firstName: string;
@@ -163,14 +165,15 @@ export interface CreateAddressPayload {
 
 export interface AttendanceRecord {
   id?: number;
-  recordId?: number; // From Swagger GET
-  studentId?: string; // Missing in Swagger GET but present in PUT/POST
+  recordId?: number;
+  studentId?: string;
   date: string;
-  status: 'Present' | 'Absent' | 'Late' | 'HalfDay'; // Unified TitleCase status
-  attendanceStatus?: string; // Raw status from Swagger
+  status: 'Present' | 'Absent' | 'Late' | 'HalfDay';
+  attendanceStatus?: string;
   remarks?: string;
-  studentName?: string; // From Swagger GET
-  studentRollNumber?: string; // From Swagger GET
+  subjectName?: string;
+  studentName?: string;
+  studentRollNumber?: string;
   firstName?: string;
   lastName?: string;
   rollNumber?: string;
@@ -179,11 +182,13 @@ export interface AttendanceRecord {
 }
 
 export interface BulkAttendancePayload {
+  session?: string;
   date: string;
-  attendance: { studentId: string; attendanceStatus: string }[];
+  attendance: { studentId: string; attendanceStatus: string; remarks?: string; [key: string]: any }[];
 }
 
 export interface AttendanceFilterParams {
+  schoolId?: string;
   studentId?: string;
   className?: string;
   sectionName?: string;

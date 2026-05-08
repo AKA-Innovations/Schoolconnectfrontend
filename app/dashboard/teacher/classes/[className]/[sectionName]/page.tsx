@@ -17,27 +17,27 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const STATUS_STYLES: Record<string, string> = {
-  Present:  'border-emerald-200 bg-emerald-50 text-emerald-700',
-  Absent:   'border-red-200   bg-red-50   text-red-700',
-  Late:     'border-amber-200 bg-amber-50  text-amber-700',
-  HalfDay:  'border-blue-200  bg-blue-50   text-blue-700',
+  Present: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  Absent: 'border-red-200   bg-red-50   text-red-700',
+  Late: 'border-amber-200 bg-amber-50  text-amber-700',
+  HalfDay: 'border-blue-200  bg-blue-50   text-blue-700',
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-  Present:  <CheckCircle2 className="h-3 w-3" />,
-  Absent:   <XCircle      className="h-3 w-3" />,
-  Late:     <Clock        className="h-3 w-3" />,
-  HalfDay:  <AlertCircle  className="h-3 w-3" />,
+  Present: <CheckCircle2 className="h-3 w-3" />,
+  Absent: <XCircle className="h-3 w-3" />,
+  Late: <Clock className="h-3 w-3" />,
+  HalfDay: <AlertCircle className="h-3 w-3" />,
 };
 
 export default function ClassDetailPage() {
-  const params  = useParams();
-  const router  = useRouter();
-  const user    = useAuthStore((s) => s.user);
+  const params = useParams();
+  const router = useRouter();
+  const user = useAuthStore((s) => s.user);
 
-  const className   = decodeURIComponent(params.className   as string);
+  const className = decodeURIComponent(params.className as string);
   const sectionName = decodeURIComponent(params.sectionName as string);
-  const today       = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
 
   // Students for this class-section
   const { data: studentData, isLoading: studentsLoading } = useStudentList({
@@ -58,19 +58,19 @@ export default function ClassDetailPage() {
     [allSubjectDetails, user?.id, className, sectionName],
   );
 
-  const students       = studentData?.items ?? [];
-  const attendanceMap  = useMemo(() => {
+  const students = studentData?.items ?? [];
+  const attendanceMap = useMemo(() => {
     const records: any[] = Array.isArray(attendanceRaw)
       ? attendanceRaw
-      : Array.isArray((attendanceRaw as any)?.items)  ? (attendanceRaw as any).items
-      : Array.isArray((attendanceRaw as any)?.data)   ? (attendanceRaw as any).data
-      : [];
-    return Object.fromEntries(records.map((r: any) => [r.studentId, r.attendanceStatus ?? r.status]));
+      : Array.isArray((attendanceRaw as any)?.items) ? (attendanceRaw as any).items
+        : Array.isArray((attendanceRaw as any)?.data) ? (attendanceRaw as any).data
+          : [];
+    return Object.fromEntries(records.map((r: any) => [r.studentId, r.status]));
   }, [attendanceRaw]);
 
-  const absentStudents  = students.filter((s) => attendanceMap[s.id] === 'Absent');
-  const presentCount    = students.filter((s) => attendanceMap[s.id] === 'Present').length;
-  const notMarkedCount  = students.filter((s) => !attendanceMap[s.id]).length;
+  const absentStudents = students.filter((s) => attendanceMap[s.id] === 'Absent');
+  const presentCount = students.filter((s) => attendanceMap[s.id] === 'Present').length;
+  const notMarkedCount = students.filter((s) => !attendanceMap[s.id]).length;
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
@@ -102,10 +102,10 @@ export default function ClassDetailPage() {
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Students', value: students.length,        icon: Users,         color: 'text-blue-500   bg-blue-500/10' },
-          { label: 'Present Today',  value: presentCount,           icon: CheckCircle2,  color: 'text-emerald-500 bg-emerald-500/10' },
-          { label: 'Absent Today',   value: absentStudents.length,  icon: XCircle,       color: 'text-red-500    bg-red-500/10' },
-          { label: 'Not Marked',     value: notMarkedCount,         icon: AlertCircle,   color: 'text-amber-500  bg-amber-500/10' },
+          { label: 'Total Students', value: students.length, icon: Users, color: 'text-blue-500   bg-blue-500/10' },
+          { label: 'Present Today', value: presentCount, icon: CheckCircle2, color: 'text-emerald-500 bg-emerald-500/10' },
+          { label: 'Absent Today', value: absentStudents.length, icon: XCircle, color: 'text-red-500    bg-red-500/10' },
+          { label: 'Not Marked', value: notMarkedCount, icon: AlertCircle, color: 'text-amber-500  bg-amber-500/10' },
         ].map((kpi) => (
           <Card key={kpi.label} className="erp-card">
             <CardContent className="p-4 flex items-center gap-3">
@@ -177,8 +177,8 @@ export default function ClassDetailPage() {
                     </thead>
                     <tbody>
                       {students.map((s, idx) => {
-                        const status  = attendanceMap[s.id] ?? null;
-                        const rollNo  = s.academics?.[0]?.rollNumber ?? '—';
+                        const status = attendanceMap[s.id] ?? null;
+                        const rollNo = s.academics?.[0]?.rollNumber ?? '—';
                         return (
                           <tr
                             key={s.id}

@@ -91,7 +91,7 @@ export function TeacherProfileManager() {
     isFetching,
     refetch,
   } = useTeacher(teacherId);
-  
+
   const uploadMutation = useUploadTeacherImage(teacherId);
   const deleteMutation = useDeleteTeacherImage(teacherId);
   const addAddressMutation = useAddAddress(teacherId);
@@ -240,7 +240,7 @@ export function TeacherProfileManager() {
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /> Refresh
+            <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} /> Refreshs
           </Button>
         </div>
       </div>

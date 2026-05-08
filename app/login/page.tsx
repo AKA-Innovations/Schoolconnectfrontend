@@ -7,12 +7,12 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
-import { 
-  GraduationCap, 
-  Loader2, 
-  BookOpen, 
-  Users, 
-  BarChart3, 
+import {
+  GraduationCap,
+  Loader2,
+  BookOpen,
+  Users,
+  BarChart3,
   Shield,
   ChevronRight,
   Sparkles,
@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const setAuth = useAuthStore((state) => state.setAuth);
   const router = useRouter();
 
@@ -139,7 +139,7 @@ export default function LoginPage() {
       </div>
 
       <div className="relative z-10 flex flex-col lg:flex-row flex-1">
-        
+
         {/* LEFT SIDE: Branding & Value Prop */}
         <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-20">
           <div className="max-w-xl mx-auto lg:mx-0">
@@ -183,17 +183,17 @@ export default function LoginPage() {
 
         {/* RIGHT SIDE: Login Form */}
         <div className="flex-1 flex items-center justify-center px-4 py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
-          <Card  className="cardprime w-full max-w-105 rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
+          <Card className="cardprime w-full max-w-105 rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
             <CardHeader className="space-y-1 text-center pb-8">
               <CardTitle className="text-2xl font-bold text-slate-900">Dashboard Login</CardTitle>
               <CardDescription className="text-slate-500">Enter your official credentials below</CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
-                  <Input 
+                  <Input
                     id="username"
                     placeholder="john.doe@school.edu"
                     value={username}
@@ -211,7 +211,7 @@ export default function LoginPage() {
                     </button>
                   </div>
                   <div className="relative">
-                    <Input 
+                    <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
                       value={password}
@@ -236,7 +236,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <Button 
+                <Button
                   disabled={isLoading}
                   className="w-full h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
                 >

@@ -57,6 +57,7 @@ export const API_ENDPOINTS = {
     PERIOD_SLOTS_BY_ID: (id: number) => `/class/period-slots/${id}`,
     TIMETABLE: '/class/timetable',
     TIMETABLE_BY_ID: (id: number) => `/class/timetable/${id}`,
+    TIMETABLE_FETCH: '/class/timetable/fetch',
   },
   STUDENT: {
     LIST: '/student',
@@ -85,5 +86,25 @@ export const API_ENDPOINTS = {
   },
   PRINCIPAL: {
     DASHBOARD_SUMMARY: '/principal/dashboard-summary',
+  },
+  ACADEMIC: {
+    SUBJECT_CHAPTER: '/academic/subject-chapter',
+    SUBJECT_CHAPTER_BY_ID: (id: number) => `/academic/subject-chapter/${id}`,
+    SUBJECT_TOPIC: '/academic/subject-topic',
+    SUBJECT_TOPIC_BY_ID: (id: number) => `/academic/subject-topic/${id}`,
+    TEACHING_PROGRESS: '/academic/teaching-progress',
+    TEACHING_PROGRESS_BY_ID: (id: number) => `/academic/teaching-progress/${id}`,
+    HOMEWORK: '/academic/homework',
+    HOMEWORK_BY_ID: (id: number) => `/academic/homework/${id}`,
+    HOMEWORK_DOCUMENT: '/academic/homework-document',
+    HOMEWORK_DOCUMENT_BY_HW_ID: (hwId: number) => `/academic/homework-document/${hwId}`,
+    HOMEWORK_DOCUMENT_BY_ID: (id: number) => `/academic/homework-document/${id}`,
+    HOMEWORK_SUBMISSION: '/academic/homework-submission',
+    HOMEWORK_SUBMISSION_BY_HW_ID: (hwId: number) => `/academic/homework-submission/${hwId}`,
+    HOMEWORK_SUBMISSION_BY_ID: (id: number) => `/academic/homework-submission/${id}`,
+    CLASSWORK: '/academic/classwork',
+    CLASSWORK_BY_ID: (id: number) => `/academic/classwork/${id}`,
+    STUDY_MATERIAL: '/academic/teacher-study-material',
+    STUDY_MATERIAL_BY_ID: (id: number) => `/academic/teacher-study-material/${id}`,
   },
 } as const;

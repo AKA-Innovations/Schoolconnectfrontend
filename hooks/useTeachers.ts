@@ -167,7 +167,7 @@ export function useRemoveClassTeacher() {
 export function useAddCoordinatorClass() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { teacherId: string; classDtlsId: number }) =>
+    mutationFn: (data: { session: string; teacherId: string; className: string }) =>
       teacherService.addCoordinatorClass(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: teacherKeys.all }),
   });

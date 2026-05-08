@@ -17,6 +17,7 @@ import type {
   SubjectDetail,
   SubjectOption,
   TimetableEntry,
+  TimetableFilterParams,
 } from './types';
 
 function buildPage<T>(
@@ -40,15 +41,24 @@ function buildPage<T>(
 }
 
 export const classService = {
+  // ─── School Classes (via /school routes used by class overview) ──────────────
+
   getClasses: async (params?: {
     page?: number;
     limit?: number;
     className?: string;
     schoolId?: string;
   }): Promise<ClassListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
+    // Uses class-section-lists which returns all class+section combos with teacher info
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+      params: { schoolId: params?.schoolId },
+    });
     const rawClasses = response.data;
-    let all: ClassDetails[] = Array.isArray(rawClasses) ? rawClasses : Array.isArray(rawClasses?.data) ? rawClasses.data : [];
+    let all: ClassDetails[] = Array.isArray(rawClasses)
+      ? rawClasses
+      : Array.isArray(rawClasses?.data)
+        ? rawClasses.data
+        : [];
 
     if (params?.className) {
       const q = params.className.toLowerCase();
@@ -59,7 +69,9 @@ export const classService = {
   },
 
   getClass: async (classDtlsId: number, schoolId?: string): Promise<ClassDetails> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+      params: { schoolId },
+    });
     const raw = response.data;
     const all: ClassDetails[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
     const found = all.find((r) => r.id === classDtlsId);
@@ -83,7 +95,7 @@ export const classService = {
 
   getSectionsByClassName: async (className: string, schoolId?: string): Promise<string[]> => {
     const response = await api.get(API_ENDPOINTS.CLASS.SECTIONS, {
-      params: { className },
+      params: { className, schoolId },
     });
     const raw = response.data;
     return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
@@ -96,15 +108,17 @@ export const classService = {
     teacherName?: string;
     schoolId?: string;
   }): Promise<ClassTeacherListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+      params: { schoolId: params?.schoolId },
+    });
     const raw = response.data;
     const all: any[] = Array.isArray(raw)
       ? raw
       : Array.isArray(raw?.items)
-      ? raw.items
-      : Array.isArray(raw?.data)
-      ? raw.data
-      : [];
+        ? raw.items
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
 
     // Only entries that have a class teacher assigned
     let teacherEntries: ClassTeacher[] = all
@@ -149,33 +163,63 @@ export const classService = {
 
   // ─── Class API endpoints (new /class/* routes) ─────────────────────────────
 
+  /** Returns distinct class names: string[] */
   getClassList: async (schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASSES);
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASSES, {
+      params: { schoolId },
+    });
     const raw = res.data;
-    return Array.isArray(raw) ? raw : raw?.classes ?? raw?.data ?? [];
+    // Backend returns { classes: string[] }
+    if (raw?.classes && Array.isArray(raw.classes)) return raw.classes;
+    if (Array.isArray(raw)) return raw;
+    return raw?.data ?? [];
   },
 
+  /** Returns distinct section names for a class: string[] */
   getSections: async (className: string, schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SECTIONS, { params: { className } });
+    const res = await api.get(API_ENDPOINTS.CLASS.SECTIONS, {
+      params: { className, schoolId },
+    });
     const raw = res.data;
-    return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
+    // Backend returns { sections: string[] }
+    if (raw?.sections && Array.isArray(raw.sections)) return raw.sections;
+    if (Array.isArray(raw)) return raw;
+    return raw?.data ?? [];
   },
 
+  /** Returns { className: string[] } map */
   getCombinations: async (schoolId?: string): Promise<any[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.COMBINATIONS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    const res = await api.get(API_ENDPOINTS.CLASS.COMBINATIONS, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    // Backend returns { combinations: {...} }
+    if (raw?.combinations) return raw.combinations;
+    if (Array.isArray(raw)) return raw;
+    return raw?.data ?? [];
   },
 
+  /** Returns ClassSectionItem[] (full class+section objects with id) */
   getClassSectionLists: async (schoolId?: string): Promise<ClassSectionItem[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
   // ─── Subject Options ──────────────────────────────────────────────────────
 
-  getSubjectOptions: async (): Promise<SubjectOption[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+  getSubjectOptions: async (schoolId?: string, className?: string): Promise<SubjectOption[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS, {
+      params: { schoolId, className },
+    });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
   createSubjectOption: async (data: CreateSubjectOptionPayload): Promise<SubjectOption> => {
@@ -194,11 +238,46 @@ export const classService = {
 
   // ─── Teacher-Subject Mapping (subject-dtls) ───────────────────────────────
 
-  getSubjectDetails: async (): Promise<SubjectDetail[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-  },
+  // getSubjectDetails: async (options?: { schoolId?: string; teacherId?: string }): Promise<SubjectDetail[]> => {
+  //   const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS, {
+  //     params: { schoolId: options?.schoolId, teacherId: options?.teacherId },
+  //   });
+  //   console.log('Raw Subject Details Response:', res.data);
+  //   const raw = res.data;
+  //   if (Array.isArray(raw)) return raw;
+  //   if (raw?.data && Array.isArray(raw.data)) return raw.data;
+  //   return [];
+  // },
+getSubjectDetails: async (
+    options?: { schoolId?: string; teacherId?: string; session?: string }
+  ): Promise<SubjectDetail[]> => {
 
+    console.log('Teacher ID:', options?.teacherId);
+    console.log('Session:', options?.session);
+
+    if (options?.teacherId) {
+      console.log('Teacher ID is being passed');
+    } else {
+      console.log('Teacher ID is NOT being passed');
+    }
+
+    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS, {
+      params: {
+        schoolId: options?.schoolId,
+        teacherId: options?.teacherId,
+        session: options?.session,
+      },
+    });
+
+  console.log('Raw Subject Details Response:', res.data);
+
+  const raw = res.data;
+
+  if (Array.isArray(raw)) return raw;
+  if (raw?.data && Array.isArray(raw.data)) return raw.data;
+
+  return [];
+},
   createSubjectDetail: async (data: CreateSubjectDetailPayload): Promise<SubjectDetail> => {
     const res = await api.post(API_ENDPOINTS.CLASS.SUBJECT_DTLS, data);
     return res.data;
@@ -215,9 +294,14 @@ export const classService = {
 
   // ─── Period Slots ─────────────────────────────────────────────────────────
 
-  getPeriodSlots: async (): Promise<PeriodSlot[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.PERIOD_SLOTS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+  getPeriodSlots: async (schoolId?: string): Promise<PeriodSlot[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.PERIOD_SLOTS, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
   createPeriodSlot: async (data: CreatePeriodSlotPayload): Promise<PeriodSlot> => {
@@ -236,22 +320,23 @@ export const classService = {
 
   // ─── Timetable ────────────────────────────────────────────────────────────
 
-  getTimetable: async (params?: { session?: string; teacherClassId?: number; dayOfWeek?: string }): Promise<TimetableEntry[]> => {
+  getTimetable: async (params?: TimetableFilterParams): Promise<TimetableEntry[]> => {
     const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE, { params });
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
   createTimetableEntry: async (data: CreateTimetablePayload): Promise<TimetableEntry> => {
-    const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, data);
-    return res.data;
+    // Backend expects an array even for single entries
+    const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, [data]);
+    return Array.isArray(res.data) ? res.data[0] : res.data;
   },
 
   createTimetableBulk: async (data: CreateTimetablePayload[]): Promise<TimetableEntry[]> => {
-    // Backend only accepts single creates, so fire them in parallel
-    const results = await Promise.all(
-      data.map((entry) => api.post(API_ENDPOINTS.CLASS.TIMETABLE, entry).then((r) => r.data))
-    );
-    return results;
+    const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, data);
+    return res.data;
   },
 
   updateTimetableEntry: async (id: number, data: Partial<CreateTimetablePayload>): Promise<TimetableEntry> => {
@@ -261,5 +346,13 @@ export const classService = {
 
   deleteTimetableEntry: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id));
+  },
+
+  fetchTimetable: async (params: any): Promise<TimetableEntry[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE_FETCH, { params });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 };

@@ -265,8 +265,8 @@ export default function ClassRoomPage() {
                                 {att ? (
                                   <Badge className={cn('rounded-full text-[10px] font-bold border px-2',
                                     att.status === 'Present' ? 'bg-success/10 text-success border-success/20' :
-                                    att.status === 'Absent' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                                    'bg-warning/10 text-warning border-warning/20'
+                                      att.status === 'Absent' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                                        'bg-warning/10 text-warning border-warning/20'
                                   )}>
                                     {att.status}
                                   </Badge>

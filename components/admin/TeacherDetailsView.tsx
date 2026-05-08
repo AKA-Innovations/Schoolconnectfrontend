@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -669,11 +669,11 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
   const mappings: SubjectDetail[] = (allDetails ?? []).filter((d: SubjectDetail) => d.teacherId === teacherId);
 
   const classNames: string[] = Array.from(new Set(
-    (classSectionsData?.classSections ?? classSectionsData ?? []).map((s: any) => String(s.className))
+    (classSectionsData ?? []).map((s: any) => String(s.className))
   )).sort() as string[];
 
   const sectionsForClass: string[] = Array.from(new Set(
-    (classSectionsData?.classSections ?? classSectionsData ?? [])
+    (classSectionsData ?? [])
       .filter((s: any) => String(s.className) === newMapping.className)
       .map((s: any) => String(s.sectionName))
   )).sort() as string[];
