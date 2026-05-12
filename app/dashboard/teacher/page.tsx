@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 export default function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useTeacherDashboard();
-  const { data: subjectDetails = [] } = useSubjectDetails();
+  const { data: subjectDetails = [] } = useSubjectDetails(user?.id);
   
   // Get today's day of week
   const today = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());

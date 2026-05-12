@@ -147,9 +147,9 @@ export default function CoordinatorAttendancePage() {
           // 1. First time init
           // 2. Date changed (reset)
           // 3. Fresh data arrived and local is still default 'Present'
-          if (!currentLocal || isNewDate || (currentLocal.status === 'Present' && existing && existing.status !== 'Present')) {
+          if (!currentLocal || isNewDate || (currentLocal.status === 'Present' && existing && (existing.attendanceStatus || existing.status) !== 'Present')) {
             newMap[s.id] = {
-              status: (existing?.status as AttendanceStatus) || 'Present',
+              status: (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus,
               remarks: existing?.remarks ?? '',
             };
           }
@@ -186,7 +186,7 @@ export default function CoordinatorAttendancePage() {
       const newStatus = attendanceMap[s.id]?.status ?? 'Present';
 
       if (existing) {
-        if (existing.status !== newStatus) {
+        if ((existing.attendanceStatus || existing.status) !== newStatus) {
           toUpdate.push({ recordId: Number(existing.recordId || existing.id), status: newStatus });
         }
       } else {
@@ -252,10 +252,13 @@ export default function CoordinatorAttendancePage() {
 
     try {
       if (existing) {
-        if (existing.status !== newStatus) {
+        if ((existing.attendanceStatus || existing.status) !== newStatus) {
           await updateMutation.mutateAsync({ 
             recordId: Number(existing.recordId || existing.id), 
-            data: { status: newStatus } as any 
+            data: { 
+              status: newStatus,
+              attendanceStatus: newStatus
+            } as any 
           });
           toast.success(`Attendance updated for ${s.firstName}`);
         }
@@ -538,8 +541,8 @@ export default function CoordinatorAttendancePage() {
                         </td>
                         <td className="p-4">
                           {existingVal ? (
-                            <Badge className={cn("rounded-lg border-0 text-[10px]", STATUS_CFG[existingVal.status]?.style)}>
-                              {existingVal.status}
+                            <Badge className={cn("rounded-lg border-0 text-[10px]", STATUS_CFG[existingVal.attendanceStatus || existingVal.status]?.style)}>
+                              {existingVal.attendanceStatus || existingVal.status}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="rounded-lg text-[10px] opacity-40">Unmarked</Badge>
@@ -563,7 +566,7 @@ export default function CoordinatorAttendancePage() {
                                 </button>
                               ))}
                             </div>
-                            {(att?.status !== existingVal?.status) && (
+                            {(att?.status !== (existingVal?.attendanceStatus || existingVal?.status)) && (
                               <Button
                                 size="sm"
                                 variant="ghost"

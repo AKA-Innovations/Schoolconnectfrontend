@@ -100,7 +100,7 @@ export default function AttendancePage() {
       );
       
       map[s.id] = {
-        status: existing?.status as AttendanceStatus ?? 'Present',
+        status: (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus,
         remarks: existing?.remarks ?? '',
       };
     });

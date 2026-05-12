@@ -1,5 +1,6 @@
 import api from '../../lib/api';
 import { API_ENDPOINTS } from '../config';
+import { CURRENT_SESSION } from '../../lib/constants';
 import type {
   Address,
   ClassTeacherAssignmentDetails,
@@ -114,12 +115,25 @@ export const teacherService = {
       throw new Error('User ID is required for teacher summary');
     }
 
-    const response = await api.get(API_ENDPOINTS.TEACHER.BY_ID(userId));
-    const teacherData = response.data?.data || response.data;
+    // Fetch teacher profile AND subject mappings in parallel
+    const [teacherRes, subjectsRes] = await Promise.all([
+      api.get(API_ENDPOINTS.TEACHER.BY_ID(userId)),
+      api.get(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, { 
+        params: { teacherId: userId, session: CURRENT_SESSION } 
+      })
+    ]).catch(err => {
+      console.error('Teacher Summary Parallel Fetch Error:', err);
+      // Fallback to just teacher profile if subjects fetch fails
+      return [api.get(API_ENDPOINTS.TEACHER.BY_ID(userId)), { data: [] }];
+    });
 
-    const details = teacherData?.data || teacherData;
+    const teacherData = (teacherRes as any).data?.data || (teacherRes as any).data;
+    const details = teacherData?.data || teacherData || {};
 
-    // The backend provides classes in two lists: as a class teacher and as a coordinator
+    const subjectMappingsRaw = (subjectsRes as any).data?.classSubjectDtls || (subjectsRes as any).data?.data || (subjectsRes as any).data || [];
+    const subjectsList = Array.isArray(subjectMappingsRaw) ? subjectMappingsRaw : [];
+
+    // The backend provides classes in several lists
     const coordinatorClasses = (details.coordinatorClasses || []).map((c: any) => ({
       id: `coord-${c.classSectionsId || c.classSectionId || c.id}`,
       name: c.className || 'Unnamed Class',
@@ -136,7 +150,9 @@ export const teacherService = {
       room: '—',
     }));
 
-    const subjectTeacherClasses = (details.classes || []).map((c: any) => ({
+    // Use fetched subjectsList if details.classes is empty
+    const sourceSubjectClasses = subjectsList.length > 0 ? subjectsList : (details.classes || []);
+    const subjectTeacherClasses = sourceSubjectClasses.map((c: any) => ({
       id: `sub-${c.id || Math.random()}`,
       name: `${c.className} ${c.sectionName}`,
       subject: c.subjectName || 'Subject Teacher',
@@ -145,11 +161,24 @@ export const teacherService = {
     }));
 
     const mappedClasses = [...coordinatorClasses, ...classTeacherClasses, ...subjectTeacherClasses];
+    
+    // Calculate unique teaching classes
+    const uniqueTeachingClasses = new Set(subjectTeacherClasses.map(c => c.name));
 
     return {
       kpis: [
-        { label: 'Assigned Classes', value: mappedClasses.length, trendType: 'neutral', iconName: 'Users' },
-        { label: 'Total Mappings', value: mappedClasses.length, trendType: 'neutral', iconName: 'BookOpen' },
+        { 
+          label: 'Assigned Classes', 
+          value: uniqueTeachingClasses.size, 
+          trendType: 'neutral', 
+          iconName: 'Users' 
+        },
+        { 
+          label: 'Total Mappings', 
+          value: subjectTeacherClasses.length, 
+          trendType: 'neutral', 
+          iconName: 'BookOpen' 
+        },
       ],
       classes: mappedClasses,
       recentData: [],

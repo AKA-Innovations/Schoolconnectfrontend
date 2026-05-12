@@ -61,7 +61,6 @@ export default function TimetablePage() {
     session: CURRENT_SESSION,
     classId: resolvedClassId,
     classSectionId: currentSection?.masterSectionId,
-    sectionId: currentSection?.masterSectionId, // Fallback param
   });
   console.log("Hi" + currentSection?.id);
 

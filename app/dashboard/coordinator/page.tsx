@@ -20,7 +20,6 @@ export default function CoordinatorDashboard() {
   const { data: subjectDetails   = [] }                            = useSubjectDetails();
   const { data: rawTimetableEntries = [] }                         = useTimetable({ 
     session: CURRENT_SESSION,
-    sectionId: undefined // Could be added if scope restricted
   });
   
   // Normalization Layer: Resolves missing IDs from enriched names
