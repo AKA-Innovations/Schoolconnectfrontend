@@ -3,10 +3,11 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useClassSectionLists, useSubjectDetails, useTimetable } from '@/hooks/useClasses';
+import { useClassSectionLists, useSubjectDetails, useTimetable, usePeriodSlots } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
 import { teacherService } from '@/services/teacher.service';
+import { CURRENT_SESSION } from '@/lib/constants';
 import { Compass, Users, BookOpen, Calendar, GraduationCap, ChevronRight, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,7 +18,27 @@ export default function CoordinatorDashboard() {
 
   const { data: allClassSections = [], isLoading: loadingClasses } = useClassSectionLists();
   const { data: subjectDetails   = [] }                            = useSubjectDetails();
-  const { data: timetableEntries = [] }                            = useTimetable();
+  const { data: rawTimetableEntries = [] }                         = useTimetable({ 
+    session: CURRENT_SESSION,
+    sectionId: undefined // Could be added if scope restricted
+  });
+  
+  // Normalization Layer: Resolves missing IDs from enriched names
+  const timetableEntries = useMemo(() => {
+    const raw = Array.isArray(rawTimetableEntries) ? rawTimetableEntries : [];
+    return raw.map(e => {
+      let classSubjectId = e.classSubjectId;
+      if (!classSubjectId && e.subjectName) {
+        const match = subjectDetails.find(sd => 
+          String(sd.subjectName).trim().toLowerCase() === String(e.subjectName).trim().toLowerCase() && 
+          String(sd.className) === String(e.className || '') &&
+          String(sd.sectionName) === String(e.sectionName || '')
+        );
+        if (match) classSubjectId = String(match.id);
+      }
+      return { ...e, classSubjectId };
+    });
+  }, [rawTimetableEntries, subjectDetails]);
   const { data: teachersData }                                     = useTeacherList({ schoolId: schoolId ?? '', page: 1, pageSize: 500 });
   const allTeachers = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
   const [isSyncing, setIsSyncing] = React.useState(false);
@@ -82,7 +103,7 @@ export default function CoordinatorDashboard() {
 
   const mySdIds = useMemo(() => new Set(mySubjectDetails.map((sd) => String(sd.id))), [mySubjectDetails]);
   const myTimetableEntries = useMemo(
-    () => timetableEntries.filter((e) => mySdIds.has(String(e.teacherClassId))),
+    () => timetableEntries.filter((e) => mySdIds.has(String(e.classSubjectId))),
     [timetableEntries, mySdIds],
   );
 
@@ -99,18 +120,19 @@ export default function CoordinatorDashboard() {
   const classSummary = useMemo(() => {
     const classMap = new Map<string, { sections: string[]; subjects: Set<string>; teacherCount: number }>();
     mySections.forEach((cs) => {
-      if (!classMap.has(cs.className)) {
-        classMap.set(cs.className, { sections: [], subjects: new Set(), teacherCount: 0 });
+      const cls = cs.className || '';
+      if (!classMap.has(cls)) {
+        classMap.set(cls, { sections: [], subjects: new Set(), teacherCount: 0 });
       }
-      classMap.get(cs.className)!.sections.push(cs.sectionName);
+      classMap.get(cls)!.sections.push(cs.sectionName || '');
     });
     mySubjectDetails.forEach((sd) => {
-      const entry = classMap.get(sd.className);
-      if (entry) entry.subjects.add(sd.subjectName);
+      const entry = classMap.get(sd.className || '');
+      if (entry) entry.subjects.add(sd.subjectName || '');
     });
     myTeachers.forEach((t: any) => {
       mySubjectDetails.filter((sd) => sd.teacherId === t.id).forEach((sd) => {
-        const entry = classMap.get(sd.className);
+        const entry = classMap.get(sd.className || '');
         if (entry) entry.teacherCount++;
       });
     });
@@ -119,7 +141,7 @@ export default function CoordinatorDashboard() {
       sections: [...new Set(data.sections)].sort(),
       subjects: [...data.subjects].sort(),
       timetabled: myTimetableEntries.filter((e) => {
-        const sd = mySubjectDetails.find((s) => String(s.id) === String(e.teacherClassId));
+        const sd = mySubjectDetails.find((s) => String(s.id) === String(e.classSubjectId));
         return sd?.className === className;
       }).length,
     }));

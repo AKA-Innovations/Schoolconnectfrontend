@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, BookOpen, Fingerprint } from 'lucide-react';
+import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
 import { classService } from '@/services/class.service';
 import { teacherService } from '@/services/teacher.service';
 import { TeacherSelectDropdown } from '@/components/admin/class/TeacherSelectDropdown';
@@ -40,10 +41,17 @@ export default function NewClassPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<ClassFormValues>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ClassFormValues>({
     resolver: zodResolver(classSchema),
-    defaultValues: { classTeacherId: '' },
+    defaultValues: { classTeacherId: '', className: '', sectionName: '' },
   });
+
+  const selectedClassName = watch('className');
+  const { data: schoolClasses = [] } = useSchoolClasses();
+  
+  // Find the selected class ID to fetch its sections
+  const selectedClass = schoolClasses.find(c => c.className === selectedClassName);
+  const { data: schoolSections = [] } = useSchoolSections(selectedClass?.id);
 
   const onSubmit = async (data: ClassFormValues) => {
     setIsLoading(true);
@@ -61,7 +69,7 @@ export default function NewClassPage() {
         await teacherService.updateTeacherDetails(data.classTeacherId, { isClassTeacher: true });
       }
 
-      toast.success(`Class ${data.className}-${data.sectionName} created successfully`);
+      toast.success(`Class ${data.className}-${data.sectionName} mapping created`);
       router.push(created?.id ? `/dashboard/admin/class/${created.id}` : '/dashboard/admin/class');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to create class');
@@ -82,8 +90,8 @@ export default function NewClassPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Create New Class</h2>
-          <p className="text-sm text-muted-foreground mt-1">Add a new class section to the institution</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Create Class Mapping</h2>
+          <p className="text-sm text-muted-foreground mt-1">Map a master class and section to create a functional unit</p>
         </div>
       </div>
 
@@ -95,19 +103,41 @@ export default function NewClassPage() {
                  <BookOpen className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-lg font-bold tracking-tight">Class Information</CardTitle>
-                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Define the grade and section identifier</CardDescription>
+                <CardTitle className="text-lg font-bold tracking-tight">Mapping Information</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Select from the institution's master structure</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <FG label="Class Name" required error={errors.className?.message}>
-                <Input {...register('className')} className="rounded-xl" placeholder="e.g., Class 1" />
+              
+              <FG label="Class (Grade)" required error={errors.className?.message}>
+                <select 
+                  {...register('className')}
+                  onChange={(e) => {
+                    register('className').onChange(e);
+                    setValue('sectionName', ''); // Reset section when class changes
+                  }}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                >
+                  <option value="">Select Class</option>
+                  {schoolClasses.map(c => (
+                    <option key={c.id} value={c.className}>{c.className}</option>
+                  ))}
+                </select>
               </FG>
               
-              <FG label="Section Name" required error={errors.sectionName?.message}>
-                <Input {...register('sectionName')} className="rounded-xl" placeholder="e.g., A, B, C" />
+              <FG label="Section" required error={errors.sectionName?.message}>
+                <select 
+                  {...register('sectionName')}
+                  disabled={!selectedClassName}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all disabled:opacity-50"
+                >
+                  <option value="">{selectedClassName ? 'Select Section' : 'Select Class First'}</option>
+                  {schoolSections.map(s => (
+                    <option key={s.id} value={s.sectionName}>{s.sectionName}</option>
+                  ))}
+                </select>
               </FG>
               
               <FG label="Max Student Limit" error={errors.maxLimit?.message}>

@@ -13,27 +13,26 @@ import { StudentTableBody } from '@/components/admin/student/StudentTableBody';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useStudentList } from '@/hooks/useStudents';
+import { useClassSectionLists } from '@/hooks/useClasses';
 import { StudentListFilters } from '@/services/student.service';
 
 export function StudentManagement() {
   const [searchName, setSearchName] = useState('');
-  const [classFilter, setClassFilter] = useState('');
-  const [sectionFilter, setSectionFilter] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [mobileFilter, setMobileFilter] = useState('');
   const [page, setPage] = useState(1);
 
+  const { data: allSections = [] } = useClassSectionLists();
+
   const debouncedName = useDebounce(searchName, 400);
   const debouncedMobile = useDebounce(mobileFilter, 400);
-  const debouncedClass = useDebounce(classFilter, 400);
-  const debouncedSection = useDebounce(sectionFilter, 400);
 
   const filters: StudentListFilters = {
     page,
     limit: 10,
     ...(debouncedName && { firstName: debouncedName }),
     ...(debouncedMobile && { mobileNumber: debouncedMobile }),
-    ...(debouncedClass && { className: debouncedClass }),
-    ...(debouncedSection && { sectionName: debouncedSection }),
+    ...(selectedSectionId && { classSectionId: Number(selectedSectionId) }),
   };
 
   const { data, isLoading, isFetching, refetch } = useStudentList(filters);
@@ -43,10 +42,10 @@ export function StudentManagement() {
   const students = data?.items ?? [];
   const pagination = data?.pagination;
   const totalPages = pagination?.totalPages ?? 1;
-  const hasFilters = !!(searchName || mobileFilter || classFilter || sectionFilter);
+  const hasFilters = !!(searchName || mobileFilter || selectedSectionId);
 
   const clearFilters = () => {
-    setSearchName(''); setMobileFilter(''); setClassFilter(''); setSectionFilter(''); setPage(1);
+    setSearchName(''); setMobileFilter(''); setSelectedSectionId(''); setPage(1);
   };
 
   return (
@@ -76,18 +75,21 @@ export function StudentManagement() {
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-4 shadow-xl shadow-slate-200/40">
         <div className="flex flex-wrap items-center gap-3">
           <SearchFilter value={searchName} onChange={v => { setSearchName(v); setPage(1); }} />
-          <Input
-            placeholder="Class (e.g. 10)"
-            value={classFilter}
-            onChange={e => { setClassFilter(e.target.value); setPage(1); }}
-            className="flex-[1_1_120px] h-11 rounded-2xl border-slate-200 bg-slate-50 text-sm"
-          />
-          <Input
-            placeholder="Section (e.g. A)"
-            value={sectionFilter}
-            onChange={e => { setSectionFilter(e.target.value); setPage(1); }}
-            className="flex-[1_1_120px] h-11 rounded-2xl border-slate-200 bg-slate-50 text-sm"
-          />
+          <select
+            value={selectedSectionId}
+            onChange={e => { setSelectedSectionId(e.target.value); setPage(1); }}
+            className="flex-[1_1_200px] h-11 px-4 rounded-2xl border-slate-200 bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+          >
+            <option value="">All Classes & Sections</option>
+            {allSections
+              .filter(s => s.id > 0) // Only mapped sections have students
+              .map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.className} — {s.sectionName}
+                </option>
+              ))
+            }
+          </select>
           <div className="relative flex-[1_1_160px]">
             <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
             <Input

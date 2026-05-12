@@ -31,7 +31,9 @@ export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLo
       render: (item) => (
         <div className="flex flex-col gap-1 max-w-xs">
           <span className="font-bold text-slate-900 truncate">{item.title}</span>
-          <span className="text-[10px] font-medium text-slate-400 truncate">{item.description.slice(0, 80)}{item.description.length > 80 ? '…' : ''}</span>
+          <span className="text-[10px] font-medium text-slate-400 truncate">
+            {item.description?.slice(0, 80) || 'No description'}{(item.description?.length ?? 0) > 80 ? '…' : ''}
+          </span>
         </div>
       ),
     },

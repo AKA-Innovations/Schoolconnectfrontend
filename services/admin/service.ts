@@ -17,7 +17,7 @@ export const adminService = {
       api.get(API_ENDPOINTS.SCHOOL.BY_ID(schoolId)),
       api.get(API_ENDPOINTS.TEACHER.LIST, { params: { pageSize: 5 } }),
       api.get(API_ENDPOINTS.STUDENT.LIST, { params: { limit: 5 } }),
-      api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS),
+      api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, { params: { schoolId } }),
     ]);
 
     // Defensive data extraction: common in this backend to wrap objects in 'data'
@@ -141,7 +141,7 @@ export const adminService = {
   },
 
   getClasses: async (schoolId?: string) => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS);
-    return response.data?.data || response.data;
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, { params: { schoolId } });
+    return response.data?.data || response.data?.items || response.data;
   },
 };

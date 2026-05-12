@@ -10,16 +10,15 @@ import { AcademicFilterBar } from '../shared/AcademicFilterBar';
 import { StudyMaterialTable } from './StudyMaterialTable';
 import { StudyMaterialUploadModal } from './StudyMaterialUploadModal';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
-import type { TeacherStudyMaterial } from '@/services/academic/types';
+import type { StudyMaterial } from '@/services/academic/types';
 
 export function StudyMaterialManagement() {
   const [search, setSearch] = useState('');
-  const [classIdFilter, setClassIdFilter] = useState('');
   const [isUploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const debouncedSearch = useDebounce(search, 400);
-  const { data, isLoading, isFetching, refetch } = useStudyMaterials(classIdFilter || undefined);
+  const { data, isLoading, isFetching, refetch } = useStudyMaterials();
   const deleteMutation = useDeleteStudyMaterial();
 
   const materials = useMemo(() => {
@@ -47,9 +46,7 @@ export function StudyMaterialManagement() {
       </AcademicPageHeader>
 
       <AcademicFilterBar searchTerm={search} onSearchChange={setSearch} searchPlaceholder="Search materials..."
-        onClear={() => { setSearch(''); setClassIdFilter(''); }} hasActiveFilters={!!(search || classIdFilter)}>
-        <input placeholder="Filter by class ID..." value={classIdFilter} onChange={(e) => setClassIdFilter(e.target.value)}
-          className="h-10 pl-4 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500/20 transition-all w-44" />
+        onClear={() => setSearch('')} hasActiveFilters={!!search}>
       </AcademicFilterBar>
 
       <StudyMaterialTable materials={materials} isLoading={isLoading} onDelete={handleDelete} />

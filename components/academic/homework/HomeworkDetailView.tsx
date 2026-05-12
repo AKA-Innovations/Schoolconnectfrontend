@@ -1,13 +1,16 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Calendar, User, FileText, Download } from 'lucide-react';
+import { ArrowLeft, Calendar, User, FileText, Download, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '../shared/StatusBadge';
-import { useHomeworkDocuments, useHomeworkSubmissions } from '@/hooks/useAcademic';
+import { useHomeworkDocuments, useHomeworkSubmissions, useHomeworkAttachments, useDeleteHomeworkAttachment, useUploadHomeworkAttachment } from '@/hooks/useAcademic';
+import { toast } from 'sonner';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { Plus } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import type { Homework } from '@/services/academic/types';
 
@@ -19,6 +22,36 @@ interface Props {
 export function HomeworkDetailView({ homework, onBack }: Props) {
   const { data: documents, isLoading: docsLoading } = useHomeworkDocuments(homework.id);
   const { data: submissions, isLoading: subsLoading } = useHomeworkSubmissions(homework.id);
+  const { data: attachments, isLoading: attachmentsLoading } = useHomeworkAttachments(homework.id);
+  const deleteAttachment = useDeleteHomeworkAttachment();
+  const uploadAttachment = useUploadHomeworkAttachment();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDeleteAttachment = (id: number) => {
+    if (confirm('Are you sure you want to delete this attachment?')) {
+      deleteAttachment.mutate({ id, homeworkId: homework.id }, {
+        onSuccess: () => toast.success('Attachment deleted successfully')
+      });
+    }
+  };
+
+  const handleUploadClick = () => fileInputRef.current?.click();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    uploadAttachment.mutate({
+      session: CURRENT_SESSION,
+      homeworkId: homework.id,
+      file,
+    }, {
+      onSuccess: () => {
+        toast.success('File uploaded successfully');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    });
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -41,7 +74,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
                   <Calendar size={14} />{formatDate(new Date(homework.dueDate), 'MMM dd, yyyy')}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <User size={14} />{homework.assignedBy.slice(0, 8)}…
+                  <User size={14} />{homework.assignedBy?.slice(0, 8) || 'Teacher'}…
                 </div>
               </div>
             </div>
@@ -54,32 +87,60 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Documents */}
-        <Card className="rounded-[2rem]">
-          <CardHeader>
+        {/* Teacher Attachments */}
+        <Card className="rounded-[2rem] border-teal-100 bg-teal-50/10">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <FileText size={18} className="text-teal-500" /> Documents ({documents?.length ?? 0})
+              <Download size={18} className="text-teal-600" /> Teacher Attachments ({attachments?.length ?? 0})
             </CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-xl h-8 text-xs gap-1 border-teal-200 text-teal-700 hover:bg-teal-50"
+              onClick={handleUploadClick}
+              disabled={uploadAttachment.isPending}
+            >
+              <Plus size={14} /> {uploadAttachment.isPending ? 'Uploading...' : 'Add'}
+            </Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={handleFileChange}
+            />
           </CardHeader>
           <CardContent>
-            {docsLoading ? (
-              <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
-            ) : !documents?.length ? (
-              <p className="text-sm text-slate-400 py-8 text-center">No documents uploaded</p>
+            {attachmentsLoading ? (
+              <div className="space-y-3">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+            ) : !attachments?.length ? (
+              <p className="text-sm text-slate-400 py-8 text-center">No teacher attachments</p>
             ) : (
               <div className="space-y-3">
-                {documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-                    <FileText size={18} className="text-teal-500 shrink-0" />
+                {attachments.map((att) => (
+                  <div key={att.id} className="flex items-center gap-3 p-3 bg-white border border-teal-50 rounded-xl hover:shadow-sm transition-all group">
+                    <Download size={18} className="text-teal-600 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-700 truncate">{doc.documentUrl.split('/').pop()}</p>
-                      <p className="text-[10px] text-slate-400">Student: {doc.studentId.slice(0, 8)}…</p>
+                      <p className="text-xs font-bold text-slate-700 truncate">{att.documentPath.split('/').pop()}</p>
+                      <p className="text-[10px] text-slate-400">{formatDate(new Date(att.createdAt), 'MMM dd, yyyy')}</p>
                     </div>
-                    {doc.signedUrl && (
-                      <a href={doc.signedUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><Download size={14} /></Button>
-                      </a>
-                    )}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {att.signedUrl && (
+                        <a href={att.signedUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-teal-50 text-teal-600">
+                            <Download size={14} />
+                          </Button>
+                        </a>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-lg hover:bg-red-50 text-red-600"
+                        onClick={() => handleDeleteAttachment(att.id)}
+                        disabled={deleteAttachment.isPending}
+                      >
+                        <XCircle size={14} />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -87,30 +148,32 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
           </CardContent>
         </Card>
 
-        {/* Submissions */}
+        {/* Student Documents (Submissions) */}
         <Card className="rounded-[2rem]">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <User size={18} className="text-blue-500" /> Submissions ({submissions?.length ?? 0})
+              <FileText size={18} className="text-blue-500" /> Student Submissions ({documents?.length ?? 0})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {subsLoading ? (
+            {docsLoading ? (
               <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
-            ) : !submissions?.length ? (
-              <p className="text-sm text-slate-400 py-8 text-center">No submissions yet</p>
+            ) : !documents?.length ? (
+              <p className="text-sm text-slate-400 py-8 text-center">No student documents yet</p>
             ) : (
               <div className="space-y-3">
-                {submissions.map((sub) => (
-                  <div key={sub.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                      {sub.studentId.slice(0, 2).toUpperCase()}
-                    </div>
+                {documents.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                    <FileText size={18} className="text-blue-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-700">Student: {sub.studentId.slice(0, 8)}…</p>
-                      {sub.remarks && <p className="text-[10px] text-slate-400 truncate">{sub.remarks}</p>}
+                      <p className="text-xs font-bold text-slate-700 truncate">{doc.documentUrl.split('/').pop()}</p>
+                      <p className="text-[10px] text-slate-400">Student: {doc.studentId?.slice(0, 8) || 'N/A'}…</p>
                     </div>
-                    <StatusBadge status={sub.status} />
+                    {doc.signedUrl && (
+                      <a href={doc.signedUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><Download size={14} /></Button>
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

@@ -82,7 +82,7 @@ export default function CoordinatorClassesPage() {
                     (sd) => sd.className === cs.className && sd.sectionName === cs.sectionName,
                   );
                   const sectionTimetable = timetableEntries.filter((e) =>
-                    sectionSubjects.some((sd) => String(sd.id) === String(e.teacherClassId)),
+                    sectionSubjects.some((sd) => String(sd.id) === String(e.classSubjectId)),
                   );
                   const uniqueTeachers = new Set(sectionSubjects.map((sd) => sd.teacherId)).size;
 

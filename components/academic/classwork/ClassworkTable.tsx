@@ -15,13 +15,17 @@ export const ClassworkTable = React.memo(function ClassworkTable({ classworks, i
       key: 'desc', header: 'Description',
       render: (item) => (
         <div className="max-w-sm">
-          <p className="font-bold text-slate-900 truncate">{item.description.slice(0, 80)}{item.description.length > 80 ? '…' : ''}</p>
-          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">Subject: {item.subjectId.slice(0, 8)}…</p>
+          <p className="font-bold text-slate-900 truncate">
+            {item.description?.slice(0, 80) || 'No description'}{(item.description?.length ?? 0) > 80 ? '…' : ''}
+          </p>
+          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">
+            Subject: {item.subjectId?.slice(0, 8) || 'N/A'}…
+          </p>
         </div>
       ),
     },
     { key: 'date', header: 'Conducted On', render: (item) => <span className="text-xs text-slate-600 font-medium">{formatDate(new Date(item.conductedOn), 'MMM dd, yyyy')}</span> },
-    { key: 'teacher', header: 'Teacher', render: (item) => <span className="text-xs text-slate-500">{item.teacherId.slice(0, 8)}…</span> },
+    { key: 'teacher', header: 'Teacher', render: (item) => <span className="text-xs text-slate-500">{item.teacherId?.slice(0, 8) || 'N/A'}…</span> },
     { key: 'session', header: 'Session', render: (item) => <span className="text-xs text-slate-500">{item.session}</span> },
     {
       key: 'actions', header: 'Actions',

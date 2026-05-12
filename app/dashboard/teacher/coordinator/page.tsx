@@ -11,6 +11,7 @@ import {
   useClassSectionLists, useSubjectDetails, useTimetable, usePeriodSlots,
   useCreateTimetableEntry, useUpdateTimetableEntry, useDeleteTimetableEntry,
   useCreateSubjectDetail, useDeleteSubjectDetail, useSubjectOptions,
+  useSchoolClasses,
 } from '@/hooks/useClasses';
 import { useTeacherList, useAddClassTeacher, useRemoveClassTeacher } from '@/hooks/useTeachers';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
@@ -39,9 +40,9 @@ export default function CoordinatorWorkspacePage() {
 
   const { data: allClassSections = [] } = useClassSectionLists();
   const { data: subjectDetails   = [] } = useSubjectDetails();
-  const { data: timetableEntries = [] } = useTimetable();
   const { data: periodSlots      = [] } = usePeriodSlots();
   const { data: subjectOptions   = [] } = useSubjectOptions();
+  const { data: schoolClasses    = [] } = useSchoolClasses();
   const { data: teachersData }          = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
 
@@ -79,15 +80,29 @@ export default function CoordinatorWorkspacePage() {
   const className   = selectedSection?.className ?? '';
   const sectionName = selectedSection?.sectionName ?? '';
 
+  // Resolve classId from schoolClasses if missing in section object
+  const resolvedClassId = useMemo(() => {
+    if (selectedSection?.classId) return selectedSection.classId;
+    if (!selectedSection || !className) return undefined;
+    const cls = schoolClasses.find(c => c.className === className);
+    return cls?.id;
+  }, [selectedSection, className, schoolClasses]);
+
+  const { data: timetableEntries = [] } = useTimetable({
+    session: CURRENT_SESSION,
+    classId: resolvedClassId,
+    classSectionId: selectedId || undefined,
+  });
+
   const sectionSubjects = useMemo(
     () => subjectDetails.filter((sd) => sd.className === className && sd.sectionName === sectionName),
     [subjectDetails, className, sectionName],
   );
 
-  const sectionSdIds = useMemo(() => new Set(sectionSubjects.map((sd) => sd.id)), [sectionSubjects]);
+  const sectionSdIds = useMemo(() => new Set(sectionSubjects.map((sd) => String(sd.id))), [sectionSubjects]);
 
   const sectionTimetable = useMemo(
-    () => timetableEntries.filter((e) => sectionSdIds.has(e.teacherClassId)),
+    () => timetableEntries.filter((e) => sectionSdIds.has(String(e.classSubjectId))),
     [timetableEntries, sectionSdIds],
   );
 
@@ -106,10 +121,8 @@ export default function CoordinatorWorkspacePage() {
     return list;
   }, [sectionTeachers, allTeachers, selectedId, teacherSearch]);
 
-  const classSubjectOptions = useMemo(
-    () => subjectOptions.filter((so) => so.className === className),
-    [subjectOptions, className],
-  );
+  // Subjects are session-global — show all
+  const classSubjectOptions = subjectOptions;
 
   const sortedSlots = useMemo(
     () => [...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber),
@@ -124,22 +137,20 @@ export default function CoordinatorWorkspacePage() {
   }, [sectionTimetable]);
 
   const sdMap = useMemo(() => {
-    const m = new Map<number, typeof subjectDetails[number]>();
-    subjectDetails.forEach((sd) => m.set(sd.id, sd));
+    const m = new Map<string, typeof subjectDetails[number]>();
+    subjectDetails.forEach((sd) => m.set(String(sd.id), sd));
     return m;
   }, [subjectDetails]);
 
   const today = new Date().toISOString().split('T')[0];
   const { data: studentsData, isLoading: loadingStudents } = useStudentList({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
+    classSectionId: selectedId || undefined,
     limit: 200,
   });
   const students = studentsData?.items ?? [];
 
   const { data: attendanceData } = useFilterAttendance({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
+    classSectionId: selectedId || undefined,
     date: today,
   });
   const attendanceRecords: any[] = Array.isArray(attendanceData) ? attendanceData : [];
@@ -164,7 +175,7 @@ export default function CoordinatorWorkspacePage() {
     ? subjectDetails.filter((sd) => coordClassNames.includes(String(sd.className)))
     : subjectDetails;
   const allCoordSdIds    = new Set(allCoordSubjects.map((sd) => sd.id));
-  const allCoordTT       = timetableEntries.filter((e) => allCoordSdIds.has(e.teacherClassId));
+  const allCoordTT       = timetableEntries.filter((e) => allCoordSdIds.has(e.classSubjectId));
   const allCoordTeachers = new Set(allCoordSubjects.map((sd) => sd.teacherId));
 
   async function handleAddSubject() {
@@ -174,13 +185,22 @@ export default function CoordinatorWorkspacePage() {
     }
     const opt = subjectOptions.find((o) => o.id === Number(newSubjectOptionId));
     if (!opt) return;
+    // Ensure classId is present, resolve from schoolClasses if missing
+    let classId = selectedSection.classId;
+    if (!classId) {
+      const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+      classId = sc?.id || 0;
+    }
+
     try {
       await createSubjectDetail.mutateAsync({
-        className,
-        sectionName,
-        subjectName: opt.subjectName,
-        teacherId: newTeacherId,
-        session: CURRENT_SESSION,
+        entries: [{
+          session: CURRENT_SESSION,
+          teacherId: newTeacherId,
+          classId,
+          classSectionId: selectedSection.id,
+          subjectId: opt.id,
+        }]
       });
       toast.success('Subject assigned');
       setNewSubjectOptionId('');
@@ -215,10 +235,10 @@ export default function CoordinatorWorkspacePage() {
     }
     try {
       if (existingEntry) {
-        await updateTimetable.mutateAsync({ id: existingEntry.id, data: { teacherClassId: Number(editingSubjectId) } });
+        await updateTimetable.mutateAsync({ id: existingEntry.id, data: { classSubjectId: String(editingSubjectId) } });
       } else {
         await createTimetable.mutateAsync({
-          teacherClassId: Number(editingSubjectId),
+          classSubjectId: String(editingSubjectId),
           periodId,
           dayOfWeek: day,
           session: CURRENT_SESSION,
@@ -515,7 +535,7 @@ export default function CoordinatorWorkspacePage() {
                         </td>
                         {DAYS.map((day) => {
                           const entry    = ttGrid[day]?.[slot.id];
-                          const sd       = entry ? sdMap.get(entry.teacherClassId) : undefined;
+                          const sd       = entry ? sdMap.get(String(entry.classSubjectId)) : undefined;
                           const cellKey  = `${day}|${slot.id}`;
                           const isEditing = editingCell === cellKey;
                           return (
@@ -548,7 +568,7 @@ export default function CoordinatorWorkspacePage() {
                               ) : (
                                 <div
                                   className="cursor-pointer rounded p-1.5 hover:bg-primary/10 transition-colors group min-h-10 flex flex-col items-center justify-center"
-                                  onClick={() => { setEditingCell(cellKey); setEditingSubjectId(entry ? String(entry.teacherClassId) : ''); }}
+                                  onClick={() => { setEditingCell(cellKey); setEditingSubjectId(entry ? String(entry.classSubjectId) : ''); }}
                                 >
                                   {sd ? (
                                     <>

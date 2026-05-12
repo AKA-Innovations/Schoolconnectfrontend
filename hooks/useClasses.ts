@@ -5,15 +5,23 @@ import {
   ClassListResponse,
   ClassTeacherListResponse,
   ClassDetails,
+  SchoolClass,
+  SchoolSection,
+  CreateSchoolClassPayload,
+  CreateSchoolSectionPayload,
+  UpdateSchoolSectionPayload,
   ClassTeacher,
   CreateClassPayload,
-  CreateSubjectOptionPayload,
+  CreateSubjectBulkPayload,
   CreateSubjectDetailPayload,
+  CreateClassSubjectMappingPayload,
+  CreateClassTeacherMappingPayload,
   CreatePeriodSlotPayload,
   CreateTimetablePayload,
   TimetableFilterParams,
   UpdateClassPayload,
   ClassSummary,
+  ClassSectionItem,
 } from '@/services/class.service';
 import { teacherService } from '@/services/teacher.service';
 import { teacherKeys } from '@/hooks/useTeachers';
@@ -177,7 +185,45 @@ export function useClassSectionLists() {
   const schoolId = useAuthStore((s) => s.schoolId);
   return useQuery({
     queryKey: classSectionKeys.lists,
-    queryFn: () => classService.getClassSectionLists(schoolId || ''),
+    queryFn: async () => {
+      // 1. Fetch both master structure and current mappings
+      const [mSections, mapped] = await Promise.all([
+        classService.getSchoolSections(schoolId || ''),
+        classService.getClassSectionLists(schoolId || '', CURRENT_SESSION)
+      ]);
+      console.log(mSections, mapped);
+      // 2. Merge them. Master list is the baseline.
+      const merged: ClassSectionItem[] = mSections.map(ms => {
+        const matchingMapped = mapped.find(m =>
+          m.className === ms.className &&
+          m.sectionName === ms.sectionName &&
+          (m.session === CURRENT_SESSION || !m.session)
+        );
+
+        return {
+          id: matchingMapped?.id || -ms.id,
+          masterSectionId: ms.id,
+          mappingId: matchingMapped?.id,
+          classId: ms.classId,
+          className: ms.className,
+          sectionName: ms.sectionName,
+          classTeacherId: matchingMapped?.classTeacherId || null,
+          maxLimit: matchingMapped?.maxLimit || null,
+          schoolId: ms.schoolId || schoolId || '',
+          session: matchingMapped?.session || CURRENT_SESSION,
+          isMapped: !!matchingMapped
+        } as ClassSectionItem;
+      });
+
+      // 3. Fallback: Add any mapped sections that might be missing from master list
+      mapped.forEach(m => {
+        if (!merged.some(mer => mer.className === m.className && mer.sectionName === m.sectionName)) {
+          merged.push({ ...m, isMapped: true });
+        }
+      });
+
+      return merged;
+    },
     enabled: !!schoolId,
   });
 }
@@ -186,12 +232,15 @@ export function useClassList() {
   const schoolId = useAuthStore((s) => s.schoolId);
   return useQuery({
     queryKey: classSectionKeys.classList,
-    queryFn: () => classService.getClassList(schoolId || ''),
+    queryFn: async () => {
+      const classes = await classService.getSchoolClasses(schoolId || '');
+      return classes.map(c => c.className).sort();
+    },
     enabled: !!schoolId,
   });
 }
 
-// ─── Subject Options ────────────────────────────────────────────────────────
+// ─── Subject Options (subject-dtls master list) ─────────────────────────────
 
 export const subjectOptionKeys = {
   all: ['subject-options'] as const,
@@ -206,49 +255,73 @@ export function useSubjectOptions(className?: string) {
   });
 }
 
-export function useCreateSubjectOption() {
+export function useCreateSubjectBulk() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateSubjectOptionPayload) => classService.createSubjectOption(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: subjectOptionKeys.all }),
+    mutationFn: (data: CreateSubjectBulkPayload) => classService.createSubjectBulk(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['subject-options'] });
+    },
   });
 }
 
-export function useUpdateSubjectOption() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<CreateSubjectOptionPayload> }) =>
-      classService.updateSubjectOption(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: subjectOptionKeys.all }),
-  });
-}
-
-export function useDeleteSubjectOption() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => classService.deleteSubjectOption(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: subjectOptionKeys.all }),
-  });
-}
-
-// ─── Subject Details (Teacher-Subject Mapping) ──────────────────────────────
+// ─── Teacher-Subject Mapping (class-subject-dtls) ─────────────────────────
 
 export const subjectDetailKeys = {
   all: ['subject-details'] as const,
 };
 
-export function useSubjectDetails(teacherId?: string) {
+export function useSubjectDetails(teacherId?: string, session?: string, classSectionId?: number) {
   return useQuery({
-    queryKey: [...subjectDetailKeys.all, teacherId],
-    queryFn: () => classService.getSubjectDetails(teacherId ? { teacherId, session: CURRENT_SESSION } : {}),
+    queryKey: [...subjectDetailKeys.all, teacherId, session, classSectionId],
+    queryFn: () => classService.getSubjectDetails({
+      teacherId,
+      session: session === 'all' ? undefined : (session !== undefined ? session : CURRENT_SESSION),
+      classSectionId,
+    }),
     enabled: true,
   });
 }
 
+export function useCreateClassSubjectMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateClassSubjectMappingPayload) => classService.createClassSubjectMapping(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: subjectDetailKeys.all });
+    },
+  });
+}
+
+// ─── Class Teacher Mapping (class-dtls) ───────────────────────────────────
+
+export function useCreateClassTeacherMapping() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateClassTeacherMappingPayload) => classService.createClassTeacherMapping(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: classKeys.all });
+      qc.invalidateQueries({ queryKey: teacherKeys.all });
+    },
+  });
+}
+
+// ─── Legacy hooks (pointing to correct new methods) ──────────────────────────
+
+/** Creates a subject-master entry via subject-dtls bulk endpoint */
+export function useCreateSubjectOption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => classService.createSubjectBulk(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subject-options'] }),
+  });
+}
+
+/** Creates a teacher-subject-class mapping via class-subject-dtls */
 export function useCreateSubjectDetail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateSubjectDetailPayload) => classService.createSubjectDetail(data),
+    mutationFn: (data: any) => classService.createSubjectDetail(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: subjectDetailKeys.all }),
   });
 }
@@ -256,8 +329,7 @@ export function useCreateSubjectDetail() {
 export function useUpdateSubjectDetail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<CreateSubjectDetailPayload> }) =>
-      classService.updateSubjectDetail(id, data),
+    mutationFn: ({ id, data }: { id: number; data: any }) => classService.updateSubjectDetail(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: subjectDetailKeys.all }),
   });
 }
@@ -267,6 +339,24 @@ export function useDeleteSubjectDetail() {
   return useMutation({
     mutationFn: (id: number) => classService.deleteSubjectDetail(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: subjectDetailKeys.all }),
+  });
+}
+
+/** Updates a subject-master entry via subject-dtls PUT */
+export function useUpdateSubjectOption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => classService.updateSubjectOption(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subject-options'] }),
+  });
+}
+
+/** Deletes a subject-master entry via subject-dtls DELETE */
+export function useDeleteSubjectOption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => classService.deleteSubjectOption(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subject-options'] }),
   });
 }
 
@@ -342,7 +432,7 @@ export function useCreateTimetableBulk() {
 export function useUpdateTimetableEntry() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<CreateTimetablePayload> }) =>
+    mutationFn: ({ id, data }: { id: number | string; data: Partial<CreateTimetablePayload> }) =>
       classService.updateTimetableEntry(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
   });
@@ -351,7 +441,7 @@ export function useUpdateTimetableEntry() {
 export function useDeleteTimetableEntry() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => classService.deleteTimetableEntry(id),
+    mutationFn: (id: number | string) => classService.deleteTimetableEntry(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
   });
 }
@@ -360,6 +450,95 @@ export function useFetchTimetable(params: any) {
   return useQuery({
     queryKey: timetableKeys.fetch(params),
     queryFn: () => classService.fetchTimetable(params),
-    enabled: !!params?.session,
+    // Only enable when session is set. If teacherId is explicitly passed (teacher
+    // dashboard), also wait for it to be defined before fetching.
+    enabled: !!params?.session && (params?.teacherId !== undefined ? !!params.teacherId : true),
+  });
+}
+
+// ─── School Classes & Sections (New) ────────────────────────────────────────
+
+export const schoolClassKeys = {
+  all: ['school-classes'] as const,
+  sections: (classId?: number) => ['school-sections', classId] as const,
+};
+
+export function useSchoolClasses() {
+  const schoolId = useAuthStore((s) => s.schoolId);
+  return useQuery({
+    queryKey: schoolClassKeys.all,
+    queryFn: () => classService.getSchoolClasses(schoolId || ''),
+    enabled: !!schoolId,
+  });
+}
+
+export function useCreateSchoolClasses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateSchoolClassPayload) => classService.createSchoolClasses(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: schoolClassKeys.all });
+    },
+  });
+}
+
+export function useSchoolSections(classId?: number) {
+  const schoolId = useAuthStore((s) => s.schoolId);
+  return useQuery({
+    queryKey: schoolClassKeys.sections(classId),
+    queryFn: () => classService.getSchoolSections(schoolId || '', classId),
+    enabled: !!schoolId,
+  });
+}
+
+export function useCreateSchoolSections() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateSchoolSectionPayload) => classService.createSchoolSections(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['school-sections'] });
+    },
+  });
+}
+
+export function useUpdateSchoolSection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateSchoolSectionPayload }) =>
+      classService.updateSchoolSection(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['school-sections'] });
+    },
+  });
+}
+
+export function useDeleteSchoolSection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => classService.deleteSchoolSection(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['school-sections'] });
+    },
+  });
+}
+
+export function useUpdateSchoolClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, className }: { id: number; className: string }) =>
+      classService.updateSchoolClass(id, className),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: schoolClassKeys.all });
+    },
+  });
+}
+
+export function useDeleteSchoolClass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => classService.deleteSchoolClass(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: schoolClassKeys.all });
+    },
   });
 }

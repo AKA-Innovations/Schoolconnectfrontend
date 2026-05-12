@@ -66,13 +66,13 @@ export function CurriculumBuilder() {
 
   // ── Existing data ──
   const isReady = !!(selectedClass && selectedSubjectId);
-  // Note: we only need class/subject to DISPLAY existing chapters
+  // Fetch chapters for the selected subject
   const { data: existingChapters = [], isLoading: loadingChapters, refetch: refetchChapters } =
-    useSubjectChapters(isReady ? selectedClass : undefined);
+    useSubjectChapters(isReady ? selectedSubjectId : undefined, CURRENT_SESSION);
 
-  // Filter chapters to the selected subject
+  // The API already returns chapters for the selected subject, but filter as safety net
   const filteredChapters = useMemo(
-    () => existingChapters.filter((c) => c.subjectId === selectedSubjectId),
+    () => (Array.isArray(existingChapters) ? existingChapters : []).filter((c) => String(c.subjectId) === String(selectedSubjectId)),
     [existingChapters, selectedSubjectId],
   );
 
@@ -140,10 +140,8 @@ export function CurriculumBuilder() {
     try {
       await createChapterMut.mutateAsync({
         session: CURRENT_SESSION,
-        className: selectedClass,
-        sectionName: selectedSection,
-        subjectId: selectedSubjectId,
-        chapterDetails,
+        subjectId: Number(selectedSubjectId),
+        chapters: chapterDetails,
       });
       setDraftChapters([]);
       toast.success(`${chapterDetails.length} chapter(s) added!`);
@@ -172,11 +170,9 @@ export function CurriculumBuilder() {
       // Send a single request for all topics
       await createTopicMut.mutateAsync({
         session: CURRENT_SESSION,
-        className: selectedClass,
-        sectionName: selectedSection,
-        subjectId: selectedSubjectId,
+        subjectId: Number(selectedSubjectId),
         chapterId,
-        topicDetails,
+        topics: topicDetails,
       });
 
       setDraftTopics((prev) => ({ ...prev, [chapterId]: [] }));
@@ -192,12 +188,12 @@ export function CurriculumBuilder() {
   const loadTopicsForChapter = useCallback(async (chapterId: number) => {
     try {
       const { academicService } = await import('@/services/academic.service');
-      const topics = await academicService.getSubjectTopics(String(chapterId));
+      const topics = await academicService.getSubjectTopics(chapterId, selectedSubjectId, CURRENT_SESSION);
       setLoadedTopics((prev) => ({ ...prev, [chapterId]: topics }));
     } catch {
       // silent fail
     }
-  }, []);
+  }, [selectedSubjectId]);
 
   const handleToggleChapter = (chapterId: number) => {
     toggleExpand(chapterId);

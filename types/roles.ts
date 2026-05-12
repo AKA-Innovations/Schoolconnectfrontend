@@ -74,6 +74,9 @@ export interface Teacher {
 
 export interface TeacherClass {
   id?: number;
+  classId?: number;
+  classSectionId?: number;
+  subjectId?: number;
   className: string;
   sectionName: string;
   subjectName: string;

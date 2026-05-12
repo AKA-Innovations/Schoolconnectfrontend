@@ -9,22 +9,25 @@ import type {
   UpdateTeachingProgressPayload,
   CreateHomeworkPayload,
   UpdateHomeworkPayload,
-  CreateHomeworkSubmissionPayload,
-  UpdateHomeworkSubmissionPayload,
-  CreateClassworkPayload,
   UpdateClassworkPayload,
+  StudyMaterial,
+  UploadStudyMaterialPayload,
   UpdateStudyMaterialPayload,
+  SubjectProgressSummary,
+  ChapterProgressSummary,
 } from '@/services/academic/types';
 
 // ─── Query key factories ──────────────────────────────────────────────────────
 
 export const academicKeys = {
   all: ['academic'] as const,
-  chapters: (className?: string) => ['academic', 'chapters', className] as const,
-  topics: (chapterId?: string) => ['academic', 'topics', chapterId] as const,
-  progress: (teacherId?: string) => ['academic', 'progress', teacherId] as const,
+  chapters: (subjectId?: number | string, session?: string) => ['academic', 'chapters', subjectId, session] as const,
+  topics: (chapterId?: number | string, subjectId?: number | string, session?: string) => ['academic', 'topics', chapterId, subjectId, session] as const,
+  subjectProgress: (subjectId?: number | string, classSectionId?: number | string, session?: string) => ['academic', 'subject-progress', subjectId, classSectionId, session] as const,
+  chapterProgress: (chapterId?: number | string, classSectionId?: number | string, session?: string) => ['academic', 'chapter-progress', chapterId, classSectionId, session] as const,
   homeworks: (className?: string) => ['academic', 'homeworks', className] as const,
   homeworkDocs: (hwId: number) => ['academic', 'hw-docs', hwId] as const,
+  homeworkAttachments: (hwId: number) => ['academic', 'hw-attachments', hwId] as const,
   homeworkSubs: (hwId: number) => ['academic', 'hw-subs', hwId] as const,
   classworks: (classId?: string) => ['academic', 'classworks', classId] as const,
   materials: (classId?: string) => ['academic', 'materials', classId] as const,
@@ -32,11 +35,12 @@ export const academicKeys = {
 
 // ─── Subject Chapters ─────────────────────────────────────────────────────────
 
-export function useSubjectChapters(className?: string) {
+export function useSubjectChapters(subjectId?: number | string, session?: string) {
   return useQuery({
-    queryKey: academicKeys.chapters(className),
-    queryFn: () => academicService.getSubjectChapters(className),
+    queryKey: academicKeys.chapters(subjectId, session),
+    queryFn: () => academicService.getSubjectChapters(subjectId, session),
     placeholderData: (prev) => prev,
+    enabled: !!subjectId && !!session,
   });
 }
 
@@ -67,11 +71,12 @@ export function useDeleteChapter() {
 
 // ─── Subject Topics ───────────────────────────────────────────────────────────
 
-export function useSubjectTopics(chapterId?: string) {
+export function useSubjectTopics(chapterId?: number | string, subjectId?: number | string, session?: string) {
   return useQuery({
-    queryKey: academicKeys.topics(chapterId),
-    queryFn: () => academicService.getSubjectTopics(chapterId),
+    queryKey: academicKeys.topics(chapterId, subjectId, session),
+    queryFn: () => academicService.getSubjectTopics(chapterId!, subjectId, session),
     placeholderData: (prev) => prev,
+    enabled: !!chapterId && !!subjectId && !!session,
   });
 }
 
@@ -102,14 +107,6 @@ export function useDeleteTopic() {
 
 // ─── Teaching Progress ────────────────────────────────────────────────────────
 
-export function useTeachingProgress(teacherId?: string) {
-  return useQuery({
-    queryKey: academicKeys.progress(teacherId),
-    queryFn: () => academicService.getTeachingProgress(teacherId),
-    placeholderData: (prev) => prev,
-  });
-}
-
 export function useCreateProgress() {
   const qc = useQueryClient();
   return useMutation({
@@ -132,6 +129,24 @@ export function useDeleteProgress() {
   return useMutation({
     mutationFn: (id: number) => academicService.deleteTeachingProgress(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'progress'] }),
+  });
+}
+
+// ─── Subject & Chapter Progress (aggregated) ──────────────────────────────────
+
+export function useSubjectProgress(subjectId?: number | string, classSectionId?: number | string, session?: string) {
+  return useQuery({
+    queryKey: academicKeys.subjectProgress(subjectId, classSectionId, session),
+    queryFn: () => academicService.getSubjectProgress(subjectId!, classSectionId!, session),
+    enabled: !!subjectId && !!classSectionId,
+  });
+}
+
+export function useChapterProgress(chapterId?: number | string, classSectionId?: number | string, session?: string) {
+  return useQuery({
+    queryKey: academicKeys.chapterProgress(chapterId, classSectionId, session),
+    queryFn: () => academicService.getChapterProgress(chapterId!, classSectionId!, session),
+    enabled: !!chapterId && !!classSectionId,
   });
 }
 
@@ -162,11 +177,41 @@ export function useUpdateHomework() {
   });
 }
 
-export function useDeleteHomework() {
+export function useDeleteHomework(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => academicService.deleteHomework(id),
+    mutationFn: () => academicService.deleteHomework(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'homeworks'] }),
+  });
+}
+
+// ─── Homework Attachments ───────────────────────────────────────────────────
+
+export function useHomeworkAttachments(homeworkId: number) {
+  return useQuery({
+    queryKey: academicKeys.homeworkAttachments(homeworkId),
+    queryFn: () => academicService.getHomeworkAttachments(homeworkId),
+    enabled: !!homeworkId,
+  });
+}
+
+export function useUploadHomeworkAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { session: string; homeworkId: number; file: File }) =>
+      academicService.uploadHomeworkAttachment(data),
+    onSuccess: (_, variables) =>
+      qc.invalidateQueries({ queryKey: academicKeys.homeworkAttachments(variables.homeworkId) }),
+  });
+}
+
+export function useDeleteHomeworkAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, homeworkId }: { id: number; homeworkId: number }) =>
+      academicService.deleteHomeworkAttachment(id),
+    onSuccess: (_, variables) =>
+      qc.invalidateQueries({ queryKey: academicKeys.homeworkAttachments(variables.homeworkId) }),
   });
 }
 
@@ -267,31 +312,20 @@ export function useDeleteClasswork() {
   });
 }
 
-// ─── Teacher Study Material ───────────────────────────────────────────────────
+// ─── Study Material ──────────────────────────────────────────────────────────
 
-export function useStudyMaterials(classId?: string) {
+export function useStudyMaterials() {
   return useQuery({
-    queryKey: academicKeys.materials(classId),
-    queryFn: () => academicService.getStudyMaterials(classId),
-    placeholderData: (prev) => prev,
+    queryKey: academicKeys.materials(),
+    queryFn: () => academicService.getStudyMaterials(),
   });
 }
 
 export function useUploadStudyMaterial() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: {
-      session: string;
-      classId: string;
-      sectionId: string;
-      subjectId: string;
-      chapterId?: number;
-      topicId?: number;
-      description: string;
-      teacherId: string;
-      file: File;
-    }) => academicService.uploadStudyMaterial(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'materials'] }),
+    mutationFn: (data: UploadStudyMaterialPayload) => academicService.uploadStudyMaterial(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: academicKeys.materials() }),
   });
 }
 
@@ -300,7 +334,7 @@ export function useUpdateStudyMaterial() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateStudyMaterialPayload }) =>
       academicService.updateStudyMaterial(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'materials'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: academicKeys.materials() }),
   });
 }
 
@@ -308,6 +342,6 @@ export function useDeleteStudyMaterial() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => academicService.deleteStudyMaterial(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'materials'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: academicKeys.materials() }),
   });
 }

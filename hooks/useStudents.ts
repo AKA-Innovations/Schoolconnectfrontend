@@ -31,11 +31,12 @@ function invalidateStudent(qc: ReturnType<typeof useQueryClient>, studentId: str
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export function useStudentList(filters: StudentListFilters) {
+export function useStudentList(filters: StudentListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: studentKeys.list(filters),
     queryFn: () => studentService.list(filters),
     placeholderData: (prev) => prev,
+    enabled: options?.enabled !== false,
   });
 }
 
@@ -217,7 +218,7 @@ export function useFilterAttendance(params: AttendanceFilterParams) {
   return useQuery({
     queryKey: attendanceKeys.filter(params),
     queryFn: () => studentService.filterAttendance(params),
-    enabled: !!(params.className && params.date),
+    enabled: !!(params.classSectionId && params.classSectionId > 0 && params.date),
   });
 }
 

@@ -68,6 +68,11 @@ export const studentService = {
     return res.data;
   },
 
+  getBasicDetails: async (): Promise<any> => {
+    const res = await api.get(API_ENDPOINTS.STUDENT.BASIC_DETAILS);
+    return res.data;
+  },
+
   updateDetails: async (id: string, data: UpdateStudentPayload) => {
     const res = await api.put(API_ENDPOINTS.STUDENT.DETAILS(id), data);
     return res.data;
@@ -153,7 +158,9 @@ export const studentService = {
   },
 
   updateAttendance: async (recordId: number, data: Partial<AttendanceRecord>) => {
-    const res = await api.put(API_ENDPOINTS.STUDENT.ATTENDANCE_UPDATE(recordId), data);
+    // Backend expects { status: "string" } for individual updates
+    const status = data.status || data.attendanceStatus || 'Present';
+    const res = await api.put(API_ENDPOINTS.STUDENT.ATTENDANCE_UPDATE(recordId), { status });
     return res.data;
   },
 

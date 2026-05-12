@@ -110,6 +110,9 @@ console.log('INITIAL DATA 👉', initialData);
     className: '',
     sectionName: '',
     subjectName: '',
+    classId: undefined,
+    classSectionId: undefined,
+    subjectId: undefined,
   });
   const { data: subjectOptions = [] } = useSubjectOptions();
 
@@ -135,12 +138,21 @@ console.log('INITIAL DATA 👉', initialData);
   };
 
   const addClass = () => {
-    if (newClass.className && newClass.sectionName && newClass.subjectName) {
+    if (newClass.classId && newClass.classSectionId && newClass.subjectId) {
       setFormData(prev => ({
         ...prev,
         classes: [...prev.classes, { ...newClass }]
       }));
-      setNewClass({ className: '', sectionName: '', subjectName: '' });
+      setNewClass({
+        className: '',
+        sectionName: '',
+        subjectName: '',
+        classId: undefined,
+        classSectionId: undefined,
+        subjectId: undefined,
+      });
+    } else {
+      toast.error('Please select Class, Section and Subject');
     }
   };
 
@@ -254,13 +266,21 @@ console.log('INITIAL DATA 👉', initialData);
             ex.className === d.className && ex.sectionName === d.sectionName && ex.subjectName === d.subjectName
           )));
 
-          await Promise.all(toAdd.map((d) => createSubjectMut.mutateAsync({
-            session: CURRENT_SESSION,
-            teacherId: initialData.id,
-            className: d.className,
-            sectionName: d.sectionName,
-            subjectName: d.subjectName,
-          })));
+          await Promise.all(toAdd.map((d) => {
+            if (!d.classId || !d.classSectionId || !d.subjectId) {
+              console.error('Missing IDs for mapping', d);
+              return Promise.resolve();
+            }
+            return createSubjectMut.mutateAsync({
+              entries: [{
+                session: CURRENT_SESSION,
+                teacherId: initialData.id,
+                classId: d.classId,
+                classSectionId: d.classSectionId,
+                subjectId: d.subjectId,
+              }]
+            });
+          }));
 
           await Promise.all(toRemove.map((ex) => ex.id ? deleteSubjectMut.mutateAsync(ex.id) : Promise.resolve()));
         } catch (err) {
@@ -486,7 +506,7 @@ console.log('INITIAL DATA 👉', initialData);
                     >
                       <option value="">Select Class-Section</option>
                       {classSections.map((cs: any) => (
-                        <option key={cs.id} value={cs.id}>
+                        <option key={cs.masterSectionId} value={cs.masterSectionId}>
                           {cs.className} — {cs.sectionName}
                         </option>
                       ))}
@@ -570,51 +590,82 @@ console.log('INITIAL DATA 👉', initialData);
           <CardContent className="p-8">
             <div className="p-4 bg-muted/5 rounded-2xl border border-border/50 flex flex-wrap gap-4 items-end mb-6">
               <div className="flex-1 min-w-30">
-                <FG label="Grade">
-                  <select
-                    value={newClass.className}
-                    onChange={(e) => setNewClass((p) => ({ ...p, className: e.target.value, sectionName: '', subjectName: '' }))}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">Select class</option>
-                    {classNames.map((cn) => (
-                      <option key={cn} value={cn}>{cn}</option>
-                    ))}
-                  </select>
-                </FG>
-              </div>
-              <div className="flex-1 min-w-20">
-                <FG label="Section">
-                  <select
-                    value={newClass.sectionName}
-                    onChange={(e) => setNewClass((p) => ({ ...p, sectionName: e.target.value }))}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={!newClass.className}
-                  >
-                    <option value="">{newClass.className ? 'Select section' : 'Select class first'}</option>
-                    {classSections
-                      .filter((cs: any) => cs.className === newClass.className)
-                      .map((cs: any) => (
-                        <option key={cs.id} value={cs.sectionName}>{cs.sectionName}</option>
+                  <FG label="Grade">
+                    <select
+                      value={newClass.classId ?? ''}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        const cs = classSections.find(c => c.classId === id);
+                        setNewClass((p) => ({
+                          ...p,
+                          classId: id,
+                          className: cs?.className ?? '',
+                          sectionName: '',
+                          classSectionId: undefined,
+                          subjectName: '',
+                          subjectId: undefined
+                        }));
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">Select class</option>
+                      {uniqueClassNames.map((name) => {
+                        const cs = classSections.find(c => c.className === name);
+                        return (
+                          <option key={cs?.classId ?? name} value={cs?.classId}>
+                            {name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </FG>
+                </div>
+                <div className="flex-1 min-w-20">
+                  <FG label="Section">
+                    <select
+                      value={newClass.classSectionId ?? ''}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        const cs = classSections.find(c => c.id === id);
+                        setNewClass((p) => ({
+                          ...p,
+                          classSectionId: id,
+                          sectionName: cs?.sectionName ?? ''
+                        }));
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={!newClass.classId}
+                    >
+                      <option value="">{newClass.classId ? 'Select section' : 'Select class first'}</option>
+                        {classSections
+                          .filter((cs: any) => cs.classId === newClass.classId)
+                          .map((cs: any) => (
+                            <option key={cs.masterSectionId} value={cs.masterSectionId}>{cs.sectionName}</option>
+                          ))}
+                    </select>
+                  </FG>
+                </div>
+                <div className="flex-2 min-w-37.5">
+                  <FG label="Subject">
+                    <select
+                      value={newClass.subjectId ?? ''}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        const s = subjectOptions.find(so => so.id === id);
+                        setNewClass((p) => ({
+                          ...p,
+                          subjectId: id,
+                          subjectName: s?.subjectName ?? ''
+                        }));
+                      }}
+                      className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">Select subject</option>
+                      {subjectOptions.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.subjectName}</option>
                       ))}
-                  </select>
-                </FG>
-              </div>
-              <div className="flex-2 min-w-37.5">
-                <FG label="Subject">
-                  <select
-                    value={newClass.subjectName}
-                    onChange={(e) => setNewClass((p) => ({ ...p, subjectName: e.target.value }))}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">Select subject</option>
-                    {subjectOptions
-                      .filter((s: any) => String(s.className) === String(newClass.className))
-                      .map((s: any) => (
-                        <option key={s.id ?? s.subjectName} value={s.subjectName}>{s.subjectName}</option>
-                      ))}
-                  </select>
-                </FG>
+                    </select>
+                  </FG>
               </div>
               <Button type="button" onClick={addClass} className="h-10 w-10 p-0 rounded-xl">
                 <Plus className="h-4 w-4" />

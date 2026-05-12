@@ -96,10 +96,14 @@ export default function CoordinatorAttendancePage() {
   }, [coordClasses, className]);
 
   const { data: attendance = [], isLoading: loadingAtt } = useFilterAttendance({
-    className,
-    sectionName,
+    classSectionId: selSection?.masterSectionId,
     session,
     date,
+  });
+
+  const { data: studentList } = useStudentList({
+    classSectionId: selSection?.masterSectionId,
+    limit: 500,
   });
 
   // DIAGNOSTIC LOGGING - To debug why "Update" button might be missing
@@ -112,11 +116,6 @@ export default function CoordinatorAttendancePage() {
     }
   }, [attendance, className, sectionName, date, session]);
 
-  const { data: studentList } = useStudentList({
-    className,
-    sectionName,
-    limit: 500,
-  });
   const students = (studentList as any)?.items ?? [];
 
   const bulkMutation = useBulkAttendance();
@@ -295,14 +294,14 @@ export default function CoordinatorAttendancePage() {
 
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((s) => 
+      list = list.filter((s: any) => 
         `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) || 
         s.academics?.[0]?.rollNumber?.toLowerCase().includes(q)
       );
     }
 
     if (statusFilter) {
-      list = list.filter((s) => (statusFilter === 'Unmarked' ? !s.currentStatus : s.currentStatus === statusFilter));
+      list = list.filter((s: any) => (statusFilter === 'Unmarked' ? !s.currentStatus : s.currentStatus === statusFilter));
     }
     return list;
   }, [students, attendanceMap, search, statusFilter, viewMode]);
@@ -520,7 +519,7 @@ export default function CoordinatorAttendancePage() {
                 </tr>
               </thead>
               <tbody>
-                  {filtered.map((s, i) => {
+                  {filtered.map((s: any, i: number) => {
                     const roll = s.academics?.[0]?.rollNumber;
                     const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
                     const existingVal = attendance.find((a: any) => 

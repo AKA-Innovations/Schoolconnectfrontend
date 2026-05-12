@@ -45,16 +45,8 @@ export default function SubjectsPage() {
   // 🔍 Filter
   const filtered = subjects.filter((s: any) => {
     const q = search.toLowerCase();
-
-    const matchesSearch =
-      s.subjectName?.toLowerCase().includes(q) ||
-      (s.className ?? '').toLowerCase().includes(q);
-
-    const matchesClass = selectedClass
-      ? s.className === selectedClass
-      : true;
-
-    return matchesSearch && matchesClass;
+    return s.subjectName?.toLowerCase().includes(q) ||
+      (s.subjectCode ?? '').toLowerCase().includes(q);
   });
 
   // 📄 Pagination
@@ -98,7 +90,6 @@ export default function SubjectsPage() {
     try {
       await createMutation.mutateAsync({
         session: form.session,
-        className: form.className,
         subjects: form.subjects,
       });
 
@@ -273,7 +264,7 @@ export default function SubjectsPage() {
               <tr className="border-b">
                 <th className="p-3 text-left">#</th>
                 <th className="p-3 text-left">Subject</th>
-                <th className="p-3 text-left">Class</th>
+                <th className="p-3 text-left">Code</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -295,7 +286,7 @@ export default function SubjectsPage() {
                   <tr key={s.id} className="border-b">
                     <td className="p-3">{idx + 1}</td>
                     <td className="p-3 font-medium">{s.subjectName}</td>
-                    <td className="p-3">{s.className}</td>
+                    <td className="p-3">{s.subjectCode || '—'}</td>
                     <td className="p-3 text-right">
                       <Button
                         variant="ghost"

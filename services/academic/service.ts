@@ -13,6 +13,7 @@ import type {
   Homework,
   CreateHomeworkPayload,
   UpdateHomeworkPayload,
+  HomeworkAttachment,
   HomeworkDocument,
   HomeworkSubmission,
   CreateHomeworkSubmissionPayload,
@@ -20,18 +21,26 @@ import type {
   Classwork,
   CreateClassworkPayload,
   UpdateClassworkPayload,
-  TeacherStudyMaterial,
+  StudyMaterial,
+  UploadStudyMaterialPayload,
   UpdateStudyMaterialPayload,
+  SubjectProgressSummary,
+  ChapterProgressSummary,
 } from './types';
 
 export const academicService = {
   // ─── Subject Chapters ──────────────────────────────────────────────────────
 
-  getSubjectChapters: async (className?: string): Promise<SubjectChapter[]> => {
+  getSubjectChapters: async (subjectId?: number | string, session?: string): Promise<SubjectChapter[]> => {
+    if (!subjectId || !session) return [];
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_CHAPTER, {
-      params: className ? { className } : undefined,
+      params: { subjectId, session },
     });
-    return response.data ?? [];
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.chapters && Array.isArray(raw.chapters)) return raw.chapters;
+    return [];
   },
 
   createSubjectChapter: async (data: CreateSubjectChapterPayload): Promise<SubjectChapter> => {
@@ -50,11 +59,16 @@ export const academicService = {
 
   // ─── Subject Topics ────────────────────────────────────────────────────────
 
-  getSubjectTopics: async (chapterId?: string): Promise<SubjectTopic[]> => {
+  getSubjectTopics: async (chapterId: number | string, subjectId?: number | string, session?: string): Promise<SubjectTopic[]> => {
+    if (!chapterId || !subjectId || !session) return [];
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_TOPIC, {
-      params: chapterId ? { chapterId } : undefined,
+      params: { chapterId, subjectId, session },
     });
-    return response.data ?? [];
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.topics && Array.isArray(raw.topics)) return raw.topics;
+    return [];
   },
 
   createSubjectTopic: async (data: CreateSubjectTopicPayload): Promise<SubjectTopic> => {
@@ -70,15 +84,24 @@ export const academicService = {
   deleteSubjectTopic: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.ACADEMIC.SUBJECT_TOPIC_BY_ID(id));
   },
+  
+  getSubjectProgress: async (subjectId: number | string, classSectionId: number | string, session?: string): Promise<SubjectProgressSummary | null> => {
+    if (!subjectId || !classSectionId) return null;
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_PROGRESS, {
+      params: { subjectId, classSectionId, session },
+    });
+    return response.data;
+  },
+
+  getChapterProgress: async (chapterId: number | string, classSectionId: number | string, session?: string): Promise<ChapterProgressSummary | null> => {
+    if (!chapterId || !classSectionId) return null;
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.CHAPTER_PROGRESS, {
+      params: { chapterId, classSectionId, session },
+    });
+    return response.data;
+  },
 
   // ─── Teaching Progress ─────────────────────────────────────────────────────
-
-  getTeachingProgress: async (teacherId?: string): Promise<TeachingProgress[]> => {
-    const response = await api.get(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, {
-      params: teacherId ? { teacherId } : undefined,
-    });
-    return response.data ?? [];
-  },
 
   createTeachingProgress: async (data: CreateTeachingProgressPayload): Promise<TeachingProgress> => {
     const response = await api.post(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, data);
@@ -100,7 +123,11 @@ export const academicService = {
     const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK, {
       params: className ? { className } : undefined,
     });
-    return response.data ?? [];
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.homeworks && Array.isArray(raw.homeworks)) return raw.homeworks;
+    return [];
   },
 
   createHomework: async (data: CreateHomeworkPayload): Promise<Homework> => {
@@ -115,6 +142,33 @@ export const academicService = {
 
   deleteHomework: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.ACADEMIC.HOMEWORK_BY_ID(id));
+  },
+
+  // ─── Homework Attachments (Teacher uploads) ────────────────────────────────
+  getHomeworkAttachments: async (homeworkId: number): Promise<HomeworkAttachment[]> => {
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK_ATTACHMENT, {
+      params: { homeworkId }
+    });
+    return response.data ?? [];
+  },
+
+  uploadHomeworkAttachment: async (data: {
+    session: string;
+    homeworkId: number;
+    file: File;
+  }): Promise<HomeworkAttachment> => {
+    const formData = new FormData();
+    formData.append('file', data.file);
+    formData.append('session', data.session);
+    formData.append('homeworkId', String(data.homeworkId));
+    const response = await api.post(API_ENDPOINTS.ACADEMIC.HOMEWORK_ATTACHMENT, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  deleteHomeworkAttachment: async (id: number): Promise<void> => {
+    await api.delete(API_ENDPOINTS.ACADEMIC.HOMEWORK_ATTACHMENT_BY_ID(id));
   },
 
   // ─── Homework Documents ────────────────────────────────────────────────────
@@ -172,7 +226,11 @@ export const academicService = {
     const response = await api.get(API_ENDPOINTS.ACADEMIC.CLASSWORK, {
       params: classId ? { classId } : undefined,
     });
-    return response.data ?? [];
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.classworks && Array.isArray(raw.classworks)) return raw.classworks;
+    return [];
   },
 
   createClasswork: async (data: CreateClassworkPayload): Promise<Classwork> => {
@@ -189,43 +247,31 @@ export const academicService = {
     await api.delete(API_ENDPOINTS.ACADEMIC.CLASSWORK_BY_ID(id));
   },
 
-  // ─── Teacher Study Material ────────────────────────────────────────────────
+  // ─── Study Material ───────────────────────────────────────────────────────
 
-  getStudyMaterials: async (classId?: string): Promise<TeacherStudyMaterial[]> => {
-    const response = await api.get(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL, {
-      params: classId ? { classId } : undefined,
-    });
-    return response.data ?? [];
+  getStudyMaterials: async (): Promise<StudyMaterial[]> => {
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL);
+    const raw = response.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.materials && Array.isArray(raw.materials)) return raw.materials;
+    return [];
   },
 
-  uploadStudyMaterial: async (data: {
-    session: string;
-    classId: string;
-    sectionId: string;
-    subjectId: string;
-    chapterId?: number;
-    topicId?: number;
-    description: string;
-    teacherId: string;
-    file: File;
-  }): Promise<TeacherStudyMaterial> => {
+  uploadStudyMaterial: async (data: UploadStudyMaterialPayload): Promise<StudyMaterial> => {
     const formData = new FormData();
-    formData.append('file', data.file);
-    formData.append('session', data.session);
-    formData.append('classId', data.classId);
-    formData.append('sectionId', data.sectionId);
-    formData.append('subjectId', data.subjectId);
-    if (data.chapterId != null) formData.append('chapterId', String(data.chapterId));
-    if (data.topicId != null) formData.append('topicId', String(data.topicId));
-    formData.append('description', data.description);
-    formData.append('teacherId', data.teacherId);
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, value instanceof File ? value : String(value));
+      }
+    });
     const response = await api.post(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  updateStudyMaterial: async (id: number, data: UpdateStudyMaterialPayload): Promise<TeacherStudyMaterial> => {
+  updateStudyMaterial: async (id: number, data: UpdateStudyMaterialPayload): Promise<StudyMaterial> => {
     const response = await api.put(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL_BY_ID(id), data);
     return response.data;
   },

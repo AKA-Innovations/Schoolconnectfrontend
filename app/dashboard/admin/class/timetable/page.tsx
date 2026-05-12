@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
-  useTimetable, useCreateTimetableBulk, useDeleteTimetableEntry,
+  useTimetable, useCreateTimetableBulk, useDeleteTimetableEntry, useUpdateTimetableEntry,
   usePeriodSlots, useSubjectDetails, useClassSectionLists,
+  useSchoolClasses,
 } from '@/hooks/useClasses';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload } from '@/types/class.types';
@@ -19,26 +20,50 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 /** Key for a grid cell: "day|periodId" */
 function cellKey(day: string, periodId: number) { return `${day}|${periodId}`; }
 
-type DraftCell = { teacherClassId: string };
+type DraftCell = { classSubjectId: string };
 
 export default function TimetablePage() {
-  // ── Data fetching ──
-  const { data: allEntries = [], isLoading: loadingTimetable } = useTimetable({ session: CURRENT_SESSION });
-  const { data: periodSlots = [] }     = usePeriodSlots();
-  const { data: subjectDetails = [] }  = useSubjectDetails();
+  const { data: periodSlots = [] } = usePeriodSlots();
+  const { data: subjectDetails = [] } = useSubjectDetails();
   const { data: rawClassSections = [] } = useClassSectionLists();
+  const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const classSections: { id: number; className: string; sectionName: string }[] =
+  const classSections: { id: number; classId: number; className: string; sectionName: string }[] =
     (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
 
   const bulkCreateMut = useCreateTimetableBulk();
-  const deleteMut     = useDeleteTimetableEntry();
+  const deleteMut = useDeleteTimetableEntry();
+  const updateMut = useUpdateTimetableEntry();
 
   // ── Local state ──
-  const [selectedClassName, setSelectedClassName]   = useState('');
+  const [selectedClassName, setSelectedClassName] = useState('');
   const [selectedSectionName, setSelectedSectionName] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [drafts, setDrafts]     = useState<Record<string, DraftCell>>({});
+  const [drafts, setDrafts] = useState<Record<string, DraftCell>>({});
+
+  // Derive currently selected section object
+  const currentSection = useMemo(
+    () => classSections.find(cs => cs.className === selectedClassName && cs.sectionName === selectedSectionName),
+    [classSections, selectedClassName, selectedSectionName]
+  );
+  console.log(currentSection);
+
+  // Resolve classId from schoolClasses if missing in section object
+  const resolvedClassId = useMemo(() => {
+    if (currentSection?.classId) return currentSection.classId;
+    if (!currentSection || !selectedClassName) return undefined;
+    const cls = schoolClasses.find(c => c.className === selectedClassName);
+    return cls?.id;
+  }, [currentSection, selectedClassName, schoolClasses]);
+
+  // ── Data fetching ──
+  const { data: allEntries = [], isLoading: loadingTimetable } = useTimetable({
+    session: CURRENT_SESSION,
+    classId: resolvedClassId,
+    classSectionId: currentSection?.masterSectionId,
+    sectionId: currentSection?.masterSectionId, // Fallback param
+  });
+  console.log("Hi" + currentSection?.id);
 
   // ── Derived data ──
   const sorted = useMemo(
@@ -64,7 +89,7 @@ export default function TimetablePage() {
     [subjectDetails, selectedClassName, selectedSectionName],
   );
 
-  // Lookup: teacherClassId → SubjectDetail
+  // Lookup: classSubjectId → SubjectDetail
   const sdMap = useMemo(() => {
     const m = new Map<string, SubjectDetail>();
     (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(String(sd.id), sd));
@@ -76,48 +101,84 @@ export default function TimetablePage() {
     [allEntries],
   );
 
-  // teacherClassIds belonging to selected class+section
-  const sectionTcIds = useMemo(
+  // ── Data Normalization ──
+  // Resolves missing IDs from enriched names/numbers in the fetch response
+  const normalizedEntries = useMemo(() => {
+    return allEntriesArr.map(e => {
+      let classSubjectId = e.classSubjectId;
+      if (!classSubjectId && e.subjectName) {
+        const match = subjectDetails.find(sd => 
+          String(sd.subjectName).trim().toLowerCase() === String(e.subjectName).trim().toLowerCase() && 
+          (String(sd.teacherName || '').trim().toLowerCase() === String(e.teacherName || '').trim().toLowerCase() || !e.teacherName) &&
+          String(sd.className) === String(e.className || selectedClassName) &&
+          String(sd.sectionName) === String(e.sectionName || selectedSectionName)
+        );
+        if (match) classSubjectId = String(match.id);
+      }
+
+      let periodId = e.periodId;
+      if (!periodId && e.periodNumber) {
+        const slot = periodSlots.find(s => Number(s.periodNumber) === Number(e.periodNumber));
+        periodId = slot?.id;
+      }
+
+      return { ...e, classSubjectId, periodId };
+    });
+  }, [allEntriesArr, subjectDetails, periodSlots, selectedClassName, selectedSectionName]);
+
+  // classSubjectIds belonging to selected class+section
+  const sectionCsIds = useMemo(
     () => new Set(mappingsForSection.map((m) => String(m.id))),
     [mappingsForSection],
   );
 
   // Timetable entries for this section
   const sectionEntries: TimetableEntry[] = useMemo(
-    () => allEntriesArr.filter((e) => sectionTcIds.has(String(e.teacherClassId))),
-    [allEntriesArr, sectionTcIds],
+    () => normalizedEntries.filter((e) => {
+      if (e.classSubjectId) return sectionCsIds.has(String(e.classSubjectId));
+      // Fallback for entries that couldn't be resolved but belong to this class/section
+      return e.className === selectedClassName && e.sectionName === selectedSectionName;
+    }),
+    [normalizedEntries, sectionCsIds, selectedClassName, selectedSectionName],
   );
 
   // "day|periodId" → existing TimetableEntry
   const existingGrid = useMemo(() => {
     const m: Record<string, TimetableEntry> = {};
-    sectionEntries.forEach((e) => { m[cellKey(e.dayOfWeek, e.periodId)] = e; });
+    sectionEntries.forEach((e) => { 
+      if (e.periodId) {
+        m[cellKey(e.dayOfWeek, e.periodId as number)] = e; 
+      }
+    });
     return m;
   }, [sectionEntries]);
 
-  // Lookup: teacherClassId (string) → SubjectDetail for existing entries
-  const existingTcToSd = useMemo(() => {
+  // Lookup: classSubjectId (string) → SubjectDetail for existing entries
+  const existingCsToSd = useMemo(() => {
     const m = new Map<string, SubjectDetail>();
     sectionEntries.forEach((e) => {
-      const sd = sdMap.get(String(e.teacherClassId));
-      if (sd) m.set(String(e.teacherClassId), sd);
+      const csId = e.classSubjectId ? String(e.classSubjectId) : null;
+      if (csId) {
+        const sd = sdMap.get(csId);
+        if (sd) m.set(csId, sd);
+      }
     });
     return m;
   }, [sectionEntries, sdMap]);
 
   // ── Conflict checker ──
-  // Checks if the teacher behind teacherClassId is already occupied at day+periodId
+  // Checks if the teacher behind classSubjectId is already occupied at day+periodId
   const teacherConflict = useCallback(
-    (teacherClassId: string, day: string, periodId: number): string | null => {
-      const sd = sdMap.get(teacherClassId);
+    (classSubjectId: string, day: string, periodId: number): string | null => {
+      const sd = sdMap.get(classSubjectId);
       if (!sd) return null;
       const teacherId = sd.teacherId;
 
       // Check existing timetable entries (other sections)
       for (const entry of allEntriesArr) {
         if (entry.dayOfWeek !== day || entry.periodId !== periodId) continue;
-        if (sectionTcIds.has(String(entry.teacherClassId))) continue; // same section — OK
-        const entrySd = sdMap.get(String(entry.teacherClassId));
+        if (sectionCsIds.has(String(entry.classSubjectId))) continue; // same section — OK
+        const entrySd = sdMap.get(String(entry.classSubjectId));
         if (entrySd && entrySd.teacherId === teacherId) {
           return `${entrySd.teacherName || 'Teacher'} already teaches ${entrySd.subjectName} in ${entrySd.className}-${entrySd.sectionName}`;
         }
@@ -129,25 +190,25 @@ export default function TimetablePage() {
         if (key === thisKey) continue;
         const [dDay, dPeriod] = key.split('|');
         if (dDay !== day || Number(dPeriod) !== periodId) continue;
-        const dSd = sdMap.get(draft.teacherClassId);
+        const dSd = sdMap.get(draft.classSubjectId);
         if (dSd && dSd.teacherId === teacherId) {
           return `${dSd.teacherName || 'Teacher'} already assigned at this period (draft)`;
         }
       }
       return null;
     },
-    [allEntriesArr, sdMap, sectionTcIds, drafts],
+    [allEntriesArr, sdMap, sectionCsIds, drafts],
   );
 
   // ── Handlers ──
-  const handleDraftChange = (day: string, periodId: number, teacherClassId: string) => {
+  const handleDraftChange = (day: string, periodId: number, classSubjectId: string) => {
     const key = cellKey(day, periodId);
     setDrafts((prev) => {
-      if (!teacherClassId) {
+      if (!classSubjectId) {
         const { [key]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [key]: { teacherClassId } };
+      return { ...prev, [key]: { classSubjectId } };
     });
   };
 
@@ -155,34 +216,68 @@ export default function TimetablePage() {
     const entries = Object.entries(drafts);
     if (entries.length === 0) { toast.info('No changes to save'); return; }
 
-    // Validate conflicts
+    // Identify changes
+    const toCreate: CreateTimetablePayload[] = [];
+    const toUpdate: { id: number | string; data: Partial<CreateTimetablePayload> }[] = [];
+
+    // We also need to handle deletions if the user cleared a cell
+    // But currently DraftSelect removes from drafts on empty. 
+    // Let's just handle Create and Update for now as per user's "edit" request.
+
     for (const [key, draft] of entries) {
       const [day, periodId] = key.split('|');
-      const conflict = teacherConflict(draft.teacherClassId, day, Number(periodId));
+
+      // Validation
+      const conflict = teacherConflict(draft.classSubjectId, day, Number(periodId));
       if (conflict) { toast.error(conflict); return; }
+
+      const existing = existingGrid[key];
+      if (existing) {
+        // If it's the same as existing, no need to update
+        if (String(existing.classSubjectId) === draft.classSubjectId) continue;
+
+        toUpdate.push({
+          id: existing.id,
+          data: { 
+            session: CURRENT_SESSION,
+            classSubjectId: draft.classSubjectId,
+            periodId: Number(periodId),
+            dayOfWeek: day,
+          }
+        });
+      } else {
+        toCreate.push({
+          session: CURRENT_SESSION,
+          classSubjectId: draft.classSubjectId,
+          periodId: Number(periodId),
+          dayOfWeek: day,
+        });
+      }
     }
 
-    const payload: CreateTimetablePayload[] = entries.map(([key, draft]) => {
-      const [day, periodId] = key.split('|');
-      return {
-        session: CURRENT_SESSION,
-        teacherClassId: draft.teacherClassId, // already string
-        periodId: Number(periodId),
-        dayOfWeek: day,
-      };
-    });
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      toast.info('No changes detected');
+      setEditMode(false);
+      return;
+    }
 
     try {
-      await bulkCreateMut.mutateAsync(payload);
-      toast.success(`${payload.length} timetable entries saved`);
+      const promises = [];
+      if (toCreate.length > 0) promises.push(bulkCreateMut.mutateAsync(toCreate));
+      if (toUpdate.length > 0) {
+        toUpdate.forEach(upd => promises.push(updateMut.mutateAsync({ id: upd.id, data: upd.data })));
+      }
+
+      await Promise.all(promises);
+      toast.success('Timetable updated successfully');
       setDrafts({});
       setEditMode(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save timetable entries');
+      toast.error(err.response?.data?.message || 'Failed to save changes');
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
     try {
       await deleteMut.mutateAsync(id);
       toast.success('Entry removed');
@@ -201,7 +296,7 @@ export default function TimetablePage() {
     const m: Record<string, string> = {};
     for (const [key, draft] of Object.entries(drafts)) {
       const [day, periodId] = key.split('|');
-      const c = teacherConflict(draft.teacherClassId, day, Number(periodId));
+      const c = teacherConflict(draft.classSubjectId, day, Number(periodId));
       if (c) m[key] = c;
     }
     return m;
@@ -353,9 +448,9 @@ export default function TimetablePage() {
                         <div className="text-muted-foreground">{slot.startTime} – {slot.endTime}</div>
                       </td>
                       {DAYS.map((day) => {
-                        const key    = cellKey(day, slot.id);
+                        const key = cellKey(day, slot.id);
                         const existing = existingGrid[key];
-                        const draft    = drafts[key];
+                        const draft = drafts[key];
                         const conflict = conflictMap[key];
 
                         return (
@@ -363,19 +458,19 @@ export default function TimetablePage() {
                             'py-2 px-2 border-b border-r border-border/30 text-center align-top min-w-[130px]',
                             conflict && 'bg-amber-50',
                           )}>
-                            {existing ? (
+                            {editMode ? (
+                              <DraftSelect
+                                value={draft?.classSubjectId ?? (existing ? String(existing.classSubjectId) : '')}
+                                mappings={mappingsForSection}
+                                onChange={(csId) => handleDraftChange(day, slot.id, csId)}
+                                conflict={conflict}
+                              />
+                            ) : existing ? (
                               <ExistingCell
                                 entry={existing}
-                                sd={sdMap.get(String(existing.teacherClassId))}
+                                sd={sdMap.get(String(existing.classSubjectId))}
                                 onDelete={handleDelete}
                                 isDeleting={deleteMut.isPending}
-                              />
-                            ) : editMode ? (
-                              <DraftSelect
-                                value={draft?.teacherClassId ?? ''}
-                                mappings={mappingsForSection}
-                                onChange={(tcId) => handleDraftChange(day, slot.id, tcId)}
-                                conflict={conflict}
                               />
                             ) : (
                               <span className="text-muted-foreground/30 text-xs">—</span>
@@ -407,7 +502,7 @@ function ExistingCell({
 }) {
   return (
     <div className="group relative py-1">
-      <div className="text-xs font-semibold text-primary">{sd?.subjectName || `#${entry.teacherClassId}`}</div>
+      <div className="text-xs font-semibold text-primary">{sd?.subjectName || `#${entry.classSubjectId}`}</div>
       {sd?.teacherName && (
         <div className="text-[10px] text-muted-foreground mt-0.5">{sd.teacherName}</div>
       )}

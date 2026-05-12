@@ -34,12 +34,10 @@ export default function CoordinatorStudentsPage() {
   const selectedSection = classSections.find((cs) => cs.id === selectedId);
 
   // Fetch students for the selected class-section (or first class when none selected)
-  const filterClass = selectedSection?.className ?? (classSections[0]?.className || '');
-  const filterSection = selectedSection?.sectionName ?? '';
+  const filterId = selectedId || classSections[0]?.id;
 
   const { data: studentsData, isLoading } = useStudentList({
-    className: filterClass,
-    sectionName: filterSection || undefined,
+    classSectionId: filterId,
     limit: 500,
   });
   const students = studentsData?.items ?? [];

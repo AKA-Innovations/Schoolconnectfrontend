@@ -92,6 +92,7 @@ export interface StudentListFilters {
   mobileNumber?: string;
   className?: string;
   sectionName?: string;
+  classSectionId?: number;
   page?: number;
   limit?: number;
 }
@@ -192,6 +193,7 @@ export interface AttendanceFilterParams {
   studentId?: string;
   className?: string;
   sectionName?: string;
+  classSectionId?: number;
   session?: string;
   teacherId?: string;
   date?: string;

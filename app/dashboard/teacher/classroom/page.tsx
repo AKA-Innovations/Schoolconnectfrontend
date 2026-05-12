@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,14 +11,82 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Users, ClipboardCheck, BookOpen, GraduationCap,
   ArrowRight, Phone, Mail, RefreshCw, Search, ShieldAlert,
+  ChevronDown,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
+import { useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
+import { useSubjectProgress } from '@/hooks/useAcademic';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useAuthStore } from '@/store/authStore';
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
+import { useAuthStore } from '@/store/authStore';
+import { CURRENT_SESSION } from '@/lib/constants';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TrendingUp } from 'lucide-react';
+
+function SubjectProgressItem({ subjectId, classSectionId, subjectName }: { subjectId: number; classSectionId?: number; subjectName: string }) {
+  const { data: rawProgress, isLoading: progressLoading } = useSubjectProgress(subjectId, classSectionId, CURRENT_SESSION);
+
+  // Normalize backend response if it's wrapped in { message, data }
+  const progress = useMemo(() => {
+    if (!rawProgress) return null;
+    const d = (rawProgress as any).data ?? rawProgress;
+    return {
+      percentage: d.overallPercentage ?? d.completionPercentage ?? 0,
+      chaptersCount: d.chaptersCount ?? d.chapters?.length ?? 0,
+      totalTopics: d.totalTopics ?? 0,
+      completedTopics: d.completedTopics ?? 0
+    };
+  }, [rawProgress]);
+
+  if (progressLoading) {
+    return (
+      <div className="px-6 py-4 border-b border-border/30 animate-pulse">
+        <div className="h-4 w-32 bg-muted rounded mb-2" />
+        <div className="h-2 w-full bg-muted rounded" />
+      </div>
+    );
+  }
+
+  if (!progress) return null;
+
+  return (
+    <div className="px-6 py-4 hover:bg-muted/5 transition-colors border-b border-border/30 last:border-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-bold text-foreground">📚 {subjectName}</span>
+            <span className="text-xs font-bold text-primary">{progress.percentage}%</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+            {progress.chaptersCount} Chapters • {progress.completedTopics}/{progress.totalTopics} Topics
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all',
+                progress.percentage >= 80 ? 'bg-emerald-500' :
+                  progress.percentage >= 40 ? 'bg-blue-500' : 'bg-amber-500'
+              )}
+              style={{ width: `${progress.percentage}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-tighter font-bold">
+            Overall Coverage
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ClassRoomPage() {
   const { user, isClassTeacher, assignedClass, isSyncing } = useTeacherProfile();
@@ -27,26 +95,63 @@ export default function ClassRoomPage() {
   const [activeTab, setActiveTab] = useState('students');
   const debouncedSearch = useDebounce(search, 400);
 
-  const className = assignedClass?.className ?? '';
-  const sectionName = assignedClass?.sectionName ?? '';
+  const { data: mySubjects = [] } = useSubjectDetails(user?.id, CURRENT_SESSION);
+  const { data: allSections = [] } = useClassSectionLists();
+
+  // Resolve assignedClass names if they are missing but ID is present (lookup from allSections)
+  const resolvedAssignedClass = useMemo(() => {
+    if (!assignedClass) return null;
+    if (assignedClass.className && assignedClass.sectionName) return assignedClass;
+
+    // Try to find names in allSections list by ID (check multiple possible ID fields)
+    const match = allSections.find(s => 
+      s.id === assignedClass.classDtlsId || 
+      s.id === assignedClass.id ||
+      s.mappingId === assignedClass.id ||
+      s.mappingId === assignedClass.classDtlsId
+    );
+    if (match) {
+      return {
+        ...assignedClass,
+        className: match.className,
+        sectionName: match.sectionName
+      };
+    }
+    return assignedClass;
+  }, [assignedClass, allSections]);
+
+  // Final resolved IDs for data fetching
+  const resolvedClassSectionId = resolvedAssignedClass?.classDtlsId;
+  const selectedClass = resolvedAssignedClass?.className || '';
+  const selectedSection = resolvedAssignedClass?.sectionName || '';
+  const hasSelection = !!resolvedClassSectionId;
+
+  // ── Data Fetching ─────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: studentData, isLoading, refetch, isFetching } = useStudentList({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
-    firstName: debouncedSearch || undefined,
-    limit: 100,
-  });
+  const { data: studentData, isLoading, refetch, isFetching } = useStudentList(
+    {
+      classSectionId: resolvedClassSectionId,
+      firstName: debouncedSearch || undefined,
+      limit: 100,
+    },
+    { enabled: !!resolvedClassSectionId }
+  );
 
   const { data: todayAttendance } = useFilterAttendance({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
+    classSectionId: resolvedClassSectionId,
     date: today,
-  });
+  }, { enabled: !!resolvedClassSectionId });
+
+  // All subjects for this class (for Academics tab)
+  const { data: classWideSubjects = [], isLoading: subjectsLoading } = useSubjectDetails(
+    undefined, // get all subjects for the class
+    CURRENT_SESSION,
+    resolvedClassSectionId
+  );
 
   const students = studentData?.items ?? [];
   const totalStudents = studentData?.pagination?.totalItemsCount ?? 0;
-  const hasClass = !!(className && sectionName);
 
   const attendanceRecords = Array.isArray(todayAttendance)
     ? todayAttendance
@@ -56,7 +161,19 @@ export default function ClassRoomPage() {
         ? (todayAttendance as any).data
         : [];
 
-  const attendanceMap = new Map(attendanceRecords.map((a: any) => [a.studentId, a]));
+  // Build a map for quick lookup. Use studentId if available, otherwise fallback to matching by roll number
+  const attendanceMap = useMemo(() => {
+    const map = new Map();
+    attendanceRecords.forEach((a: any) => {
+      if (a.studentId) {
+        map.set(String(a.studentId), a);
+      }
+      if (a.studentRollNumber) {
+        map.set(`roll-${a.studentRollNumber}`, a);
+      }
+    });
+    return map;
+  }, [attendanceRecords]);
 
   const presentCount = attendanceRecords.filter((a: any) => a.status === 'Present').length;
   const absentCount = attendanceRecords.filter((a: any) => a.status === 'Absent').length;
@@ -76,7 +193,7 @@ export default function ClassRoomPage() {
   ];
 
   // ── Syncing state ────────────────────────────────────────────────────────
-  if (isSyncing && !assignedClass) {
+  if (isSyncing && !hasSelection) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)] gap-4 transition-all">
         <Loader2 className="h-10 w-10 text-primary animate-spin" />
@@ -88,8 +205,11 @@ export default function ClassRoomPage() {
     );
   }
 
-  // ── Not a class teacher → show access-denied card ──────────────────────────
-  if (!isClassTeacher || !assignedClass) {
+  // ── Access Check ──────────────────────────────────────────────────────────
+  // Strictly allow entry only if they have a resolved assigned class from profile
+  const canAccess = !!resolvedAssignedClass;
+
+  if (!canAccess) {
     return (
       <div className="m-4 space-y-6 animate-in fade-in duration-500">
         <div className="space-y-1">
@@ -107,7 +227,7 @@ export default function ClassRoomPage() {
             <div className="text-center space-y-1">
               <p className="text-base font-bold text-foreground">Access Restricted</p>
               <p className="text-sm max-w-md">
-                The classroom portal is only available for class teachers. You are not currently assigned as a class teacher for any class.
+                The classroom portal is designed for class teachers and subject teachers. You are not currently assigned to any class or section.
               </p>
             </div>
           </CardContent>
@@ -145,11 +265,15 @@ export default function ClassRoomPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">Class</Label>
-              <Input value={className} readOnly disabled className="rounded-xl h-10 bg-muted/30 cursor-not-allowed" />
+              <div className="h-10 px-4 flex items-center bg-muted/30 border border-border rounded-xl text-sm font-bold text-foreground cursor-not-allowed">
+                {selectedClass || '—'}
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">Section</Label>
-              <Input value={sectionName} readOnly disabled className="rounded-xl h-10 bg-muted/30 cursor-not-allowed" />
+              <div className="h-10 px-4 flex items-center bg-muted/30 border border-border rounded-xl text-sm font-bold text-foreground cursor-not-allowed">
+                {selectedSection || '—'}
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">Search Student</Label>
@@ -159,14 +283,18 @@ export default function ClassRoomPage() {
               </div>
             </div>
           </div>
+          {/* Debug info — remove after verification */}
+          {!resolvedClassSectionId && hasSelection && (
+            <p className="text-xs text-destructive mt-2">⚠ Could not resolve classSectionId for {selectedClass}-{selectedSection}. Students cannot be fetched.</p>
+          )}
         </CardContent>
       </Card>
 
-      {!hasClass ? (
+      {!hasSelection ? (
         <Card className="border-border shadow-sm">
           <CardContent className="py-16 flex flex-col items-center gap-3 text-muted-foreground">
             <GraduationCap size={44} className="opacity-20" />
-            <p className="font-semibold">Enter your class and section to get started</p>
+            <p className="font-semibold text-sm">Select a class and section to view student details</p>
           </CardContent>
         </Card>
       ) : (
@@ -206,7 +334,7 @@ export default function ClassRoomPage() {
               <Card className="border-border shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
                   <CardTitle className="text-lg font-bold">Student Directory</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Class {className} Section {sectionName}</CardDescription>
+                  <CardDescription className="text-xs mt-0.5">Class {selectedClass} Section {selectedSection}</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
@@ -231,19 +359,23 @@ export default function ClassRoomPage() {
                             <div className="flex flex-col items-center gap-2 text-muted-foreground">
                               <Users size={32} className="opacity-20" />
                               <p className="text-sm font-semibold">No students found</p>
+                              {!resolvedClassSectionId && (
+                                <p className="text-xs text-destructive">classSectionId could not be resolved</p>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
                       ) : (
                         students.map((s, idx) => {
-                          const att = attendanceMap.get(s.id);
+                          const roll = s.academics?.[0]?.rollNumber;
+                          const att = (attendanceMap.get(String(s.id)) || (roll ? attendanceMap.get(`roll-${roll}`) : null)) as any;
                           return (
                             <TableRow key={s.id} className="group hover:bg-muted/10 transition-colors border-b border-border/30">
                               <TableCell className="pl-6 text-xs font-bold text-muted-foreground">{idx + 1}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-3">
                                   <div className="h-9 w-9 rounded-xl bg-muted/40 flex items-center justify-center text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                    {s.firstName[0]}{s.lastName[0]}
+                                    {s.firstName?.[0]}{s.lastName?.[0]}
                                   </div>
                                   <p className="text-sm font-semibold text-foreground">{s.firstName} {s.lastName}</p>
                                 </div>
@@ -295,10 +427,10 @@ export default function ClassRoomPage() {
               <Card className="border-border shadow-sm">
                 <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
                   <CardTitle className="text-lg font-bold">Attendance Overview</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Today&apos;s attendance summary for Class {className} - {sectionName}</CardDescription>
+                  <CardDescription className="text-xs mt-0.5">Today&apos;s attendance summary for Class {selectedClass} - {selectedSection}</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {(todayAttendance ?? []).length === 0 ? (
+                  {attendanceRecords.length === 0 ? (
                     <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
                       <ClipboardCheck size={36} className="opacity-20" />
                       <p className="text-sm font-semibold">No attendance marked for today</p>
@@ -335,17 +467,33 @@ export default function ClassRoomPage() {
             </TabsContent>
 
             <TabsContent value="academics" className="mt-4">
-              <Card className="border-border shadow-sm">
+              <Card className="border-border shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
-                  <CardTitle className="text-lg font-bold">Academic Overview</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Class performance and academic details</CardDescription>
+                  <CardTitle className="text-lg font-bold">Academic Progress</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">Syllabus coverage across all subjects</CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
-                    <BookOpen size={36} className="opacity-20" />
-                    <p className="text-sm font-semibold">Academic analytics coming soon</p>
-                    <p className="text-xs text-muted-foreground">Grade entry and performance tracking will be available here</p>
-                  </div>
+                <CardContent className="p-0">
+                  {subjectsLoading ? (
+                    <div className="p-8 space-y-4">
+                      {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}
+                    </div>
+                  ) : classWideSubjects.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center gap-3 text-muted-foreground">
+                      <TrendingUp size={36} className="opacity-20" />
+                      <p className="text-sm font-semibold">No subjects mapped to this class</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/20">
+                      {classWideSubjects.map((sd: any) => (
+                        <SubjectProgressItem
+                          key={sd.id}
+                          subjectId={sd.subjectDtlsId}
+                          classSectionId={resolvedClassSectionId}
+                          subjectName={sd.subjectName}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

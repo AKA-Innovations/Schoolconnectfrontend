@@ -54,11 +54,15 @@ export const TopicFormModal = React.memo(function TopicFormModal({ open, onOpenC
   }, [selectedClassName, allClassSections]);
 
   const { data: subjectOptions = [], isLoading: loadingSubjects } = useSubjectOptions(selectedClassName);
-  const { data: chapterOptions = [], isLoading: loadingChapters } = useSubjectChapters(selectedClassName);
+  const { data: chapterOptions = [], isLoading: loadingChapters } = useSubjectChapters(
+    selectedSubjectId || undefined,
+    CURRENT_SESSION
+  );
 
   const filteredChapters = useMemo(() => {
     if (!selectedSubjectId) return [];
-    return chapterOptions.filter(ch => String(ch.subjectId) === selectedSubjectId).sort((a, b) => a.sequenceNo - b.sequenceNo);
+    // API already filters by subjectId, but keep client filter as safety net
+    return (chapterOptions ?? []).sort((a, b) => a.sequenceNo - b.sequenceNo);
   }, [selectedSubjectId, chapterOptions]);
 
   useEffect(() => {
@@ -104,11 +108,9 @@ export const TopicFormModal = React.memo(function TopicFormModal({ open, onOpenC
     } else {
       createMutation.mutate({
         session: CURRENT_SESSION,
-        className: values.className,
-        sectionName: values.sectionName,
-        subjectId: values.subjectId,
+        subjectId: Number(values.subjectId),
         chapterId: values.chapterId,
-        topicDetails: [{ topicName: values.topicName, sequenceNo: values.sequenceNo }],
+        topics: [{ topicName: values.topicName, sequenceNo: values.sequenceNo }],
       }, {
         onSuccess: () => {
           onSuccess();

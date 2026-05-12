@@ -2,33 +2,94 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTeacherDashboard } from '../../../hooks/useTeacherDashboard';
-import { useFetchTimetable } from '../../../hooks/useClasses';
+import { useFetchTimetable, useSubjectDetails, usePeriodSlots } from '../../../hooks/useClasses';
 import { StatsRow } from '../../../components/dashboard/StatsRow';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
-import { ClipboardCheck, FilePlus, PenTool, RefreshCw, BookOpen, PenLine, Clock } from 'lucide-react';
+import { ClipboardCheck, FilePlus, PenTool, RefreshCw, BookOpen, PenLine, Clock, BarChart3 } from 'lucide-react';
 import { CURRENT_SESSION } from '../../../lib/constants';
 import { useAuthStore } from '../../../store/authStore';
 import { HomeworkFormModal } from '../../../components/academic/homework/HomeworkFormModal';
 import { ClassworkFormModal } from '../../../components/academic/classwork/ClassworkFormModal';
+import { ProgressFormModal } from '../../../components/academic/teaching-progress/ProgressFormModal';
+import { ProgressDashboardCards } from '../../../components/academic/teaching-progress/ProgressDashboardCards';
 import { toast } from 'sonner';
 
 export default function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useTeacherDashboard();
+  const { data: subjectDetails = [] } = useSubjectDetails();
   
   // Get today's day of week
   const today = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());
   
-  const { data: timetable = [], isLoading: isTimetableLoading, refetch: refetchTimetable } = useFetchTimetable({
+  const { data: rawTimetable = [], isLoading: isTimetableLoading, refetch: refetchTimetable } = useFetchTimetable({
     session: CURRENT_SESSION,
     dayOfWeek: today,
+    teacherId: user?.id,
   });
+
+  const { data: periodSlots = [] } = usePeriodSlots();
+
+  // Build a periodId → PeriodSlot lookup for normalization
+  const periodSlotMap = useMemo(() => {
+    const m = new Map<number, typeof periodSlots[0]>();
+    periodSlots.forEach(s => m.set(s.id, s));
+    return m;
+  }, [periodSlots]);
+
+  const timetable = useMemo(() => {
+    const entries = Array.isArray(rawTimetable) ? rawTimetable : [];
+    return entries.map(e => {
+      let classSubjectId = e.classSubjectId;
+      let classSectionId = 0;
+      let subjectDtlsId = 0;
+
+      // Resolve periodNumber / times from periodSlots if missing
+      let periodNumber = e.periodNumber;
+      let startTime = e.startTime;
+      let endTime = e.endTime;
+
+      if (e.periodId) {
+        const slot = periodSlotMap.get(Number(e.periodId));
+        if (slot) {
+          if (!periodNumber) periodNumber = slot.periodNumber;
+          if (!startTime) startTime = slot.startTime;
+          if (!endTime) endTime = slot.endTime;
+        }
+      }
+      if (!e.periodId && periodNumber) {
+        const slot = periodSlots.find(s => Number(s.periodNumber) === Number(periodNumber));
+        if (slot) {
+          e = { ...e, periodId: slot.id };
+          if (!startTime) startTime = slot.startTime;
+          if (!endTime) endTime = slot.endTime;
+        }
+      }
+
+      const match = subjectDetails.find(sd => 
+        (sd.id === String(e.classSubjectId)) || (
+          String(sd.subjectName || '').trim().toLowerCase() === String(e.subjectName || '').trim().toLowerCase() && 
+          String(sd.className || '').trim().toLowerCase() === String(e.className || '').trim().toLowerCase() &&
+          String(sd.sectionName || '').trim().toLowerCase() === String(e.sectionName || '').trim().toLowerCase()
+        )
+      );
+
+      if (match) {
+        classSubjectId = String(match.id);
+        classSectionId = match.classDtlsId || (match as any).classSectionId || 0;
+        subjectDtlsId = match.subjectDtlsId || (match as any).subjectId || 0;
+      }
+
+      return { ...e, classSubjectId, classSectionId, subjectDtlsId, periodNumber, startTime, endTime };
+    }).sort((a, b) => (a.periodNumber || 0) - (b.periodNumber || 0));
+  }, [rawTimetable, subjectDetails, periodSlotMap, periodSlots]);
 
   const [isHomeworkModalOpen, setHomeworkModalOpen] = useState(false);
   const [isClassworkModalOpen, setClassworkModalOpen] = useState(false);
+  const [isProgressModalOpen, setProgressModalOpen] = useState(false);
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<any>(null);
 
   const actions = [
@@ -38,13 +99,36 @@ export default function TeacherDashboard() {
   ];
 
   const handleAddHomework = (item: any) => {
-    setSelectedScheduleItem(item);
+    setSelectedScheduleItem({
+      className: item.className,
+      sectionName: item.sectionName,
+      subjectId: item.classSubjectId,
+      classSectionId: item.classSectionId,
+      subjectDtlsId: item.subjectDtlsId
+    });
     setHomeworkModalOpen(true);
   };
 
   const handleAddClasswork = (item: any) => {
-    setSelectedScheduleItem(item);
+    setSelectedScheduleItem({
+      className: item.className,
+      sectionName: item.sectionName,
+      subjectId: item.classSubjectId,
+      classSectionId: item.classSectionId,
+      subjectDtlsId: item.subjectDtlsId
+    });
     setClassworkModalOpen(true);
+  };
+
+  const handleUpdateProgress = (item: any) => {
+    setSelectedScheduleItem({
+      className: item.className,
+      sectionName: item.sectionName,
+      subjectId: item.classSubjectId,
+      classSectionId: item.classSectionId,
+      subjectDtlsId: item.subjectDtlsId
+    });
+    setProgressModalOpen(true);
   };
 
   const isLoading = isSummaryLoading || isTimetableLoading;
@@ -98,7 +182,7 @@ export default function TeacherDashboard() {
                 </div>
               ) : (
                 timetable.map((cls, idx) => (
-                  <div key={cls.id} className="relative ml-8 group">
+                  <div key={`${cls.id}-${idx}`} className="relative ml-8 group">
                     <div className={cn(
                       "absolute -left-[41px] top-1 w-5 h-5 rounded-full border-4 border-white shadow-sm transition-all duration-500 group-hover:scale-125",
                       idx === 0 ? "bg-primary animate-pulse" : "bg-slate-300 group-hover:bg-primary/50"
@@ -118,24 +202,33 @@ export default function TeacherDashboard() {
                           <h4 className="text-xl font-bold text-slate-900 leading-tight">{cls.subjectName}</h4>
                         </div>
 
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                           <Button 
                             variant="secondary" 
                             size="sm" 
-                            className="flex-1 sm:flex-none rounded-xl text-[11px] font-bold h-9 bg-slate-50 hover:bg-primary hover:text-white transition-all border-none"
+                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-none"
                             onClick={() => handleAddHomework(cls)}
                           >
-                            <FilePlus className="h-3.5 w-3.5 mr-1.5" />
-                            HOMEWORK
+                            <FilePlus className="h-3 w-3 mr-1" />
+                            HW
                           </Button>
                           <Button 
                             variant="secondary" 
                             size="sm" 
-                            className="flex-1 sm:flex-none rounded-xl text-[11px] font-bold h-9 bg-slate-50 hover:bg-accent hover:text-white transition-all border-none"
+                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white transition-all border-none"
                             onClick={() => handleAddClasswork(cls)}
                           >
-                            <PenLine className="h-3.5 w-3.5 mr-1.5" />
-                            CLASSWORK
+                            <PenLine className="h-3 w-3 mr-1" />
+                            CW
+                          </Button>
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all border-none"
+                            onClick={() => handleUpdateProgress(cls)}
+                          >
+                            <BarChart3 className="h-3 w-3 mr-1" />
+                            PROG
                           </Button>
                         </div>
                       </div>
@@ -149,6 +242,15 @@ export default function TeacherDashboard() {
 
         <div className="space-y-8">
           <QuickActions actions={actions} />
+
+          <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Syllabus Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ProgressDashboardCards />
+            </CardContent>
+          </Card>
 
           <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
             <CardHeader>
@@ -180,11 +282,7 @@ export default function TeacherDashboard() {
         open={isHomeworkModalOpen} 
         onOpenChange={setHomeworkModalOpen}
         editItem={null}
-        prefill={selectedScheduleItem ? {
-          className: selectedScheduleItem.className,
-          sectionName: selectedScheduleItem.sectionName,
-          subjectId: selectedScheduleItem.teacherClassId,
-        } : undefined}
+        prefill={selectedScheduleItem}
         onSuccess={() => {
           setHomeworkModalOpen(false);
           toast.success('Homework assigned successfully!');
@@ -195,14 +293,21 @@ export default function TeacherDashboard() {
         open={isClassworkModalOpen}
         onOpenChange={setClassworkModalOpen}
         editItem={null}
-        prefill={selectedScheduleItem ? {
-          className: selectedScheduleItem.className,
-          sectionName: selectedScheduleItem.sectionName,
-          subjectId: selectedScheduleItem.teacherClassId,
-        } : undefined}
+        prefill={selectedScheduleItem}
         onSuccess={() => {
           setClassworkModalOpen(false);
           toast.success('Classwork logged successfully!');
+        }}
+      />
+
+      <ProgressFormModal
+        open={isProgressModalOpen}
+        onOpenChange={setProgressModalOpen}
+        editItem={null}
+        prefill={selectedScheduleItem}
+        onSuccess={() => {
+          setProgressModalOpen(false);
+          toast.success('Progress updated successfully!');
         }}
       />
     </div>

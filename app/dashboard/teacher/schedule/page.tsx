@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/authStore';
-import { useFetchTimetable, usePeriodSlots } from '@/hooks/useClasses';
+import { useFetchTimetable, usePeriodSlots, useSubjectDetails } from '@/hooks/useClasses';
 import { Calendar, Clock, BookOpen, Plus, ClipboardList, BookMarked, BarChart3 } from 'lucide-react';
 import { HomeworkFormModal } from '@/components/academic/homework/HomeworkFormModal';
 import { ClassworkFormModal } from '@/components/academic/classwork/ClassworkFormModal';
@@ -18,17 +18,94 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 export default function TeacherSchedulePage() {
   const user = useAuthStore((s) => s.user);
 
-  // Backend auto-detects teacher from JWT when role = 'teacher'
-  const { data: myEntries = [], isLoading: loadingTT } = useFetchTimetable({ session: CURRENT_SESSION });
+  // Fetch timetable entries for the logged-in teacher
+  const { data: rawEntries = [], isLoading: loadingTT } = useFetchTimetable({ 
+    session: CURRENT_SESSION,
+    teacherId: user?.id 
+  });
+  const { data: subjectDetails = [] } = useSubjectDetails();
   const { data: periodSlots = [], isLoading: loadingSlots } = usePeriodSlots();
+
+  // Build a periodId → PeriodSlot lookup for normalization
+  const periodSlotMap = useMemo(() => {
+    const m = new Map<number, typeof periodSlots[0]>();
+    periodSlots.forEach(s => m.set(s.id, s));
+    return m;
+  }, [periodSlots]);
+
+  // Normalize timetable entries: resolve periodNumber/startTime/endTime from
+  // periodSlots (the backend may only return periodId), and resolve classSectionId
+  // / subjectDtlsId from the teacher's subject-details mapping.
+  const myEntries = useMemo(() => {
+    const entries = Array.isArray(rawEntries) ? rawEntries : [];
+
+    if (entries.length === 0 && !loadingTT) {
+      console.debug('[TeacherSchedule] No timetable entries returned.', {
+        session: CURRENT_SESSION,
+        teacherId: user?.id,
+        rawEntries,
+      });
+    }
+
+    return entries.map(e => {
+      let classSubjectId = e.classSubjectId;
+      let classSectionId = 0;
+      let subjectDtlsId = 0;
+
+      // Resolve periodNumber / times from periodSlots if missing
+      let periodNumber = e.periodNumber;
+      let startTime = e.startTime;
+      let endTime = e.endTime;
+
+      if (e.periodId) {
+        const slot = periodSlotMap.get(Number(e.periodId));
+        if (slot) {
+          if (!periodNumber) periodNumber = slot.periodNumber;
+          if (!startTime) startTime = slot.startTime;
+          if (!endTime) endTime = slot.endTime;
+        }
+      }
+      // Reverse: if we have periodNumber but not periodId, resolve periodId
+      if (!e.periodId && periodNumber) {
+        const slot = periodSlots.find(s => Number(s.periodNumber) === Number(periodNumber));
+        if (slot) {
+          e = { ...e, periodId: slot.id };
+          if (!startTime) startTime = slot.startTime;
+          if (!endTime) endTime = slot.endTime;
+        }
+      }
+
+      // Find numeric IDs from subjectDetails mapping
+      const match = subjectDetails.find(sd => 
+        (sd.id === String(e.classSubjectId)) || (
+          String(sd.subjectName || '').trim().toLowerCase() === String(e.subjectName || '').trim().toLowerCase() && 
+          String(sd.className || '').trim().toLowerCase() === String(e.className || '').trim().toLowerCase() &&
+          String(sd.sectionName || '').trim().toLowerCase() === String(e.sectionName || '').trim().toLowerCase()
+        )
+      );
+
+      if (match) {
+        classSubjectId = String(match.id);
+        classSectionId = match.classDtlsId || (match as any).classSectionId || 0;
+        subjectDtlsId = match.subjectDtlsId || (match as any).subjectId || 0;
+      }
+
+      return { ...e, classSubjectId, classSectionId, subjectDtlsId, periodNumber, startTime, endTime };
+    });
+  }, [rawEntries, subjectDetails, periodSlotMap, periodSlots, loadingTT, user?.id]);
+
   const isLoading = loadingTT || loadingSlots;
-
-
 
   const [hwModalOpen, setHwModalOpen] = React.useState(false);
   const [cwModalOpen, setCwModalOpen] = React.useState(false);
   const [progressModalOpen, setProgressModalOpen] = React.useState(false);
-  const [prefill, setPrefill] = React.useState<{ className: string; sectionName: string; subjectId: string } | undefined>();
+  const [prefill, setPrefill] = React.useState<{ 
+    className: string; 
+    sectionName: string; 
+    subjectId: string;
+    classSectionId: number;
+    subjectDtlsId: number;
+  } | undefined>();
 
   const sorted = useMemo(
     () => [...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber),
@@ -37,10 +114,12 @@ export default function TeacherSchedulePage() {
 
   // Build grid: day → periodNumber → entry
   const grid = useMemo(() => {
-    const map: Record<string, Record<number, typeof myEntries[number]>> = {};
+    const map: Record<string, Record<number, any>> = {};
     DAYS.forEach((d) => { map[d] = {}; });
     myEntries.forEach((e) => {
-      if (map[e.dayOfWeek]) map[e.dayOfWeek][e.periodNumber] = e;
+      if (e.periodNumber && map[e.dayOfWeek]) {
+        map[e.dayOfWeek][e.periodNumber] = e;
+      }
     });
     return map;
   }, [myEntries]);
@@ -55,17 +134,35 @@ export default function TeacherSchedulePage() {
   );
 
   const openHW = (e: any) => {
-    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setPrefill({ 
+      className: e.className, 
+      sectionName: e.sectionName, 
+      subjectId: e.classSubjectId,
+      classSectionId: e.classSectionId,
+      subjectDtlsId: e.subjectDtlsId
+    });
     setHwModalOpen(true);
   };
 
   const openCW = (e: any) => {
-    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setPrefill({ 
+      className: e.className, 
+      sectionName: e.sectionName, 
+      subjectId: e.classSubjectId,
+      classSectionId: e.classSectionId,
+      subjectDtlsId: e.subjectDtlsId
+    });
     setCwModalOpen(true);
   };
 
   const openProgress = (e: any) => {
-    setPrefill({ className: e.className, sectionName: e.sectionName, subjectId: e.subjectName });
+    setPrefill({ 
+      className: e.className, 
+      sectionName: e.sectionName, 
+      subjectId: e.classSubjectId,
+      classSectionId: e.classSectionId,
+      subjectDtlsId: e.subjectDtlsId
+    });
     setProgressModalOpen(true);
   };
 

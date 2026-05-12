@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/FormField';
-import { useCreateHomework, useUpdateHomework } from '@/hooks/useAcademic';
-import { useSubjectDetails } from '@/hooks/useClasses';
+import { useCreateHomework, useUpdateHomework, useUploadHomeworkAttachment } from '@/hooks/useAcademic';
 import { useAuthStore } from '@/store/authStore';
+import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { formatDate } from '@/lib/dateUtils';
+import { AssignmentSelector } from '../shared/AssignmentSelector';
+import { ChapterSelect } from '../shared/ChapterSelect';
+import { TopicSelect } from '../shared/TopicSelect';
 import type { Homework } from '@/services/academic/types';
-import type { SubjectDetail } from '@/types/class.types';
 
 interface FormValues {
-  assignmentKey: string; // composite "className|sectionName|subjectName|teacherSubjectDetailId"
+  assignmentKey: string; // "className|sectionName|mappingId"
+  chapterId: string;
+  topicId: string;
   title: string;
   description: string;
   dueDate: string;
@@ -28,7 +33,9 @@ interface Props {
   prefill?: {
     className: string;
     sectionName: string;
-    subjectId: string; // This is teacherClassId (mapping ID)
+    subjectId: string; // mapping ID
+    classSectionId: number;
+    subjectDtlsId: number;
   };
 }
 
@@ -40,25 +47,35 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
   const updateMutation = useUpdateHomework();
   const isEditing = !!editItem;
 
-  // Get teacher's subject assignments from the teacher-subject mapping
-  const { data: allSubjectDetails = [] } = useSubjectDetails(user?.id);
+  const [selectedClassName, setSelectedClassName] = useState<string | undefined>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); // Mapping ID
+  const [selectedClassSectionId, setSelectedClassSectionId] = useState<number | undefined>();
+  const [selectedSubjectDtlsId, setSelectedSubjectDtlsId] = useState<number | undefined>();
 
-  // Filter to only this teacher's assignments for the current session
- const myAssignments: SubjectDetail[] = useMemo(() => {
-  if (!user?.id) return [];
+  const uploadAttachment = useUploadHomeworkAttachment();
+  const [step, setStep] = useState<'form' | 'upload_prompt'>('form');
+  const [createdHw, setCreatedHw] = useState<Homework | null>(null);
 
-  return allSubjectDetails.filter(
-    (sd) => sd.session === CURRENT_SESSION
-  );
-}, [allSubjectDetails, user?.id]);
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormValues>({
-    defaultValues: { assignmentKey: '', title: '', description: '', dueDate: '' },
+  const { register, handleSubmit, reset, control, watch, setValue, formState: { errors } } = useForm<FormValues>({
+    defaultValues: {
+      assignmentKey: '',
+      chapterId: '',
+      topicId: '',
+      title: '',
+      description: '',
+      dueDate: formatDate(new Date(Date.now() + 86400000), 'yyyy-MM-dd'),
+    },
   });
+
+  const assignmentKey = watch('assignmentKey');
+  const chapterId = watch('chapterId');
 
   useEffect(() => {
     if (editItem) {
       reset({
         assignmentKey: '',
+        chapterId: editItem.chapterId ? String(editItem.chapterId) : '',
+        topicId: editItem.topicId ? String(editItem.topicId) : '',
         title: editItem.title,
         description: editItem.description,
         dueDate: formatDate(new Date(editItem.dueDate), 'yyyy-MM-dd'),
@@ -66,16 +83,50 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
     } else if (prefill && open) {
       reset({
         assignmentKey: `${prefill.className}|${prefill.sectionName}|${prefill.subjectId}`,
+        chapterId: '',
+        topicId: '',
         title: '',
         description: '',
         dueDate: formatDate(new Date(Date.now() + 86400000), 'yyyy-MM-dd'),
       });
+      setSelectedClassName(prefill.className);
+      setSelectedSubjectId(prefill.subjectId);
+      setSelectedClassSectionId(prefill.classSectionId);
+      setSelectedSubjectDtlsId(prefill.subjectDtlsId);
     } else {
-      reset({ assignmentKey: '', title: '', description: '', dueDate: '' });
+      reset({
+        assignmentKey: '',
+        chapterId: '',
+        topicId: '',
+        title: '',
+        description: '',
+        dueDate: formatDate(new Date(Date.now() + 86400000), 'yyyy-MM-dd'),
+      });
     }
   }, [editItem, reset, prefill, open]);
 
+  // Handle dependent resets
+  useEffect(() => {
+    if (!assignmentKey) {
+      setSelectedClassName(undefined);
+      setSelectedSubjectId(undefined);
+      setSelectedClassSectionId(undefined);
+      setSelectedSubjectDtlsId(undefined);
+    }
+  }, [assignmentKey]);
+
   const onSubmit = (values: FormValues) => {
+    const onFinalSuccess = (hw: Homework) => {
+      if (isEditing) {
+        toast.success('Homework updated');
+        onSuccess();
+      } else {
+        toast.success('Homework created successfully');
+        setCreatedHw(hw);
+        setStep('upload_prompt');
+      }
+    };
+
     if (isEditing) {
       updateMutation.mutate(
         {
@@ -86,113 +137,183 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
             dueDate: new Date(values.dueDate).toISOString(),
           },
         },
-        { onSuccess },
+        { onSuccess: () => onFinalSuccess(editItem) },
       );
       return;
     }
 
-    const [className, sectionName, subjectId] = values.assignmentKey.split('|');
+    if (!selectedClassSectionId || !selectedSubjectDtlsId) {
+      toast.error('Unable to resolve class/subject identifiers. Please re-select the class.');
+      return;
+    }
+
     createMutation.mutate(
       {
         session: CURRENT_SESSION,
-        className,
-        sectionName,
-        subjectId,
+        classSectionId: selectedClassSectionId,
+        subjectId: selectedSubjectDtlsId,
+        chapterId: values.chapterId ? Number(values.chapterId) : undefined,
+        topicId: values.topicId ? Number(values.topicId) : undefined,
         title: values.title,
         description: values.description,
-        assignedBy: user?.id ?? '',
-        assignedDate: new Date().toISOString(),
         dueDate: new Date(values.dueDate).toISOString(),
       },
-      { onSuccess },
+      { onSuccess: (data) => onFinalSuccess(data) },
     );
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !createdHw) return;
+
+    uploadAttachment.mutate({
+      session: CURRENT_SESSION,
+      homeworkId: createdHw.id,
+      file,
+    }, {
+      onSuccess: () => {
+        toast.success('Attachment added successfully');
+        onSuccess(); // Close and refresh
+      }
+    });
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending || uploadAttachment.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Homework' : 'Create Homework'}</DialogTitle>
-          {!isEditing && (
+          <DialogTitle>
+            {step === 'upload_prompt' ? 'Homework Created!' : isEditing ? 'Edit Homework' : 'Create Homework'}
+          </DialogTitle>
+          {step === 'form' && !isEditing && (
             <DialogDescription>
-              Assign homework to one of your classes. Class/Section/Subject are loaded from your teaching schedule.
+              Step-by-step: Select assignment, chapter, and topic to assign homework.
             </DialogDescription>
           )}
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Smart assignment picker — only shown when creating */}
-          {!isEditing && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Class / Section / Subject *
-              </label>
+        {step === 'form' ? (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {!isEditing && (
               <Controller
                 name="assignmentKey"
                 control={control}
-                rules={{ required: 'Please select a class assignment' }}
+                rules={{ required: 'Required' }}
                 render={({ field }) => (
-                  <select
-                    {...field}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">— Select your class —</option>
-                    {myAssignments.length === 0 ? (
-                      <option disabled value="">No assignments found for this session</option>
-                    ) : (
-                      myAssignments.map((sd) => (
-                        <option
-                          key={sd.id}
-                          value={`${sd.className}|${sd.sectionName}|${sd.id}`}
-                        >
-                          Class {sd.className} — {sd.sectionName} &nbsp;|&nbsp; {sd.subjectName}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <AssignmentSelector
+                    value={field.value}
+                    error={errors.assignmentKey?.message}
+                    onChange={(val, detail) => {
+                      field.onChange(val);
+                      setSelectedClassName(detail?.className);
+                      setSelectedSubjectId(detail?.subjectId);
+                      setSelectedClassSectionId(detail?.classSectionId);
+                      setSelectedSubjectDtlsId(detail?.subjectDtlsId);
+                      setValue('chapterId', '');
+                      setValue('topicId', '');
+                    }}
+                  />
                 )}
               />
-              {errors.assignmentKey && (
-                <p className="text-xs text-destructive">{errors.assignmentKey.message}</p>
-              )}
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Controller
+                name="chapterId"
+                control={control}
+                render={({ field }) => (
+                  <ChapterSelect
+                    className={selectedClassName}
+                    subjectId={selectedSubjectId}
+                    value={field.value}
+                    onChange={(val) => {
+                      field.onChange(val);
+                      setValue('topicId', '');
+                    }}
+                    error={errors.chapterId?.message}
+                    disabled={!assignmentKey}
+                  />
+                )}
+              />
+
+              <Controller
+                name="topicId"
+                control={control}
+                render={({ field }) => (
+                  <TopicSelect
+                    chapterId={chapterId}
+                    subjectId={selectedSubjectDtlsId}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.topicId?.message}
+                    disabled={!chapterId}
+                  />
+                )}
+              />
             </div>
-          )}
 
-          <FormField label="Title" error={errors.title?.message} required>
-            <input
-              {...register('title', { required: 'Required' })}
-              className="field"
-              placeholder="Homework title"
-            />
-          </FormField>
+            <FormField label="Title" error={errors.title?.message} required>
+              <input
+                {...register('title', { required: 'Required' })}
+                className="field"
+                placeholder="Homework title"
+              />
+            </FormField>
 
-          <FormField label="Description / Instructions" error={errors.description?.message} required>
-            <textarea
-              {...register('description', { required: 'Required' })}
-              className="field min-h-[100px] resize-y"
-              placeholder="Detailed instructions for students..."
-            />
-          </FormField>
+            <FormField label="Description / Instructions" error={errors.description?.message} required>
+              <textarea
+                {...register('description', { required: 'Required' })}
+                className="field min-h-[100px] resize-y"
+                placeholder="Detailed instructions for students..."
+              />
+            </FormField>
 
-          <FormField label="Due Date" error={errors.dueDate?.message} required>
-            <input
-              {...register('dueDate', { required: 'Required' })}
-              type="date"
-              className="field"
-            />
-          </FormField>
+            <FormField label="Due Date" error={errors.dueDate?.message} required>
+              <input
+                {...register('dueDate', { required: 'Required' })}
+                type="date"
+                className="field"
+              />
+            </FormField>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? 'Saving…' : isEditing ? 'Update' : 'Create Homework'}
-            </Button>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? 'Saving…' : isEditing ? 'Update' : 'Create & Continue'}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="py-6 space-y-6 text-center">
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">
+                The assignment has been created. Would you like to attach a supporting document (PDF, image, etc.)?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 max-w-[240px] mx-auto pt-2">
+              <Button asChild className="rounded-xl h-12 gap-2 relative">
+                <label className="cursor-pointer">
+                  <Plus className="h-4 w-4" /> 
+                  {uploadAttachment.isPending ? 'Uploading...' : 'Attach Document'}
+                  <input
+                    type="file"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={handleFileUpload}
+                    disabled={uploadAttachment.isPending}
+                  />
+                </label>
+              </Button>
+              <Button variant="ghost" className="h-12 rounded-xl text-slate-500" onClick={onSuccess}>
+                I'll do it later
+              </Button>
+            </div>
           </div>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );

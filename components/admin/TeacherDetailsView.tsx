@@ -664,7 +664,14 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
   const deleteMutation = useDeleteSubjectDetail();
 
   const [showAdd, setShowAdd] = useState(false);
-  const [newMapping, setNewMapping] = useState({ className: '', sectionName: '', subjectName: '' });
+  const [newMapping, setNewMapping] = useState({
+    classId: 0,
+    classSectionId: 0,
+    subjectId: 0,
+    className: '',
+    sectionName: '',
+    subjectName: ''
+  });
 
   const mappings: SubjectDetail[] = (allDetails ?? []).filter((d: SubjectDetail) => d.teacherId === teacherId);
 
@@ -680,18 +687,35 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
 
   const subjectNamesForClass: string[] = Array.from(new Set(
     (subjectOptsData ?? [])
-      .filter((s: any) => String(s.className) === newMapping.className)
       .map((s: any) => String(s.subjectName))
   )).sort() as string[];
 
   const handleAdd = () => {
-    if (!newMapping.className || !newMapping.sectionName || !newMapping.subjectName) {
+    if (!newMapping.classId || !newMapping.classSectionId || !newMapping.subjectId) {
       alert('Please select class, section, and subject.'); return;
     }
     createMutation.mutate(
-      { session: CURRENT_SESSION, teacherId, ...newMapping },
       {
-        onSuccess: () => { setShowAdd(false); setNewMapping({ className: '', sectionName: '', subjectName: '' }); },
+        entries: [{
+          session: CURRENT_SESSION,
+          teacherId,
+          classId: newMapping.classId,
+          classSectionId: newMapping.classSectionId,
+          subjectId: newMapping.subjectId
+        }]
+      },
+      {
+        onSuccess: () => {
+          setShowAdd(false);
+          setNewMapping({
+            classId: 0,
+            classSectionId: 0,
+            subjectId: 0,
+            className: '',
+            sectionName: '',
+            subjectName: ''
+          });
+        },
         onError: (err: any) => alert(err.response?.data?.message || 'Failed to create mapping.'),
       }
     );
@@ -726,33 +750,58 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class *</Label>
                 <select
-                  value={newMapping.className}
-                  onChange={e => setNewMapping({ className: e.target.value, sectionName: '', subjectName: '' })}
+                  value={newMapping.classId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const cs = (classSectionsData ?? []).find((s: any) => s.classId === id);
+                    setNewMapping({
+                      classId: id,
+                      className: cs?.className ?? '',
+                      sectionName: '',
+                      classSectionId: 0,
+                      subjectId: 0,
+                      subjectName: ''
+                    });
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                   <option value="">Select class</option>
-                  {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+                  {classNames.map(name => {
+                    const cs = (classSectionsData ?? []).find((s: any) => s.className === name);
+                    return <option key={cs?.classId ?? name} value={cs?.classId}>{name}</option>;
+                  })}
                 </select>
               </div>
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Section *</Label>
                 <select
-                  value={newMapping.sectionName}
-                  onChange={e => setNewMapping(p => ({ ...p, sectionName: e.target.value, subjectName: '' }))}
+                  value={newMapping.classSectionId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const cs = (classSectionsData ?? []).find((s: any) => s.id === id);
+                    setNewMapping(p => ({ ...p, classSectionId: id, sectionName: cs?.sectionName ?? '', subjectName: '', subjectId: 0 }));
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={!newMapping.className}>
+                  disabled={!newMapping.classId}>
                   <option value="">Select section</option>
-                  {sectionsForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                  {(classSectionsData ?? [])
+                    .filter((s: any) => s.classId === newMapping.classId)
+                    .map((s: any) => <option key={s.id} value={s.id}>{s.sectionName}</option>)
+                  }
                 </select>
               </div>
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
                 <select
-                  value={newMapping.subjectName}
-                  onChange={e => setNewMapping(p => ({ ...p, subjectName: e.target.value }))}
+                  value={newMapping.subjectId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const s = (subjectOptsData ?? []).find((so: any) => so.id === id);
+                    setNewMapping(p => ({ ...p, subjectId: id, subjectName: s?.subjectName ?? '' }));
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={!newMapping.className}>
+                  disabled={!newMapping.classId}>
                   <option value="">Select subject</option>
-                  {subjectNamesForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                  {(subjectOptsData ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.subjectName}</option>)}
                 </select>
               </div>
             </div>

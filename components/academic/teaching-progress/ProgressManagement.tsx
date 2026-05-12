@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTeachingProgress, useDeleteProgress } from '@/hooks/useAcademic';
+import { Card, CardContent } from '@/components/ui/card';
+import { useDeleteProgress, useSubjectChapters, useSubjectTopics, useSubjectProgress } from '@/hooks/useAcademic';
+import { useSubjectDetails } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
+import { CURRENT_SESSION } from '@/lib/constants';
 import { AcademicPageHeader } from '../shared/AcademicPageHeader';
 import { AcademicFilterBar } from '../shared/AcademicFilterBar';
-import { ProgressTable } from './ProgressTable';
-import { ProgressFormModal } from './ProgressFormModal';
 import { ProgressAnalytics } from './ProgressAnalytics';
-import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
-import type { TeachingProgress } from '@/services/academic/types';
+import type { TeachingProgress, SubjectChapter } from '@/services/academic/types';
+import { ChapterProgressTable } from './ChapterProgressTable';
+import { ProgressFormModal } from './ProgressFormModal';
+
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 
 interface Props { teacherIdOverride?: string; }
 
@@ -21,24 +25,91 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
 
   const [isFormOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<TeachingProgress | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedAssignment, setSelectedAssignment] = useState('');
 
-  const { data, isLoading, isFetching, refetch } = useTeachingProgress(teacherId);
+  const { data: taughtSubjects = [] } = useSubjectDetails(teacherId, CURRENT_SESSION);
+  const { isClassTeacher, assignedClass } = useTeacherProfile();
+
+  // If they are a class teacher, they might want to see all subjects in their class
+  // Especially if they don't teach any subjects themselves
+  const { data: classWideSubjects = [] } = useSubjectDetails(
+    undefined, 
+    CURRENT_SESSION, 
+    assignedClass?.classDtlsId
+  );
+
+  const mySubjects = useMemo(() => {
+    // For Class Teachers, we always want the full class view
+    if (isClassTeacher && classWideSubjects.length > 0) return classWideSubjects;
+    return taughtSubjects;
+  }, [taughtSubjects, classWideSubjects, isClassTeacher]);
+
+  // Derive IDs from selected assignment for API filtering
+  const { selectedClassSectionId, selectedSubjectId } = useMemo(() => {
+    if (!selectedAssignment) return { selectedClassSectionId: undefined, selectedSubjectId: undefined };
+    const sd = mySubjects.find((s) => String(s.id) === selectedAssignment) as any;
+    return {
+      selectedClassSectionId: sd?.classDtlsId || sd?.classSectionId,
+      selectedSubjectId: sd?.subjectDtlsId || sd?.subjectId
+    };
+  }, [selectedAssignment, mySubjects]);
+
+  // Fetch chapters for the selected subject
+  const { data: chapters = [], isLoading: chaptersLoading } = useSubjectChapters(selectedSubjectId, CURRENT_SESSION);
+
   const deleteMutation = useDeleteProgress();
 
-  const items = useMemo(() => {
-    const list = data ?? [];
-    if (!statusFilter) return list;
-    return list.filter((p) => p.status === statusFilter);
-  }, [data, statusFilter]);
+  // Fetch high-level subject progress summary
+  const { data: subjectSummary, refetch, isFetching } = useSubjectProgress(
+    selectedSubjectId,
+    selectedClassSectionId,
+    CURRENT_SESSION
+  );
 
-  const handleEdit = useCallback((p: TeachingProgress) => { setEditItem(p); setFormOpen(true); }, []);
-  const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
-  const handleDeleteConfirm = useCallback(() => {
-    if (deleteTarget == null) return;
-    deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) });
-  }, [deleteTarget, deleteMutation]);
+  const items = useMemo(() => {
+    if (!statusFilter) return chapters;
+    // Note: status filter might not be directly applicable to SubjectChapter unless we have progress for each
+    return chapters;
+  }, [chapters, statusFilter]);
+
+  // Derive prefill from selected assignment
+  const prefill = useMemo(() => {
+    if (!selectedAssignment) return undefined;
+    const sd = mySubjects.find((s) => String(s.id) === selectedAssignment);
+    if (!sd) return undefined;
+    return {
+      className: sd.className ?? '',
+      sectionName: sd.sectionName ?? '',
+      subjectName: sd.subjectName ?? '',
+      classSectionId: sd.classDtlsId || sd.classSectionId,
+      subjectDtlsId: sd.subjectDtlsId || sd.subjectId,
+    };
+  }, [selectedAssignment, mySubjects]);
+
+  // Auto-select first assignment if available and nothing selected
+  useEffect(() => {
+    if (mySubjects.length > 0 && !selectedAssignment) {
+      setSelectedAssignment(String(mySubjects[0].id));
+    }
+  }, [mySubjects, selectedAssignment]);
+
+  const handleEdit = (ch: SubjectChapter) => {
+    setEditItem({
+      id: 0,
+      chapterId: ch.id,
+      subjectId: Number(selectedSubjectId),
+      classSectionId: Number(selectedClassSectionId),
+      status: 'not_started',
+      completionPercentage: 0,
+      session: CURRENT_SESSION,
+      schoolId: ch.schoolId,
+      topicId: 0,
+      createdAt: '',
+      updatedAt: ''
+    } as any);
+    setFormOpen(true);
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -46,23 +117,91 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
         <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
-        <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl">
+        <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl"
+          disabled={!selectedAssignment}>
           <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Log Progress</span>
         </Button>
       </AcademicPageHeader>
 
-      <ProgressAnalytics data={data ?? []} />
+      {/* Assignment selector */}
+      {mySubjects.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignment:</span>
+          <select
+            value={selectedAssignment}
+            onChange={(e) => setSelectedAssignment(e.target.value)}
+            className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all min-w-[280px]"
+          >
+            <option value="">— Select Class-Subject —</option>
+            {mySubjects.map((sd) => (
+              <option key={sd.id} value={String(sd.id)}>
+                {sd.className} {sd.sectionName} — {sd.subjectName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      <AcademicFilterBar searchTerm={statusFilter} onSearchChange={setStatusFilter} searchPlaceholder="Filter by status (completed, in_progress, not_started)..."
+      {subjectSummary && (
+        <Card className="rounded-2xl border-none shadow-lg shadow-slate-200/30 bg-teal-50/30 border border-teal-100 overflow-hidden">
+          <CardContent className="p-6">
+            {(() => {
+              const d = (subjectSummary as any).data ?? subjectSummary;
+              const percentage = d.overallPercentage ?? d.completionPercentage ?? 0;
+              const chaptersCount = d.chaptersCount ?? d.chapters?.length ?? 0;
+              
+              return (
+                <>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Overall Subject Progress</p>
+                      <h3 className="text-xl font-bold text-slate-900">
+                        {mySubjects.find(s => String(s.id) === selectedAssignment)?.subjectName}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-teal-700">{percentage}%</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Completion</p>
+                      </div>
+                      <div className="h-12 w-[1px] bg-teal-100 hidden md:block" />
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-slate-700">{chaptersCount}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chapters</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6 h-2 w-full bg-teal-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-teal-500 rounded-full transition-all duration-1000"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Subject Coverage Analytics */}
+      {subjectSummary && (
+        <ProgressAnalytics summary={subjectSummary} />
+      )}
+
+      <AcademicFilterBar searchTerm={statusFilter} onSearchChange={setStatusFilter} searchPlaceholder="Filter by status (completed, IN_PROGRESS, not_started)..."
         onClear={() => setStatusFilter('')} hasActiveFilters={!!statusFilter} />
 
-      <ProgressTable items={items} isLoading={isLoading} onEdit={handleEdit} onDelete={handleDelete} />
+      <ChapterProgressTable 
+        chapters={items} 
+        classSectionId={selectedClassSectionId} 
+        isLoading={chaptersLoading} 
+        onEdit={handleEdit} 
+      />
 
       <ProgressFormModal open={isFormOpen} onOpenChange={setFormOpen} editItem={editItem}
-        onSuccess={() => { setFormOpen(false); setEditItem(null); }} />
-
-      <DeleteConfirmDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title="Delete Progress Entry" description="This will remove this progress record." onConfirm={handleDeleteConfirm} loading={deleteMutation.isPending} />
+        prefill={prefill}
+        onSuccess={() => { setFormOpen(false); setEditItem(null); refetch(); }} />
     </div>
   );
 }

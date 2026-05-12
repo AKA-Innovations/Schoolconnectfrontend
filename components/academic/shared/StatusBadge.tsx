@@ -21,7 +21,8 @@ interface Props {
 }
 
 export const StatusBadge = React.memo(function StatusBadge({ status, className }: Props) {
-  const config = STATUS_CONFIG[status.toLowerCase()] ?? STATUS_CONFIG.pending;
+  const normalizedStatus = (status || 'pending').toLowerCase();
+  const config = STATUS_CONFIG[normalizedStatus] ?? STATUS_CONFIG.pending;
 
   return (
     <div

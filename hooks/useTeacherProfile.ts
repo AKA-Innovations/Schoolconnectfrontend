@@ -36,7 +36,7 @@ export function useTeacherProfile() {
 
   return {
     user,
-    isClassTeacher: user?.isClassTeacher ?? false,
+    isClassTeacher: (user?.isClassTeacher || !!user?.classTeacherClass) ?? false,
     assignedClass: user?.classTeacherClass ?? null,
     isSyncing,
   };

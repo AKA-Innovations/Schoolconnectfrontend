@@ -1,20 +1,23 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/FormField';
 import { useCreateClasswork, useUpdateClasswork } from '@/hooks/useAcademic';
-import { useSubjectDetails } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { formatDate } from '@/lib/dateUtils';
+import { AssignmentSelector } from '../shared/AssignmentSelector';
+import { ChapterSelect } from '../shared/ChapterSelect';
+import { TopicSelect } from '../shared/TopicSelect';
 import type { Classwork } from '@/services/academic/types';
-import type { SubjectDetail } from '@/types/class.types';
 
 interface FormValues {
-  assignmentKey: string; // composite "className|sectionName|subjectName"
+  assignmentKey: string; // "className|sectionName|mappingId"
+  chapterId: string;
+  topicId: string;
   description: string;
   conductedOn: string;
 }
@@ -28,6 +31,8 @@ interface Props {
     className: string;
     sectionName: string;
     subjectId: string; // mapping ID
+    classSectionId: number;
+    subjectDtlsId: number;
   };
 }
 
@@ -39,40 +44,65 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
   const updateMutation = useUpdateClasswork();
   const isEditing = !!editItem;
 
-  // Get teacher's subject assignments from the teacher-subject mapping
-  const { data: allSubjectDetails = [] } = useSubjectDetails(user?.id);
+  const [selectedClassName, setSelectedClassName] = useState<string | undefined>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); // Mapping ID
+  const [selectedClassSectionId, setSelectedClassSectionId] = useState<number | undefined>();
+  const [selectedSubjectDtlsId, setSelectedSubjectDtlsId] = useState<number | undefined>();
 
-  // Filter to only this teacher's assignments for the current session
-  const myAssignments: SubjectDetail[] = useMemo(() => {
-    if (!user?.id) return [];
-    return allSubjectDetails.filter(sd => sd.session === CURRENT_SESSION);
-  }, [allSubjectDetails, user?.id]);
-
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormValues>({
-    defaultValues: { assignmentKey: '', description: '', conductedOn: '' },
+  const { register, handleSubmit, reset, control, watch, setValue, formState: { errors } } = useForm<FormValues>({
+    defaultValues: {
+      assignmentKey: '',
+      chapterId: '',
+      topicId: '',
+      description: '',
+      conductedOn: formatDate(new Date(), 'yyyy-MM-dd'),
+    },
   });
+
+  const assignmentKey = watch('assignmentKey');
+  const chapterId = watch('chapterId');
 
   useEffect(() => {
     if (editItem) {
       reset({
-        assignmentKey: '',
+        assignmentKey: '', // We don't change assignment on edit for now
+        chapterId: editItem.chapterId ? String(editItem.chapterId) : '',
+        topicId: editItem.topicId ? String(editItem.topicId) : '',
         description: editItem.description,
         conductedOn: formatDate(new Date(editItem.conductedOn), 'yyyy-MM-dd'),
       });
     } else if (prefill && open) {
       reset({
         assignmentKey: `${prefill.className}|${prefill.sectionName}|${prefill.subjectId}`,
+        chapterId: '',
+        topicId: '',
         description: '',
         conductedOn: formatDate(new Date(), 'yyyy-MM-dd'),
       });
+      setSelectedClassName(prefill.className);
+      setSelectedSubjectId(prefill.subjectId);
+      setSelectedClassSectionId(prefill.classSectionId);
+      setSelectedSubjectDtlsId(prefill.subjectDtlsId);
     } else {
       reset({
         assignmentKey: '',
+        chapterId: '',
+        topicId: '',
         description: '',
         conductedOn: formatDate(new Date(), 'yyyy-MM-dd'),
       });
     }
   }, [editItem, reset, prefill, open]);
+
+  // Handle dependent resets
+  useEffect(() => {
+    if (!assignmentKey) {
+      setSelectedClassName(undefined);
+      setSelectedSubjectId(undefined);
+      setSelectedClassSectionId(undefined);
+      setSelectedSubjectDtlsId(undefined);
+    }
+  }, [assignmentKey]);
 
   const onSubmit = (values: FormValues) => {
     if (isEditing) {
@@ -89,16 +119,25 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
       return;
     }
 
-    const [classId, sectionId, subjectId] = values.assignmentKey.split('|');
+    if (!selectedClassSectionId || !selectedSubjectDtlsId) {
+      console.error('Missing required IDs for classwork creation:', { 
+        classSectionId: selectedClassSectionId, 
+        subjectDtlsId: selectedSubjectDtlsId,
+        prefill: !!prefill,
+        isEditing
+      });
+      toast.error('Unable to resolve class/subject identifiers. Please re-select the class.');
+      return;
+    }
+
     createMutation.mutate(
       {
         session: CURRENT_SESSION,
-        classId,
-        sectionId,
-        subjectId,
+        classSectionId: selectedClassSectionId,
+        subjectId: selectedSubjectDtlsId,
+        chapterId: values.chapterId ? Number(values.chapterId) : undefined,
+        topicId: values.topicId ? Number(values.topicId) : undefined,
         description: values.description,
-        conductedOn: new Date(values.conductedOn).toISOString(),
-        teacherId: user?.id ?? '',
       },
       { onSuccess },
     );
@@ -113,48 +152,69 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
           <DialogTitle>{isEditing ? 'Edit Classwork' : 'Add Classwork'}</DialogTitle>
           {!isEditing && (
             <DialogDescription>
-              Log classwork for one of your classes. Selections are based on your teaching schedule.
+              Step-by-step: Select assignment, chapter, and topic to log classwork.
             </DialogDescription>
           )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Smart assignment picker — only shown when creating */}
           {!isEditing && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Class / Section / Subject *
-              </label>
-              <Controller
-                name="assignmentKey"
-                control={control}
-                rules={{ required: 'Please select a class assignment' }}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">— Select your class —</option>
-                    {myAssignments.length === 0 ? (
-                      <option disabled value="">No assignments found for this session</option>
-                    ) : (
-                      myAssignments.map((sd) => (
-                        <option
-                          key={sd.id}
-                          value={`${sd.className}|${sd.sectionName}|${sd.id}`}
-                        >
-                          Class {sd.className} — {sd.sectionName} &nbsp;|&nbsp; {sd.subjectName}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-              />
-              {errors.assignmentKey && (
-                <p className="text-xs text-destructive">{errors.assignmentKey.message}</p>
+            <Controller
+              name="assignmentKey"
+              control={control}
+              rules={{ required: 'Required' }}
+              render={({ field }) => (
+                <AssignmentSelector
+                  value={field.value}
+                  error={errors.assignmentKey?.message}
+                  onChange={(val, detail) => {
+                    field.onChange(val);
+                    setSelectedClassName(detail?.className);
+                    setSelectedSubjectId(detail?.subjectId);
+                    setSelectedClassSectionId(detail?.classSectionId);
+                    setSelectedSubjectDtlsId(detail?.subjectDtlsId);
+                    setValue('chapterId', '');
+                    setValue('topicId', '');
+                  }}
+                />
               )}
-            </div>
+            />
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <Controller
+              name="chapterId"
+              control={control}
+              render={({ field }) => (
+                <ChapterSelect
+                  className={selectedClassName}
+                  subjectId={selectedSubjectId}
+                  value={field.value}
+                  onChange={(val) => {
+                    field.onChange(val);
+                    setValue('topicId', '');
+                  }}
+                  error={errors.chapterId?.message}
+                  disabled={!assignmentKey}
+                />
+              )}
+            />
+
+            <Controller
+              name="topicId"
+              control={control}
+              render={({ field }) => (
+                <TopicSelect
+                  chapterId={chapterId}
+                  subjectId={selectedSubjectDtlsId}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.topicId?.message}
+                  disabled={!chapterId}
+                />
+              )}
+            />
+          </div>
 
           <FormField label="Description / What was covered" error={errors.description?.message} required>
             <textarea

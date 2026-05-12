@@ -114,10 +114,8 @@ export const ChapterFormModal = React.memo(function ChapterFormModal({
       createMutation.mutate(
         {
           session: CURRENT_SESSION,
-          className: values.className,
-          sectionName: values.sectionName,
-          subjectId: values.subjectId,
-          chapterDetails: [{ chapterName: values.chapterName, sequenceNo: values.sequenceNo }],
+          subjectId: Number(values.subjectId),
+          chapters: [{ chapterName: values.chapterName, sequenceNo: values.sequenceNo }],
         },
         { onSuccess: () => {
           onSuccess();

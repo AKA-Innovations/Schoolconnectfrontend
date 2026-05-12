@@ -13,7 +13,7 @@ import {
   useSubjectDetails, useCreateSubjectDetail,
   useUpdateSubjectDetail, useDeleteSubjectDetail,
   useSubjectOptions, useClassSectionLists,
-  useClassList,
+  useClassList, useSchoolClasses,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -21,13 +21,14 @@ import { Plus, Pencil, Trash2, Search, X, Save, BookOpen, Users } from 'lucide-r
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
 
-const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectName: '' };
+const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectId: 0 };
 
 export default function SubjectDetailsPage() {
   const { data: mappings = [], isLoading } = useSubjectDetails();
   const { data: subjects = [] } = useSubjectOptions();
   const { data: classSections = [] } = useClassSectionLists();
   const { data: uniqueClasses = [] } = useClassList();
+  const { data: schoolClasses = [] } = useSchoolClasses();
   
   const schoolId = useAuthStore((s) => s.schoolId);
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
@@ -52,37 +53,45 @@ export default function SubjectDetailsPage() {
 
   // Available subjects filtered to the selected class-section
   const selectedSection = classSections.find((cs) => cs.id === form.classSectionId);
-  const availableSubjects = subjects.filter((s) => {
-  if (!selectedSection) return false;
-
-  return String(s.className) === String(selectedSection.className);
-});
+  // Subjects are session-global — show all available subjects
+  const availableSubjects = subjects;
 
   const filtered = mappings.filter((m) => {
     const q = search.toLowerCase();
     const resolvedName = teacherNameMap.get(m.teacherId) || m.teacherName || m.teacherId;
     return (
-      m.className.toLowerCase().includes(q) ||
-      m.sectionName.toLowerCase().includes(q) ||
+      (m.className ?? '').toLowerCase().includes(q) ||
+      (m.sectionName ?? '').toLowerCase().includes(q) ||
       resolvedName.toLowerCase().includes(q) ||
-      m.subjectName.toLowerCase().includes(q)
+      (m.subjectName ?? '').toLowerCase().includes(q)
     );
   });
 
   const buildPayload = () => {
-    if (!selectedSection) return null;
+    const selectedSubject = subjects.find(s => s.id === form.subjectId);
+    if (!selectedSection || !selectedSubject) return null;
+
+    // Ensure classId is present, resolve from schoolClasses if missing
+    let classId = selectedSection.classId;
+    if (!classId) {
+      const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+      classId = sc?.id || 0;
+    }
+
     return {
-      session: CURRENT_SESSION,
-      teacherId: form.teacherId,
-      className: selectedSection.className,
-      sectionName: selectedSection.sectionName,
-      subjectName: form.subjectName,
+      entries: [{
+        session: CURRENT_SESSION,
+        teacherId: form.teacherId,
+        classId,
+        classSectionId: selectedSection.id,
+        subjectId: selectedSubject.id,
+      }]
     };
   };
 
   const handleSave = async () => {
     const payload = buildPayload();
-    if (!payload || !form.teacherId || !form.subjectName) {
+    if (!payload || !form.teacherId || !form.subjectId) {
       toast.error('All fields are required');
       return;
     }
@@ -111,10 +120,15 @@ export default function SubjectDetailsPage() {
 
   const startEdit = (m: any) => {
     setEditId(m.id);
+    // Find classSectionId by matching className and sectionName
     const cs = classSections.find(
-      (s) => s.className === m.className && s.sectionName === m.sectionName,
+      (c) => c.className === m.className && c.sectionName === m.sectionName
     );
-    setForm({ teacherId: m.teacherId, classSectionId: cs?.id ?? 0, subjectName: m.subjectName });
+    setForm({ 
+      teacherId: m.teacherId, 
+      classSectionId: cs?.id || 0, 
+      subjectId: m.subjectId 
+    });
     setShowAdd(true);
   };
 
@@ -143,7 +157,7 @@ export default function SubjectDetailsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class / Section *</Label>
-                <Select value={form.classSectionId ? String(form.classSectionId) : ''} onValueChange={(v) => setForm({ ...form, classSectionId: Number(v), subjectName: '' })}>
+                <Select value={form.classSectionId ? String(form.classSectionId) : ''} onValueChange={(v) => setForm({ ...form, classSectionId: Number(v) })}>
                   <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
                     {classSections.map((cs) => (
@@ -169,11 +183,11 @@ export default function SubjectDetailsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
-                <Select value={form.subjectName} onValueChange={(v) => setForm({ ...form, subjectName: v })} disabled={!form.classSectionId}>
+                <Select value={form.subjectId ? String(form.subjectId) : ''} onValueChange={(v) => setForm({ ...form, subjectId: Number(v) })} disabled={!form.classSectionId}>
                   <SelectTrigger className="rounded-xl"><SelectValue placeholder={form.classSectionId ? 'Select subject' : 'Select class first'} /></SelectTrigger>
                   <SelectContent>
                     {availableSubjects.map((s) => (
-                      <SelectItem key={s.id} value={s.subjectName}>
+                      <SelectItem key={s.id} value={String(s.id)}>
                         {s.subjectName}
                       </SelectItem>
                     ))}

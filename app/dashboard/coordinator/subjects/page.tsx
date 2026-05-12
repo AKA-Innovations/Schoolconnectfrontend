@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   useClassSectionLists, useSubjectDetails, useSubjectOptions,
   useCreateSubjectDetail, useDeleteSubjectDetail,
+  useSchoolClasses,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -23,6 +24,7 @@ export default function CoordinatorSubjectsPage() {
   const { data: allClassSections = [], isLoading: loadingCs } = useClassSectionLists();
   const { data: subjectDetails = [], isLoading: loadingSd } = useSubjectDetails();
   const { data: subjectOptions = [] } = useSubjectOptions();
+  const { data: schoolClasses = [] } = useSchoolClasses();
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
   const allTeachers = teachersData?.data ?? [];
 
@@ -39,7 +41,7 @@ export default function CoordinatorSubjectsPage() {
       if (!search) return subjectDetails;
       const q = search.toLowerCase();
       return subjectDetails.filter(
-        (sd) => sd.className.toLowerCase().includes(q) || sd.subjectName.toLowerCase().includes(q),
+        (sd) => (sd.className ?? '').toLowerCase().includes(q) || (sd.subjectName ?? '').toLowerCase().includes(q),
       );
     }
     return subjectDetails.filter(
@@ -48,15 +50,11 @@ export default function CoordinatorSubjectsPage() {
   }, [subjectDetails, selectedSection, search]);
 
   // Available subject options for the selected class
-  const classSubjectOptions: SubjectOption[] = useMemo(
-    () => selectedSection
-      ? subjectOptions.filter((so) => so.className === selectedSection.className)
-      : subjectOptions,
-    [subjectOptions, selectedSection],
-  );
+  // Subjects are session-global — show all
+  const classSubjectOptions: SubjectOption[] = subjectOptions;
 
   const [showAdd, setShowAdd] = useState(false);
-  const [addSubject, setAddSubject] = useState('');
+  const [addSubjectId, setAddSubjectId] = useState('');
   const [addTeacherId, setAddTeacherId] = useState('');
 
   const createMutation = useCreateSubjectDetail();
@@ -65,16 +63,32 @@ export default function CoordinatorSubjectsPage() {
   const handleAdd = () => {
     const cn = selectedSection?.className ?? '';
     const sn = selectedSection?.sectionName ?? '';
-    if (!cn || !sn || !addSubject || !addTeacherId) {
+    const opt = classSubjectOptions.find(o => o.id === Number(addSubjectId));
+    if (!cn || !sn || !opt || !addTeacherId || !selectedSection) {
       toast.error('Please select a class/section, subject, and teacher');
       return;
     }
+    // Ensure classId is present, resolve from schoolClasses if missing
+    let classId = selectedSection.classId;
+    if (!classId) {
+      const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+      classId = sc?.id || 0;
+    }
+
     createMutation.mutate(
-      { session: CURRENT_SESSION, teacherId: addTeacherId, className: cn, sectionName: sn, subjectName: addSubject },
+      {
+        entries: [{
+          session: CURRENT_SESSION,
+          teacherId: addTeacherId,
+          classId,
+          classSectionId: selectedSection.id,
+          subjectId: opt.id
+        }]
+      },
       {
         onSuccess: () => {
           toast.success('Subject mapping created');
-          setAddSubject('');
+          setAddSubjectId('');
           setAddTeacherId('');
           setShowAdd(false);
         },
@@ -122,7 +136,7 @@ export default function CoordinatorSubjectsPage() {
               classSections.map((cs) => (
                 <button
                   key={cs.id}
-                  onClick={() => { setSelectedId(cs.id); setShowAdd(false); setAddSubject(''); setAddTeacherId(''); }}
+                  onClick={() => { setSelectedId(cs.id); setShowAdd(false); setAddSubjectId(''); setAddTeacherId(''); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${selectedId === cs.id ? 'bg-primary text-white' : 'bg-muted hover:bg-muted/70 text-foreground'}`}
                 >
                   {cs.className} — {cs.sectionName}
@@ -144,13 +158,13 @@ export default function CoordinatorSubjectsPage() {
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Subject *</label>
                 <select
-                  value={addSubject}
-                  onChange={(e) => setAddSubject(e.target.value)}
+                  value={addSubjectId}
+                  onChange={(e) => setAddSubjectId(e.target.value)}
                   className="w-full h-9 px-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Select subject…</option>
                   {classSubjectOptions.map((so) => (
-                    <option key={so.id} value={so.subjectName}>{so.subjectName}</option>
+                    <option key={so.id} value={String(so.id)}>{so.subjectName}</option>
                   ))}
                 </select>
               </div>

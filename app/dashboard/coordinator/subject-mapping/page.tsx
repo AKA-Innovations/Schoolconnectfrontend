@@ -12,7 +12,7 @@ import {
 import {
   useSubjectDetails, useCreateSubjectDetail,
   useUpdateSubjectDetail, useDeleteSubjectDetail,
-  useSubjectOptions, useClassSectionLists,
+  useSubjectOptions, useClassSectionLists, useSchoolClasses,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -20,7 +20,7 @@ import { Plus, Pencil, Trash2, Search, X, Save, Users, Layers } from 'lucide-rea
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
 
-const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectName: '' };
+const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectId: 0 };
 
 export default function CoordinatorSubjectMappingPage() {
   const user = useAuthStore((s) => s.user);
@@ -30,6 +30,7 @@ export default function CoordinatorSubjectMappingPage() {
   const { data: allMappings = [], isLoading } = useSubjectDetails();
   const { data: allSubjects = [] } = useSubjectOptions();
   const { data: allClassSections = [] } = useClassSectionLists();
+  const { data: schoolClasses = [] } = useSchoolClasses();
   
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
   const teachers = teachersData?.data ?? [];
@@ -48,12 +49,8 @@ export default function CoordinatorSubjectMappingPage() {
     [allClassSections, coordClassNames]
   );
   
-  const subjects = useMemo(
-    () => coordClassNames.length > 0
-      ? allSubjects.filter((s) => coordClassNames.includes(String(s.className)))
-      : allSubjects,
-    [allSubjects, coordClassNames]
-  );
+  // Subjects are session-global (not class-scoped) — show all
+  const subjects = allSubjects;
 
   const mappings = useMemo(
     () => coordClassNames.length > 0
@@ -80,36 +77,45 @@ export default function CoordinatorSubjectMappingPage() {
 
   // Available subjects filtered to the selected class-section
   const selectedSection = classSections.find((cs) => cs.id === form.classSectionId);
-  const availableSubjects = subjects.filter((s) => {
-    if (!selectedSection) return false;
-    return String(s.className) === String(selectedSection.className);
-  });
+  // Subjects are session-global — show all available subjects
+  const availableSubjects = allSubjects;
 
   const filtered = mappings.filter((m) => {
     const q = search.toLowerCase();
     const resolvedName = teacherNameMap.get(m.teacherId) || m.teacherName || m.teacherId;
     return (
-      m.className.toLowerCase().includes(q) ||
-      m.sectionName.toLowerCase().includes(q) ||
+      (m.className ?? '').toLowerCase().includes(q) ||
+      (m.sectionName ?? '').toLowerCase().includes(q) ||
       resolvedName.toLowerCase().includes(q) ||
-      m.subjectName.toLowerCase().includes(q)
+      (m.subjectName ?? '').toLowerCase().includes(q)
     );
   });
 
   const buildPayload = () => {
-    if (!selectedSection) return null;
+    const selectedSubject = allSubjects.find(s => s.id === form.subjectId);
+    if (!selectedSection || !selectedSubject) return null;
+
+    // Ensure classId is present, resolve from schoolClasses if missing
+    let classId = selectedSection.classId;
+    if (!classId) {
+      const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+      classId = sc?.id || 0;
+    }
+
     return {
-      session: CURRENT_SESSION,
-      teacherId: form.teacherId,
-      className: selectedSection.className,
-      sectionName: selectedSection.sectionName,
-      subjectName: form.subjectName,
+      entries: [{
+        session: CURRENT_SESSION,
+        teacherId: form.teacherId,
+        classId,
+        classSectionId: selectedSection.id,
+        subjectId: selectedSubject.id,
+      }]
     };
   };
 
   const handleSave = async () => {
     const payload = buildPayload();
-    if (!payload || !form.teacherId || !form.subjectName) {
+    if (!payload || !form.teacherId || !form.subjectId) {
       toast.error('All fields are required');
       return;
     }
@@ -138,10 +144,15 @@ export default function CoordinatorSubjectMappingPage() {
 
   const startEdit = (m: any) => {
     setEditId(m.id);
-    const cs = classSections.find(
-      (s) => s.className === m.className && s.sectionName === m.sectionName,
+    // Find classSectionId by matching className and sectionName
+    const cs = allClassSections.find(
+      (c) => c.className === m.className && c.sectionName === m.sectionName
     );
-    setForm({ teacherId: m.teacherId, classSectionId: cs?.id ?? 0, subjectName: m.subjectName });
+    setForm({ 
+      teacherId: m.teacherId, 
+      classSectionId: cs?.id || 0, 
+      subjectId: m.subjectId 
+    });
     setShowAdd(true);
   };
 
@@ -175,7 +186,7 @@ export default function CoordinatorSubjectMappingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class / Section *</Label>
-                <Select value={form.classSectionId ? String(form.classSectionId) : ''} onValueChange={(v) => setForm({ ...form, classSectionId: Number(v), subjectName: '' })}>
+                <Select value={form.classSectionId ? String(form.classSectionId) : ''} onValueChange={(v) => setForm({ ...form, classSectionId: Number(v) })}>
                   <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select class" /></SelectTrigger>
                   <SelectContent>
                     {classSections.map((cs) => (
@@ -201,11 +212,11 @@ export default function CoordinatorSubjectMappingPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
-                <Select value={form.subjectName} onValueChange={(v) => setForm({ ...form, subjectName: v })} disabled={!form.classSectionId}>
+                <Select value={form.subjectId ? String(form.subjectId) : ''} onValueChange={(v) => setForm({ ...form, subjectId: Number(v) })} disabled={!form.classSectionId}>
                   <SelectTrigger className="rounded-xl"><SelectValue placeholder={form.classSectionId ? 'Select subject' : 'Select class first'} /></SelectTrigger>
                   <SelectContent>
                     {availableSubjects.map((s) => (
-                      <SelectItem key={s.id} value={s.subjectName}>
+                      <SelectItem key={s.id} value={String(s.id)}>
                         {s.subjectName}
                       </SelectItem>
                     ))}

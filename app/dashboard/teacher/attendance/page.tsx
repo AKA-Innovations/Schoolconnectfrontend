@@ -9,10 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ClipboardCheck, Save, CheckCircle2, XCircle, Clock, AlertCircle, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useStudentList } from '@/hooks/useStudents';
-import { useBulkAttendance, useFilterAttendance } from '@/hooks/useStudents';
+import { useStudentList, useBulkAttendance, useFilterAttendance, useUpdateAttendance } from '@/hooks/useStudents';
+import { useClassSectionLists } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { RefreshCw } from 'lucide-react';
 
 const statusOptions = ['Present', 'Absent', 'Late', 'HalfDay'] as const;
 type AttendanceStatus = typeof statusOptions[number];
@@ -33,27 +35,51 @@ const statusIcons: Record<AttendanceStatus, React.ReactNode> = {
 
 export default function AttendancePage() {
   const user = useAuthStore((s) => s.user);
-  const isClassTeacher = user?.isClassTeacher ?? false;
   const assignedClass = user?.classTeacherClass ?? null;
 
-  const [className] = useState(assignedClass?.className ?? '');
-  const [sectionName] = useState(assignedClass?.sectionName ?? '');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});
 
+  const { data: allSections = [] } = useClassSectionLists();
+  
+  // Resolve assignedClass names if they are missing but ID is present (lookup from allSections)
+  const resolvedAssignedClass = useMemo(() => {
+    if (!assignedClass) return null;
+    if (assignedClass.className && assignedClass.sectionName) return assignedClass;
+
+    // Try to find names in allSections list by ID (check multiple possible ID fields)
+    const match = allSections.find(s => 
+      s.id === assignedClass.classDtlsId || 
+      s.id === assignedClass.id ||
+      s.mappingId === assignedClass.id ||
+      s.mappingId === assignedClass.classDtlsId
+    );
+    if (match) {
+      return {
+        ...assignedClass,
+        className: match.className,
+        sectionName: match.sectionName
+      };
+    }
+    return assignedClass;
+  }, [assignedClass, allSections]);
+
+  const className = resolvedAssignedClass?.className || '';
+  const sectionName = resolvedAssignedClass?.sectionName || '';
+  const targetId = resolvedAssignedClass?.classDtlsId;
+
   const { data: studentData, isLoading: studentsLoading } = useStudentList({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
+    classSectionId: targetId,
     limit: 100,
   });
 
   const { data: existingAttendance } = useFilterAttendance({
-    className: className || undefined,
-    sectionName: sectionName || undefined,
+    classSectionId: targetId,
     date,
   });
 
   const bulkMutation = useBulkAttendance();
+  const updateMutation = useUpdateAttendance();
   const students = studentData?.items ?? [];
   const existingAttendanceRecords = useMemo(() => {
     if (Array.isArray(existingAttendance)) return existingAttendance;
@@ -67,7 +93,12 @@ export default function AttendancePage() {
     if (students.length === 0) return;
     const map: Record<string, { status: AttendanceStatus; remarks: string }> = {};
     students.forEach(s => {
-      const existing = existingAttendanceRecords.find((a: any) => a.studentId === s.id);
+      const studentRoll = s.academics?.[0]?.rollNumber;
+      const existing = existingAttendanceRecords.find((a: any) => 
+        (a.studentId && a.studentId === s.id) || 
+        (studentRoll && (a.studentRollNumber === studentRoll || a.rollNumber === studentRoll))
+      );
+      
       map[s.id] = {
         status: existing?.status as AttendanceStatus ?? 'Present',
         remarks: existing?.remarks ?? '',
@@ -94,18 +125,63 @@ export default function AttendancePage() {
 
   const handleSubmit = () => {
     if (!date || students.length === 0) return;
+    
+    // The bulk API strictly expects only studentId and attendanceStatus
     const attendance = Object.entries(attendanceMap).map(([studentId, { status }]) => ({
       studentId,
       attendanceStatus: status,
     }));
-    bulkMutation.mutate({ date, attendance }, {
-      onSuccess: () => {
-        toast.success('Attendance records synchronized successfully');
-      },
-      onError: (err: any) => {
-        toast.error(err.response?.data?.message || 'Failed to submit attendance');
+
+    bulkMutation.mutate(
+      { 
+        date, 
+        session: CURRENT_SESSION,
+        attendance 
+      }, 
+      {
+        onSuccess: () => {
+          toast.success('Attendance marked successfully for the class');
+        },
+        onError: (err: any) => {
+          toast.error(err.response?.data?.message || 'Failed to submit attendance');
+        }
       }
-    });
+    );
+  };
+
+  const handleIndividualUpdate = (studentId: string) => {
+    const att = attendanceMap[studentId];
+    const studentRoll = students.find(s => s.id === studentId)?.academics?.[0]?.rollNumber;
+    
+    const existing = existingAttendanceRecords.find((a: any) => 
+      (a.studentId && a.studentId === studentId) || 
+      (studentRoll && (a.studentRollNumber === studentRoll || a.rollNumber === studentRoll))
+    );
+
+    const recordId = existing?.recordId || existing?.id;
+    
+    if (!recordId) {
+      toast.error('No existing record found to update. Use bulk save instead.');
+      return;
+    }
+
+    updateMutation.mutate(
+      { 
+        recordId, 
+        data: { 
+          status: att.status as any,
+          attendanceStatus: att.status 
+        } 
+      },
+      {
+        onSuccess: () => {
+          toast.success('Record updated successfully');
+        },
+        onError: (err: any) => {
+          toast.error(err.response?.data?.message || 'Failed to update record');
+        }
+      }
+    );
   };
 
   const summary = useMemo(() => {
@@ -116,8 +192,11 @@ export default function AttendancePage() {
 
   const hasClass = !!(className && sectionName);
 
-  // ── Not a class teacher → show access-denied card ──────────────────────────
-  if (!isClassTeacher || !assignedClass) {
+  // ── Access Check ──────────────────────────────────────────────────────────
+  // Allow entry if they have a resolved assigned class from profile
+  const canAccess = !!resolvedAssignedClass;
+
+  if (!canAccess) {
     return (
       <div className="m-4 space-y-6 animate-in fade-in duration-500">
         <div className="space-y-1">
@@ -175,9 +254,13 @@ export default function AttendancePage() {
               <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl h-10" />
             </div>
             <div className="flex items-end">
-              <Button onClick={handleSubmit} disabled={!hasClass || students.length === 0 || bulkMutation.isPending}
-                className="w-full rounded-xl h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs">
-                <Save size={14} className="mr-2" />{bulkMutation.isPending ? 'Saving...' : 'Save Attendance'}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!hasClass || students.length === 0 || bulkMutation.isPending || existingAttendanceRecords.length > 0}
+                className="w-full rounded-xl h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs"
+              >
+                <Save size={14} className="mr-2" />
+                {existingAttendanceRecords.length > 0 ? 'Attendance Already Marked' : (bulkMutation.isPending ? 'Saving...' : 'Save Attendance')}
               </Button>
             </div>
           </div>
@@ -285,8 +368,41 @@ export default function AttendancePage() {
                           </div>
                         </TableCell>
                         <TableCell className="pr-6">
-                          <Input value={att?.remarks ?? ''} onChange={e => setStudentRemarks(student.id, e.target.value)}
-                            placeholder="Optional" className="rounded-lg h-8 text-xs" />
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              value={att?.remarks ?? ''} 
+                              onChange={e => setStudentRemarks(student.id, e.target.value)}
+                              placeholder="Optional" 
+                              className="rounded-lg h-8 text-xs flex-1" 
+                            />
+                            {(() => {
+                              const studentRoll = student.academics?.[0]?.rollNumber;
+                              const existing = existingAttendanceRecords.find((a: any) => 
+                                (a.studentId && a.studentId === student.id) || 
+                                (studentRoll && (a.studentRollNumber === studentRoll || a.rollNumber === studentRoll))
+                              );
+                              
+                              if (existing) {
+                                return (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleIndividualUpdate(student.id)}
+                                    disabled={updateMutation.isPending}
+                                    className="h-8 w-8 rounded-lg p-0 border-slate-200 hover:bg-primary/5 hover:text-primary transition-all"
+                                    title="Update this record only"
+                                  >
+                                    {updateMutation.isPending ? (
+                                      <RefreshCw size={12} className="animate-spin" />
+                                    ) : (
+                                      <Save size={12} />
+                                    )}
+                                  </Button>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

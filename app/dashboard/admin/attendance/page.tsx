@@ -44,15 +44,13 @@ export default function AdminAttendancePage() {
   const session = selClass?.session || '';
 
   const { data: attendance = [], isLoading: loadingAtt } = useFilterAttendance({
-    className,
-    sectionName,
+    classSectionId: selClass?.masterSectionId,
     session,
     date,
   });
 
   const { data: studentList } = useStudentList({
-    className,
-    sectionName,
+    classSectionId: selClass?.masterSectionId,
     limit: 500,
   });
   const students = (studentList as any)?.items ?? [];
@@ -132,8 +130,8 @@ export default function AdminAttendancePage() {
     if (!search) return allSections;
     const q = search.toLowerCase();
     return allSections.filter(s => 
-      s.className.toLowerCase().includes(q) || 
-      s.sectionName.toLowerCase().includes(q)
+      (s.className ?? '').toLowerCase().includes(q) || 
+      (s.sectionName ?? '').toLowerCase().includes(q)
     );
   }, [allSections, search]);
 

@@ -15,13 +15,20 @@ import type {
 } from './types';
 
 function mapClassTeacherAssignment(t: any): ClassTeacherAssignmentDetails | null {
-  const rawAssignment = t.classTeacherAssignment ?? t.classTeacherClasses?.[0] ?? null;
+  // Find the most detailed assignment source (preferring the one with classSectionsId)
+  const sources = [
+    t.classTeacherClasses?.[0],
+    t.classTeacherClass,
+    t.classTeacherAssignment
+  ].filter(Boolean);
+
+  const rawAssignment = sources.find(s => s.classSectionsId || s.classSectionId) || sources[0] || null;
 
   if (!rawAssignment) {
     return null;
   }
 
-  const classDtlsId = rawAssignment.classDtlsId ?? rawAssignment.classId ?? rawAssignment.id;
+  const classDtlsId = rawAssignment.classSectionsId ?? rawAssignment.classSectionId ?? rawAssignment.classDtlsId ?? rawAssignment.id ?? rawAssignment.classId;
 
   if (typeof classDtlsId !== 'number') {
     return null;
@@ -29,8 +36,8 @@ function mapClassTeacherAssignment(t: any): ClassTeacherAssignmentDetails | null
 
   return {
     classDtlsId,
-    className: rawAssignment.className ?? '',
-    sectionName: rawAssignment.sectionName ?? '',
+    className: rawAssignment.className ?? rawAssignment.class?.className ?? '',
+    sectionName: rawAssignment.sectionName ?? rawAssignment.section?.sectionName ?? rawAssignment.class?.sectionName ?? '',
     schoolId: rawAssignment.schoolId ?? t.schoolId ?? '',
   };
 }
@@ -39,7 +46,7 @@ function mapBackendTeacher(t: any): Teacher & { role: 'teacher', name: string, u
   const schoolRecord = t.schoolRecord ?? {};
   const firstName = t.firstName ?? '';
   const lastName = t.lastName ?? '';
-  
+
   return {
     id: t.id,
     role: 'teacher',
@@ -109,27 +116,35 @@ export const teacherService = {
 
     const response = await api.get(API_ENDPOINTS.TEACHER.BY_ID(userId));
     const teacherData = response.data?.data || response.data;
-    
+
     const details = teacherData?.data || teacherData;
-    
+
     // The backend provides classes in two lists: as a class teacher and as a coordinator
     const coordinatorClasses = (details.coordinatorClasses || []).map((c: any) => ({
-      id: `coord-${c.id}`,
+      id: `coord-${c.classSectionsId || c.classSectionId || c.id}`,
       name: c.className || 'Unnamed Class',
       subject: 'Coordinator',
       time: '—',
       room: '—',
     }));
 
-    const classTeacherClasses = (teacherData.classTeacherClasses || []).map((c: any) => ({
-      id: `ct-${c.id}`,
+    const classTeacherClasses = (details.classTeacherClasses || []).map((c: any) => ({
+      id: `ct-${c.classSectionsId || c.classSectionId || c.id}`,
       name: `${c.className} ${c.sectionName}`,
       subject: 'Class Teacher',
       time: '—',
       room: '—',
     }));
 
-    const mappedClasses = [...coordinatorClasses, ...classTeacherClasses];
+    const subjectTeacherClasses = (details.classes || []).map((c: any) => ({
+      id: `sub-${c.id || Math.random()}`,
+      name: `${c.className} ${c.sectionName}`,
+      subject: c.subjectName || 'Subject Teacher',
+      time: '—',
+      room: '—',
+    }));
+
+    const mappedClasses = [...coordinatorClasses, ...classTeacherClasses, ...subjectTeacherClasses];
 
     return {
       kpis: [

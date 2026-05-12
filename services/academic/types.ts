@@ -19,10 +19,8 @@ export interface ChapterDetail {
 
 export interface CreateSubjectChapterPayload {
   session: string;
-  className: string;
-  sectionName: string;
-  subjectId: string;
-  chapterDetails: ChapterDetail[];
+  subjectId: number;
+  chapters: ChapterDetail[];
 }
 
 export interface UpdateSubjectChapterPayload {
@@ -52,11 +50,9 @@ export interface TopicDetail {
 
 export interface CreateSubjectTopicPayload {
   session: string;
-  className: string;
-  sectionName: string;
-  subjectId: string;
+  subjectId: number;
   chapterId: number;
-  topicDetails: TopicDetail[];
+  topics: TopicDetail[];
 }
 
 export interface UpdateSubjectTopicPayload {
@@ -66,39 +62,68 @@ export interface UpdateSubjectTopicPayload {
 
 // ─── TeachingProgress ───────────────────────────────────────────────────────
 
-export type ProgressStatus = 'not_started' | 'in_progress' | 'completed';
+export type ProgressStatus = 'not_started' | 'IN_PROGRESS' | 'completed';
 
 export interface TeachingProgress {
   id: number;
   session: string;
   schoolId: string;
-  className: string;
-  sectionName: string;
-  subjectId: string;
+  classSectionId: number;
+  subjectId: number;
   chapterId: number;
   topicId: number;
-  teacherId: string;
   status: string;
-  completedOn: string | null;
+  completionPercentage: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateTeachingProgressPayload {
   session: string;
-  className: string;
-  sectionName: string;
-  subjectId: string;
+  classSectionId: number;
+  subjectId: number;
   chapterId: number;
-  topicId: number;
-  teacherId: string;
+  topicId?: number;
   status: string;
-  completedOn?: string;
+  completionPercentage: number;
 }
 
 export interface UpdateTeachingProgressPayload {
   status?: string;
+  completionPercentage?: number;
+}
+
+// ─── Progress Summaries ─────────────────────────────────────────────────────
+
+export interface SubjectProgressSummary {
+  totalTopics: number;
+  completedTopics: number;
+  overallPercentage: number;
+  completedSubjects?: number;
+  chapters?: {
+    chapterId: number;
+    chapterName: string;
+    totalTopics: number;
+    completedTopics: number;
+    completionPercentage: number;
+  }[];
+}
+
+export interface TopicProgressSummary {
+  topicId: number;
+  topicName: string;
+  status: string;
+  completionPercentage: number;
   completedOn?: string;
+}
+
+export interface ChapterProgressSummary {
+  chapterId: number;
+  chapterName?: string;
+  status: string;
+  completionPercentage: number;
+  topicsCount: number;
+  topics?: TopicProgressSummary[];
 }
 
 // ─── Homework ───────────────────────────────────────────────────────────────
@@ -123,15 +148,12 @@ export interface Homework {
 
 export interface CreateHomeworkPayload {
   session: string;
-  className: string;
-  sectionName: string;
-  subjectId: string;
+  classSectionId: number;
+  subjectId: number;
   chapterId?: number;
   topicId?: number;
   title: string;
   description: string;
-  assignedBy: string;
-  assignedDate: string;
   dueDate: string;
 }
 
@@ -139,6 +161,17 @@ export interface UpdateHomeworkPayload {
   title?: string;
   description?: string;
   dueDate?: string;
+}
+
+// ─── HomeworkAttachment ─────────────────────────────────────────────────────
+export interface HomeworkAttachment {
+  id: number;
+  session: string;
+  homeworkId: number;
+  documentPath: string;
+  signedUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── HomeworkDocument ───────────────────────────────────────────────────────
@@ -212,14 +245,11 @@ export interface Classwork {
 
 export interface CreateClassworkPayload {
   session: string;
-  classId: string;
-  sectionId: string;
-  subjectId: string;
+  classSectionId: number;
+  subjectId: number;
   chapterId?: number;
   topicId?: number;
   description: string;
-  conductedOn: string;
-  teacherId: string;
 }
 
 export interface UpdateClassworkPayload {
@@ -227,39 +257,35 @@ export interface UpdateClassworkPayload {
   conductedOn?: string;
 }
 
-// ─── TeacherStudyMaterial ───────────────────────────────────────────────────
-
-export interface TeacherStudyMaterial {
+// ─── StudyMaterial ──────────────────────────────────────────────────────────
+export interface StudyMaterial {
   id: number;
   session: string;
-  schoolId: string;
-  classId: string;
-  sectionId: string;
-  subjectId: string;
-  chapterId: number | null;
-  topicId: number | null;
+  classId: number;
+  classSectionId: number;
+  subjectId: number;
+  chapterId?: number;
+  topicId?: number;
   description: string;
   documentPath: string;
   signedUrl?: string;
-  teacherId: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UploadStudyMaterialPayload {
   session: string;
-  classId: string;
-  sectionId: string;
-  subjectId: string;
+  classId: number;
+  classSectionId: number;
+  subjectId: number;
   chapterId?: number;
   topicId?: number;
   description: string;
-  teacherId: string;
   file: File;
 }
 
 export interface UpdateStudyMaterialPayload {
-  description?: string;
+  description: string;
 }
 
 // ─── Filter Params ──────────────────────────────────────────────────────────
