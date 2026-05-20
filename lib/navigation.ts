@@ -82,6 +82,17 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
     { 
+      name: 'Exams & Results', 
+      href: '/dashboard/admin/exams', 
+      icon: ClipboardList,
+      subLinks: [
+        { name: 'Exam Master', href: '/dashboard/admin/exams' },
+        { name: 'Schedule Builder', href: '/dashboard/admin/exams/schedule-builder' },
+        { name: 'Result Monitoring', href: '/dashboard/admin/exams/results' },
+        { name: 'Report Cards', href: '/dashboard/admin/exams/report-cards' },
+      ]
+    },
+    { 
       name: 'School', 
       href: '/dashboard/admin/school', 
       icon: Building2,
@@ -144,6 +155,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
     { 
+      name: 'Exams', 
+      href: '/dashboard/teacher/exams/result-entry', 
+      icon: FileText,
+      subLinks: [
+        { name: 'Result Entry', href: '/dashboard/teacher/exams/result-entry' },
+      ]
+    },
+    { 
       name: 'Academic', 
       href: '/dashboard/teacher/academic', 
       icon: GraduationCap,
@@ -179,7 +198,17 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
   ],
-  student: [],
+  student: [
+    { 
+      name: 'Exams', 
+      href: '/dashboard/student/exams/schedule', 
+      icon: ClipboardList,
+      subLinks: [
+        { name: 'My Schedule', href: '/dashboard/student/exams/schedule' },
+        { name: 'Report Cards', href: '/dashboard/student/exams/report-card' },
+      ]
+    },
+  ],
   parent: [],
 };
 export const isLinkActive = (link: SidebarLink, pathname: string, searchParams: URLSearchParams) => {

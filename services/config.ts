@@ -110,7 +110,11 @@ export const API_ENDPOINTS = {
     HOMEWORK_SUBMISSION_BY_ID: (id: number) => `/academic/homework-submission/${id}`,
     CLASSWORK: '/academic/classwork',
     CLASSWORK_BY_ID: (id: number) => `/academic/classwork/${id}`,
-    STUDY_MATERIAL: '/academic/study-material',
-    STUDY_MATERIAL_BY_ID: (id: number) => `/academic/study-material/${id}`,
+    EXAM: '/academic/exam',
+    EXAM_BY_ID: (id: number) => `/academic/exam/${id}`,
+    EXAM_SCHEDULE: '/academic/exam-schedule',
+    EXAM_SCHEDULE_BY_ID: (id: number) => `/academic/exam-schedule/${id}`,
+    EXAM_RESULT: '/academic/exam-result',
+    EXAM_RESULT_BY_ID: (id: number) => `/academic/exam-result/${id}`,
   },
 } as const;

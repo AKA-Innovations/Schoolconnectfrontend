@@ -11,12 +11,18 @@ import {
 import {
   useSubjectOptions,
   useCreateSubjectOption,
-  useDeleteSubjectOption,
+  useUpdateSubjectOption,
   useClassList,
 } from '@/hooks/useClasses';
-import { Plus, Trash2, BookOpen, Search, X } from 'lucide-react';
+import { Plus, Edit2, BookOpen, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { CURRENT_SESSION } from '@/lib/constants';
 
 export default function SubjectsPage() {
@@ -24,7 +30,10 @@ export default function SubjectsPage() {
   const { data: uniqueclasses = [] } = useClassList();
 
   const createMutation = useCreateSubjectOption();
-  const deleteMutation = useDeleteSubjectOption();
+  const updateMutation = useUpdateSubjectOption();
+
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '' });
 
   const [search, setSearch] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
@@ -108,13 +117,26 @@ export default function SubjectsPage() {
     }
   };
 
-  // 🗑 Delete
-  const handleDelete = async (id: number) => {
+  // ✏️ Edit
+  const handleEditSave = async () => {
+    if (!editingSubject) return;
+    if (!editForm.subjectName.trim() || !editForm.subjectCode.trim()) {
+      toast.error('Both subject name and code are required');
+      return;
+    }
+
     try {
-      await deleteMutation.mutateAsync(id);
-      toast.success('Subject deleted');
+      await updateMutation.mutateAsync({
+        id: editingSubject.id,
+        data: {
+          subjectName: editForm.subjectName.trim(),
+          subjectCode: editForm.subjectCode.trim(),
+        },
+      });
+      toast.success('Subject updated successfully');
+      setEditingSubject(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete subject');
+      toast.error(err.response?.data?.message || 'Failed to update subject');
     }
   };
 
@@ -291,9 +313,12 @@ export default function SubjectsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(s.id)}
+                        onClick={() => {
+                          setEditingSubject(s);
+                          setEditForm({ subjectName: s.subjectName, subjectCode: s.subjectCode || '' });
+                        }}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                     </td>
                   </tr>
@@ -329,6 +354,41 @@ export default function SubjectsPage() {
 
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingSubject} onOpenChange={(open) => !open && setEditingSubject(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Subject</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Subject Name</Label>
+              <Input
+                value={editForm.subjectName}
+                onChange={(e) => setEditForm({ ...editForm, subjectName: e.target.value })}
+                placeholder="E.g. Mathematics"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject Code</Label>
+              <Input
+                value={editForm.subjectCode}
+                onChange={(e) => setEditForm({ ...editForm, subjectCode: e.target.value })}
+                placeholder="E.g. MATH"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingSubject(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={(updateMutation as any).isPending || (updateMutation as any).isLoading}>
+              {((updateMutation as any).isPending || (updateMutation as any).isLoading) ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
