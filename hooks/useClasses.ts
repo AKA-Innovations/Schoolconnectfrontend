@@ -82,7 +82,7 @@ export function useClassSummary() {
   const schoolId = useAuthStore((s) => s.schoolId);
   return useQuery({
     queryKey: classKeys.summary(),
-    queryFn: () => classService.getClassSummary(schoolId || ''),
+    queryFn: () => classService.getClassSummary(schoolId || '', CURRENT_SESSION),
     enabled: !!schoolId,
   });
 }
@@ -329,7 +329,7 @@ export function useCreateSubjectDetail() {
 export function useUpdateSubjectDetail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => classService.updateSubjectDetail(id, data),
+    mutationFn: ({ id, data }: { id: number | string; data: any }) => classService.updateSubjectDetail(id as any, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: subjectDetailKeys.all }),
   });
 }
@@ -337,7 +337,7 @@ export function useUpdateSubjectDetail() {
 export function useDeleteSubjectDetail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => classService.deleteSubjectDetail(id),
+    mutationFn: (id: number | string) => classService.deleteSubjectDetail(id as any),
     onSuccess: () => qc.invalidateQueries({ queryKey: subjectDetailKeys.all }),
   });
 }

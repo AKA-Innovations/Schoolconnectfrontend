@@ -179,14 +179,14 @@ export default function CoordinatorWorkspacePage() {
   const allCoordTeachers = new Set(allCoordSubjects.map((sd) => sd.teacherId));
 
   async function handleAddSubject() {
-    if (!newSubjectOptionId || !newTeacherId || !className || !sectionName) {
+    if (!selectedSection || !newSubjectOptionId || !newTeacherId || !className || !sectionName) {
       toast.error('Select a subject and teacher first');
       return;
     }
     const opt = subjectOptions.find((o) => o.id === Number(newSubjectOptionId));
     if (!opt) return;
     // Ensure classId is present, resolve from schoolClasses if missing
-    let classId = selectedSection.classId;
+    let classId = (selectedSection as any).classId;
     if (!classId) {
       const sc = schoolClasses.find((c) => c.className === selectedSection.className);
       classId = sc?.id || 0;
@@ -198,7 +198,7 @@ export default function CoordinatorWorkspacePage() {
           session: CURRENT_SESSION,
           teacherId: newTeacherId,
           classId,
-          classSectionId: selectedSection.id,
+          classSectionId: selectedSection.masterSectionId,
           subjectId: opt.id,
         }]
       });
@@ -210,7 +210,7 @@ export default function CoordinatorWorkspacePage() {
     }
   }
 
-  async function handleDeleteSubject(id: number) {
+  async function handleDeleteSubject(id: number | string) {
     try {
       await deleteSubjectDetail.mutateAsync(id);
       toast.success('Subject removed');
@@ -252,9 +252,14 @@ export default function CoordinatorWorkspacePage() {
   }
 
   async function handleAssignClassTeacher() {
-    if (!newCtTeacherId || !selectedId) return;
+    if (!newCtTeacherId || !selectedId || !selectedSection) return;
     try {
-      await addClassTeacher.mutateAsync({ teacherId: newCtTeacherId, classDtlsId: selectedId });
+      await addClassTeacher.mutateAsync({
+        classTeacherId: newCtTeacherId,
+        className: selectedSection.className,
+        sectionName: selectedSection.sectionName,
+        schoolId,
+      });
       toast.success('Class teacher assigned');
       setNewCtTeacherId('');
     } catch (e: any) {
@@ -263,9 +268,14 @@ export default function CoordinatorWorkspacePage() {
   }
 
   async function handleRemoveClassTeacher() {
-    if (!currentCT || !selectedId) return;
+    if (!currentCT || !selectedId || !selectedSection) return;
     try {
-      await removeClassTeacher.mutateAsync({ teacherId: currentCT.id, classDtlsId: selectedId });
+      await removeClassTeacher.mutateAsync({
+        classTeacherId: currentCT.id,
+        className: selectedSection.className,
+        sectionName: selectedSection.sectionName,
+        schoolId,
+      });
       toast.success('Class teacher removed');
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Failed — admin permission may be required');

@@ -21,8 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
+import { useStudentList, useFilterAttendance, birthdayKeys } from '@/hooks/useStudents';
 import { useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
+import { studentService } from '@/services/student.service';
+import { useQueries } from '@tanstack/react-query';
+import { Gift, Cake, CalendarDays, Sparkles } from 'lucide-react';
 import { useSubjectProgress } from '@/hooks/useAcademic';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
@@ -88,8 +91,212 @@ function SubjectProgressItem({ subjectId, classSectionId, subjectName }: { subje
   );
 }
 
+function ClassroomBirthdays({ classSectionId }: { classSectionId: number }) {
+  const birthdayQueries = useQueries({
+    queries: Array.from({ length: 8 }).map((_, index) => {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + index);
+      const dateString = targetDate.toISOString().split('T')[0];
+      return {
+        queryKey: birthdayKeys.filter(classSectionId, dateString),
+        queryFn: () => studentService.getBirthdays(classSectionId, dateString),
+        enabled: !!classSectionId && classSectionId > 0,
+      };
+    }),
+  });
+
+  const { todayBirthdays, upcomingBirthdays, isLoading } = useMemo(() => {
+    const todayList: any[] = [];
+    const upcomingList: { date: string; dayName: string; students: any[] }[] = [];
+    let loading = false;
+
+    birthdayQueries.forEach((query, index) => {
+      if (query.isLoading) loading = true;
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + index);
+      const dateString = targetDate.toISOString().split('T')[0];
+
+      // Format upcoming day label nicely
+      let dayName = '';
+      if (index === 1) {
+        dayName = 'Tomorrow';
+      } else {
+        dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      }
+
+      const students = Array.isArray(query.data) ? query.data : [];
+      if (index === 0) {
+        todayList.push(...students);
+      } else if (students.length > 0) {
+        upcomingList.push({
+          date: dateString,
+          dayName,
+          students,
+        });
+      }
+    });
+
+    return {
+      todayBirthdays: todayList,
+      upcomingBirthdays: upcomingList,
+      isLoading: loading,
+    };
+  }, [birthdayQueries]);
+
+  if (isLoading) {
+    return (
+      <Card className="border-purple-100 shadow-lg shadow-purple-100/20 bg-gradient-to-br from-purple-50/20 to-pink-50/20 overflow-hidden border-none backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-5 bg-purple-200 animate-pulse rounded-md" />
+            <div className="h-5 w-36 bg-purple-200 animate-pulse rounded-md" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-16 bg-purple-100/50 animate-pulse rounded-xl" />
+          <div className="h-20 bg-purple-100/30 animate-pulse rounded-xl" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white border border-[#E6EBF2] rounded-3xl shadow-none overflow-hidden">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-[#EAF8F5] flex items-center justify-center">
+            <Gift className="h-5 w-5 text-[#2DB6A3]" />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-[#243B63]">
+              Classroom Birthdays
+            </h3>
+            <p className="text-xs text-[#8A97AB]">
+              Upcoming celebrations
+            </p>
+          </div>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        {/* Today's Birthdays */}
+        <div className="rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] p-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[#2DB6A3]">
+              Today
+            </p>
+
+            {todayBirthdays.length > 0 && (
+              <span className="text-[10px] text-[#8A97AB] font-medium">
+                {todayBirthdays.length} Celebration
+                {todayBirthdays.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          {todayBirthdays.length > 0 ? (
+            <div className="space-y-3">
+              {todayBirthdays.map((student: any) => (
+                <div
+                  key={student.id}
+                  className="flex items-center justify-between py-2 border-b border-[#F0F3F7] last:border-b-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-[#EAF8F5] flex items-center justify-center">
+                      <Cake className="h-4 w-4 text-[#2DB6A3]" />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-[#243B63]">
+                        {student.firstName} {student.lastName}
+                      </p>
+
+                      <p className="text-xs text-[#8A97AB]">
+                        Roll No.{" "}
+                        {student.academics?.[0]?.rollNumber || "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Badge className="bg-[#EAF8F5] text-[#2DB6A3] border-0 hover:bg-[#EAF8F5]">
+                    Today
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Cake className="h-10 w-10 text-[#D0D7E2]" />
+              <p className="mt-3 text-sm text-[#8A97AB]">
+                No birthdays today
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming Birthdays */}
+        <div className="rounded-2xl border border-[#EEF2F7] bg-white p-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-[#8A97AB]">
+              Upcoming This Week
+            </p>
+
+            <CalendarDays className="h-4 w-4 text-[#8A97AB]" />
+          </div>
+
+          {upcomingBirthdays.length > 0 ? (
+            <div className="space-y-5 max-h-[240px] overflow-y-auto pr-1">
+              {upcomingBirthdays.map((item) => (
+                <div key={item.date}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-2 w-2 rounded-full bg-[#2DB6A3]" />
+
+                    <p className="text-xs font-semibold text-[#243B63]">
+                      {item.dayName}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pl-4">
+                    {item.students.map((student: any) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-[#243B63]">
+                            {student.firstName} {student.lastName}
+                          </p>
+                        </div>
+
+                        <span className="text-xs text-[#8A97AB]">
+                          Roll #
+                          {student.academics?.[0]?.rollNumber || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10">
+              <Gift className="h-12 w-12 text-[#D0D7E2]" />
+
+              <p className="mt-3 text-sm font-medium text-[#8A97AB]">
+                No birthdays this week
+              </p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ClassRoomPage() {
-  const { user, isClassTeacher, assignedClass, isSyncing } = useTeacherProfile();
+  const { user, isClassTeacher, assignedClass: rawAssignedClass, isSyncing } = useTeacherProfile();
+  const assignedClass = rawAssignedClass as any;
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('students');
@@ -104,8 +311,8 @@ export default function ClassRoomPage() {
     if (assignedClass.className && assignedClass.sectionName) return assignedClass;
 
     // Try to find names in allSections list by ID (check multiple possible ID fields)
-    const match = allSections.find(s => 
-      s.id === assignedClass.classDtlsId || 
+    const match = allSections.find(s =>
+      s.id === assignedClass.classDtlsId ||
       s.id === assignedClass.id ||
       s.mappingId === assignedClass.id ||
       s.mappingId === assignedClass.classDtlsId
@@ -137,11 +344,11 @@ export default function ClassRoomPage() {
     },
     { enabled: !!resolvedClassSectionId }
   );
-
+  console.log("resolvedClassSectionId", resolvedClassSectionId)
   const { data: todayAttendance } = useFilterAttendance({
     classSectionId: resolvedClassSectionId,
     date: today,
-  }, { enabled: !!resolvedClassSectionId });
+  });
 
   // All subjects for this class (for Academics tab)
   const { data: classWideSubjects = [], isLoading: subjectsLoading } = useSubjectDetails(
@@ -320,184 +527,193 @@ export default function ClassRoomPage() {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="flex w-max gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
-              {tabs.map(tab => (
-                <TabsTrigger key={tab.id} value={tab.id}
-                  className="rounded-xl px-5 py-2 text-[10px] font-bold tracking-widest uppercase gap-1.5 flex items-center data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
-                  {tab.icon}{tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+            <div className="lg:col-span-3">
+              {/* Tabs */}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="flex w-max gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
+                  {tabs.map(tab => (
+                    <TabsTrigger key={tab.id} value={tab.id}
+                      className="rounded-xl px-5 py-2 text-[10px] font-bold tracking-widest uppercase gap-1.5 flex items-center data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+                      {tab.icon}{tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-            <TabsContent value="students" className="mt-4">
-              <Card className="border-border shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
-                  <CardTitle className="text-lg font-bold">Student Directory</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Class {selectedClass} Section {selectedSection}</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/20 hover:bg-muted/20">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pl-6 w-12">#</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Student</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Roll No</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Contact</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right pr-6">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoading ? (
-                        [...Array(5)].map((_, i) => (
-                          <TableRow key={i}><TableCell colSpan={6} className="py-3 pl-6"><div className="h-8 bg-muted/40 rounded-lg animate-pulse" /></TableCell></TableRow>
-                        ))
-                      ) : students.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-32 text-center">
-                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                              <Users size={32} className="opacity-20" />
-                              <p className="text-sm font-semibold">No students found</p>
-                              {!resolvedClassSectionId && (
-                                <p className="text-xs text-destructive">classSectionId could not be resolved</p>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        students.map((s, idx) => {
-                          const roll = s.academics?.[0]?.rollNumber;
-                          const att = (attendanceMap.get(String(s.id)) || (roll ? attendanceMap.get(`roll-${roll}`) : null)) as any;
-                          return (
-                            <TableRow key={s.id} className="group hover:bg-muted/10 transition-colors border-b border-border/30">
-                              <TableCell className="pl-6 text-xs font-bold text-muted-foreground">{idx + 1}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  <div className="h-9 w-9 rounded-xl bg-muted/40 flex items-center justify-center text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                    {s.firstName?.[0]}{s.lastName?.[0]}
-                                  </div>
-                                  <p className="text-sm font-semibold text-foreground">{s.firstName} {s.lastName}</p>
+                <TabsContent value="students" className="mt-4">
+                  <Card className="border-border shadow-sm overflow-hidden">
+                    <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
+                      <CardTitle className="text-lg font-bold">Student Directory</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">Class {selectedClass} Section {selectedSection}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pl-6 w-12">#</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Student</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Roll No</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Contact</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Today</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right pr-6">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {isLoading ? (
+                            [...Array(5)].map((_, i) => (
+                              <TableRow key={i}><TableCell colSpan={6} className="py-3 pl-6"><div className="h-8 bg-muted/40 rounded-lg animate-pulse" /></TableCell></TableRow>
+                            ))
+                          ) : students.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="h-32 text-center">
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                  <Users size={32} className="opacity-20" />
+                                  <p className="text-sm font-semibold">No students found</p>
+                                  {!resolvedClassSectionId && (
+                                    <p className="text-xs text-destructive">classSectionId could not be resolved</p>
+                                  )}
                                 </div>
-                              </TableCell>
-                              <TableCell className="text-sm font-medium text-muted-foreground">
-                                {s.academics?.[0]?.rollNumber ?? '—'}
-                              </TableCell>
-                              <TableCell>
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Mail size={10} className="opacity-50" />{s.emailId}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                                    <Phone size={10} className="opacity-50" />{s.mobileNumber}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {att ? (
-                                  <Badge className={cn('rounded-full text-[10px] font-bold border px-2',
-                                    att.status === 'Present' ? 'bg-success/10 text-success border-success/20' :
-                                      att.status === 'Absent' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                                        'bg-warning/10 text-warning border-warning/20'
-                                  )}>
-                                    {att.status}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground italic">Not marked</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right pr-6">
-                                <Link href={`/dashboard/teacher/students/${s.id}`}>
-                                  <Button variant="ghost" size="sm" className="rounded-xl h-8 px-3 text-xs font-bold opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all">
-                                    View <ArrowRight size={12} className="ml-1" />
-                                  </Button>
-                                </Link>
                               </TableCell>
                             </TableRow>
-                          );
-                        })
+                          ) : (
+                            students.map((s, idx) => {
+                              const roll = s.academics?.[0]?.rollNumber;
+                              const att = (attendanceMap.get(String(s.id)) || (roll ? attendanceMap.get(`roll-${roll}`) : null)) as any;
+                              return (
+                                <TableRow key={s.id} className="group hover:bg-muted/10 transition-colors border-b border-border/30">
+                                  <TableCell className="pl-6 text-xs font-bold text-muted-foreground">{idx + 1}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-9 w-9 rounded-xl bg-muted/40 flex items-center justify-center text-xs font-bold text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                        {s.firstName?.[0]}{s.lastName?.[0]}
+                                      </div>
+                                      <p className="text-sm font-semibold text-foreground">{s.firstName} {s.lastName}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm font-medium text-muted-foreground">
+                                    {s.academics?.[0]?.rollNumber ?? '—'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Mail size={10} className="opacity-50" />{s.emailId}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                        <Phone size={10} className="opacity-50" />{s.mobileNumber}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {att ? (
+                                      <Badge className={cn('rounded-full text-[10px] font-bold border px-2',
+                                        att.status === 'Present' ? 'bg-success/10 text-success border-success/20' :
+                                          att.status === 'Absent' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                                            'bg-warning/10 text-warning border-warning/20'
+                                      )}>
+                                        {att.status}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground italic">Not marked</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right pr-6">
+                                    <Link href={`/dashboard/teacher/students/${s.id}`}>
+                                      <Button variant="ghost" size="sm" className="rounded-xl h-8 px-3 text-xs font-bold opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all">
+                                        View <ArrowRight size={12} className="ml-1" />
+                                      </Button>
+                                    </Link>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="attendance" className="mt-4">
+                  <Card className="border-border shadow-sm">
+                    <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
+                      <CardTitle className="text-lg font-bold">Attendance Overview</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">Today&apos;s attendance summary for Class {selectedClass} - {selectedSection}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {attendanceRecords.length === 0 ? (
+                        <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
+                          <ClipboardCheck size={36} className="opacity-20" />
+                          <p className="text-sm font-semibold">No attendance marked for today</p>
+                          <Link href="/dashboard/teacher/attendance">
+                            <Button size="sm" className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold mt-1">
+                              Mark Attendance Now
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="text-center">
+                            <p className="text-3xl font-bold text-success">{presentCount}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Present</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-3xl font-bold text-destructive">{absentCount}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Absent</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-3xl font-bold text-warning">{lateCount}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Late / Half</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-3xl font-bold text-primary">
+                              {totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0}%
+                            </p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Attendance Rate</p>
+                          </div>
+                        </div>
                       )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
-            <TabsContent value="attendance" className="mt-4">
-              <Card className="border-border shadow-sm">
-                <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
-                  <CardTitle className="text-lg font-bold">Attendance Overview</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Today&apos;s attendance summary for Class {selectedClass} - {selectedSection}</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {attendanceRecords.length === 0 ? (
-                    <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
-                      <ClipboardCheck size={36} className="opacity-20" />
-                      <p className="text-sm font-semibold">No attendance marked for today</p>
-                      <Link href="/dashboard/teacher/attendance">
-                        <Button size="sm" className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold mt-1">
-                          Mark Attendance Now
-                        </Button>
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-success">{presentCount}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Present</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-destructive">{absentCount}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Absent</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-warning">{lateCount}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Late / Half</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-primary">
-                          {totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0}%
-                        </p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Attendance Rate</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                <TabsContent value="academics" className="mt-4">
+                  <Card className="border-border shadow-sm overflow-hidden">
+                    <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
+                      <CardTitle className="text-lg font-bold">Academic Progress</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">Syllabus coverage across all subjects</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {subjectsLoading ? (
+                        <div className="p-8 space-y-4">
+                          {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}
+                        </div>
+                      ) : classWideSubjects.length === 0 ? (
+                        <div className="py-16 flex flex-col items-center gap-3 text-muted-foreground">
+                          <TrendingUp size={36} className="opacity-20" />
+                          <p className="text-sm font-semibold">No subjects mapped to this class</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border/20">
+                          {classWideSubjects.map((sd: any) => (
+                            <SubjectProgressItem
+                              key={sd.id}
+                              subjectId={sd.subjectDtlsId}
+                              classSectionId={resolvedClassSectionId}
+                              subjectName={sd.subjectName}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
 
-            <TabsContent value="academics" className="mt-4">
-              <Card className="border-border shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-border/50 bg-muted/10 py-4 px-6">
-                  <CardTitle className="text-lg font-bold">Academic Progress</CardTitle>
-                  <CardDescription className="text-xs mt-0.5">Syllabus coverage across all subjects</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {subjectsLoading ? (
-                    <div className="p-8 space-y-4">
-                      {[1, 2, 3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}
-                    </div>
-                  ) : classWideSubjects.length === 0 ? (
-                    <div className="py-16 flex flex-col items-center gap-3 text-muted-foreground">
-                      <TrendingUp size={36} className="opacity-20" />
-                      <p className="text-sm font-semibold">No subjects mapped to this class</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border/20">
-                      {classWideSubjects.map((sd: any) => (
-                        <SubjectProgressItem
-                          key={sd.id}
-                          subjectId={sd.subjectDtlsId}
-                          classSectionId={resolvedClassSectionId}
-                          subjectName={sd.subjectName}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+            <div className="lg:col-span-1">
+              <ClassroomBirthdays classSectionId={resolvedClassSectionId} />
+            </div>
+          </div>
         </>
       )}
     </div>

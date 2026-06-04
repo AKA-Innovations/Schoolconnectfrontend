@@ -215,10 +215,12 @@ export const attendanceKeys = {
 };
 
 export function useFilterAttendance(params: AttendanceFilterParams) {
+  console.log("Attendance Filter params:", params);
   return useQuery({
     queryKey: attendanceKeys.filter(params),
     queryFn: () => studentService.filterAttendance(params),
     enabled: !!(params.classSectionId && params.classSectionId > 0 && params.date),
+
   });
 }
 
@@ -236,5 +238,20 @@ export function useUpdateAttendance() {
     mutationFn: ({ recordId, data }: { recordId: number; data: Partial<AttendanceRecord> }) =>
       studentService.updateAttendance(recordId, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: attendanceKeys.all }),
+  });
+}
+
+// ─── Birthdays ───────────────────────────────────────────────────────────────
+
+export const birthdayKeys = {
+  all: ['birthdays'] as const,
+  filter: (classSectionId: number, date: string) => ['birthdays', 'filter', classSectionId, date] as const,
+};
+
+export function useBirthdays(classSectionId?: number, date?: string) {
+  return useQuery({
+    queryKey: birthdayKeys.filter(classSectionId!, date!),
+    queryFn: () => studentService.getBirthdays(classSectionId!, date!),
+    enabled: !!(classSectionId && classSectionId > 0 && date),
   });
 }

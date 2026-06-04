@@ -198,4 +198,11 @@ export const studentService = {
       return mappedRecord;
     });
   },
+
+  getBirthdays: async (classSectionId: number, date: string): Promise<any[]> => {
+    const res = await api.get(API_ENDPOINTS.STUDENT.BIRTHDAYS, {
+      params: { classSectionId, date }
+    });
+    return res.data?.data ?? res.data ?? [];
+  },
 };

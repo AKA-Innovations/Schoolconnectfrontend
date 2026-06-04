@@ -72,7 +72,9 @@ export function ClassStudentsView() {
   // Build attendance map: studentId -> status
   const attendanceMap = useMemo(() => {
     const map: Record<string, string> = {};
-    attendanceRecords.forEach((r) => { map[r.studentId] = r.status; });
+    attendanceRecords.forEach((r) => {
+      if (r.studentId) map[r.studentId] = r.status;
+    });
     return map;
   }, [attendanceRecords]);
 

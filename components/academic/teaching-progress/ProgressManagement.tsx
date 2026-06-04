@@ -36,7 +36,7 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
   const { data: classWideSubjects = [] } = useSubjectDetails(
     undefined, 
     CURRENT_SESSION, 
-    assignedClass?.classDtlsId
+    (assignedClass as any)?.classDtlsId
   );
 
   const mySubjects = useMemo(() => {
@@ -82,8 +82,9 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
       className: sd.className ?? '',
       sectionName: sd.sectionName ?? '',
       subjectName: sd.subjectName ?? '',
-      classSectionId: sd.classDtlsId || sd.classSectionId,
-      subjectDtlsId: sd.subjectDtlsId || sd.subjectId,
+      subjectId: String(sd.id),
+      classSectionId: sd.classDtlsId || (sd as any).classSectionId,
+      subjectDtlsId: sd.subjectDtlsId || (sd as any).subjectId,
     };
   }, [selectedAssignment, mySubjects]);
 

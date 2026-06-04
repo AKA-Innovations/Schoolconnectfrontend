@@ -57,9 +57,10 @@ export const classService = {
     limit?: number;
     className?: string;
     schoolId?: string;
+    session?: string;
   }): Promise<ClassListResponse> => {
     const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, {
-      params: { schoolId: params?.schoolId },
+      params: { schoolId: params?.schoolId, session: params?.session },
     });
     const rawClasses = response.data;
     let all: ClassDetails[] = [];
@@ -204,8 +205,8 @@ export const classService = {
     return buildPage(teacherEntries, params?.page, params?.limit);
   },
 
-  getClassSummary: async (schoolId?: string): Promise<ClassSummary> => {
-    const classesRes = await classService.getClasses({ schoolId });
+  getClassSummary: async (schoolId?: string, session?: string): Promise<ClassSummary> => {
+    const classesRes = await classService.getClasses({ schoolId, session });
 
     const allClasses = classesRes.items;
     const uniqueClassNames = new Set(allClasses.map((c) => c.className));

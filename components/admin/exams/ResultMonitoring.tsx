@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useExams, useExamSchedules, useExamResults } from '@/services/exam/queries';
-import { classService } from '@/services/class/service';
-import { useQuery } from '@tanstack/react-query';
+import { useSubjectOptions, useSchoolSections } from '@/hooks/useClasses';
 import { Eye, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 export function ResultMonitoring() {
@@ -16,16 +15,9 @@ export function ResultMonitoring() {
   const { data: schedules, isLoading: loadingSchedules } = useExamSchedules(session);
   const { data: results, isLoading: loadingResults } = useExamResults({ session });
 
-  const { data: subjects } = useQuery({
-    queryKey: ['schoolSubjects'],
-    queryFn: () => classService.getSubjectOptions('school_id_placeholder'),
-  });
+  const { data: subjects = [] } = useSubjectOptions();
 
-  const { data: classSections } = useQuery({
-    queryKey: ['allSchoolSections'],
-    // Fetching sections without classId gets all sections for the school in the current backend API design
-    queryFn: () => classService.getSchoolSections('school_id_placeholder'),
-  });
+  const { data: classSections = [] } = useSchoolSections();
 
   const isLoading = loadingExams || loadingSchedules || loadingResults;
 

@@ -10,8 +10,9 @@ import { CURRENT_SESSION } from '@/lib/constants';
 
 function ProgressCardItem({ assignment }: { assignment: any }) {
   const { data: progress, isLoading } = useSubjectProgress(
-    assignment.subjectDtlsId, 
-    assignment.classSectionId
+    assignment.subjectDtlsId || assignment.subjectId, 
+    assignment.classDtlsId || assignment.classSectionId,
+    CURRENT_SESSION
   );
 
   // Normalize backend response
@@ -66,7 +67,7 @@ function ProgressCardItem({ assignment }: { assignment: any }) {
 
 export const ProgressDashboardCards = () => {
   const user = useAuthStore((s) => s.user);
-  const { data: assignments = [], isLoading } = useSubjectDetails(user?.id);
+  const { data: assignments = [], isLoading } = useSubjectDetails(user?.id, CURRENT_SESSION);
 
   if (isLoading) {
     return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

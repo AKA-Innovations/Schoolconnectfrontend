@@ -10,7 +10,7 @@ import {
   useSchoolClasses,
 } from '@/hooks/useClasses';
 import { CURRENT_SESSION } from '@/lib/constants';
-import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload } from '@/types/class.types';
+import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload, ClassSectionItem } from '@/types/class.types';
 import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -28,7 +28,7 @@ export default function TimetablePage() {
   const { data: rawClassSections = [] } = useClassSectionLists();
   const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const classSections: { id: number; classId: number; className: string; sectionName: string }[] =
+  const classSections: ClassSectionItem[] =
     (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
 
   const bulkCreateMut = useCreateTimetableBulk();
@@ -118,7 +118,7 @@ export default function TimetablePage() {
       let periodId = e.periodId;
       if (!periodId && e.periodNumber) {
         const slot = periodSlots.find(s => Number(s.periodNumber) === Number(e.periodNumber));
-        periodId = slot?.id;
+        periodId = slot?.id ?? 0;
       }
 
       return { ...e, classSubjectId, periodId };
@@ -496,7 +496,7 @@ function ExistingCell({
 }: {
   entry: TimetableEntry;
   sd?: SubjectDetail;
-  onDelete: (id: number) => void;
+  onDelete: (id: number | string) => void;
   isDeleting: boolean;
 }) {
   return (

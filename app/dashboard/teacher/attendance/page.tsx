@@ -35,7 +35,7 @@ const statusIcons: Record<AttendanceStatus, React.ReactNode> = {
 
 export default function AttendancePage() {
   const user = useAuthStore((s) => s.user);
-  const assignedClass = user?.classTeacherClass ?? null;
+  const assignedClass = (user?.classTeacherClass as any) ?? null;
 
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});

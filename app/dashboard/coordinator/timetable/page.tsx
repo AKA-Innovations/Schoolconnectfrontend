@@ -11,7 +11,7 @@ import {
 } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { CURRENT_SESSION } from '@/lib/constants';
-import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload } from '@/types/class.types';
+import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload, ClassSectionItem } from '@/types/class.types';
 import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -32,7 +32,7 @@ export default function CoordinatorTimetablePage() {
   const { data: rawClassSections = [] } = useClassSectionLists();
   const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const allClassSections: { id: number; classId: number; className: string; sectionName: string }[] =
+  const allClassSections: ClassSectionItem[] =
     (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
 
   const bulkCreateMut = useCreateTimetableBulk();
@@ -133,7 +133,7 @@ export default function CoordinatorTimetablePage() {
       let periodId = e.periodId;
       if (!periodId && e.periodNumber) {
         const slot = periodSlots.find(s => s.periodNumber === e.periodNumber);
-        periodId = slot?.id;
+        periodId = slot?.id ?? 0;
       }
 
       return { ...e, classSubjectId, periodId };
@@ -265,9 +265,9 @@ export default function CoordinatorTimetablePage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
     try {
-      await deleteMut.mutateAsync(id);
+      await deleteMut.mutateAsync(id as any);
       toast.success('Entry removed');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete');
@@ -485,7 +485,7 @@ function ExistingCell({
 }: {
   entry: TimetableEntry;
   sd?: SubjectDetail;
-  onDelete: (id: number) => void;
+  onDelete: (id: number | string) => void;
   isDeleting: boolean;
 }) {
   return (

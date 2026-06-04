@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
     ATTENDANCE_BULK: '/student/attendance/bulk',
     ATTENDANCE_UPDATE: (recordId: number) => `/student/attendance/${recordId}`,
     ATTENDANCE_FILTER: '/student/attendance/filter',
+    BIRTHDAYS: '/student/birthdays',
   },
   COORDINATOR: {
     DASHBOARD_SUMMARY: '/coordinator/dashboard-summary',

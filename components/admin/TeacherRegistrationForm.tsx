@@ -193,7 +193,7 @@ console.log('INITIAL DATA 👉', initialData);
         if (formData.isClassTeacher && classTeacherClassId) {
           const prevClassId = initialData?.classTeacherAssignment?.classDtlsId;
           if (prevClassId && prevClassId !== classTeacherClassId) {
-            const prevClass = classSections.find((c: any) => c.id === prevClassId);
+            const prevClass = classSections.find((c: any) => c.masterSectionId === prevClassId);
             if (prevClass) {
               await teacherService.removeClassTeacher({
                 classTeacherId: initialData.id,
@@ -204,7 +204,7 @@ console.log('INITIAL DATA 👉', initialData);
             }
           }
           if (prevClassId !== classTeacherClassId) {
-            const cs = classSections.find((c: any) => c.id === classTeacherClassId);
+            const cs = classSections.find((c: any) => c.masterSectionId === classTeacherClassId);
             if (cs) {
               await teacherService.addClassTeacher({
                 classTeacherId: initialData.id,
@@ -215,7 +215,7 @@ console.log('INITIAL DATA 👉', initialData);
             }
           }
         } else if (!formData.isClassTeacher && initialData?.classTeacherAssignment?.classDtlsId) {
-          const prevClass = classSections.find((c: any) => c.id === initialData.classTeacherAssignment.classDtlsId);
+          const prevClass = classSections.find((c: any) => c.masterSectionId === initialData.classTeacherAssignment.classDtlsId);
           if (!prevClass) return;
           await teacherService.removeClassTeacher({
             classTeacherId: initialData.id,
@@ -626,10 +626,10 @@ console.log('INITIAL DATA 👉', initialData);
                       value={newClass.classSectionId ?? ''}
                       onChange={(e) => {
                         const id = Number(e.target.value);
-                        const cs = classSections.find(c => c.id === id);
+                        const cs = classSections.find(c => c.masterSectionId === id);
                         setNewClass((p) => ({
                           ...p,
-                          classSectionId: id,
+                          classSectionId: cs?.masterSectionId || cs?.id,
                           sectionName: cs?.sectionName ?? ''
                         }));
                       }}

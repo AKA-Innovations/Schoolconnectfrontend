@@ -44,26 +44,29 @@ function SubjectProgressItem({ subjectId, classSectionId, subjectName }: { subje
 
   if (!progress) return null;
 
+  const percentage = progress.overallPercentage ?? 0;
+  const chaptersCount = progress.chapters?.length ?? 0;
+
   return (
     <div className="px-6 py-4 hover:bg-muted/5 transition-colors">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-bold text-foreground">📚 {subjectName}</span>
-            <span className="text-xs font-bold text-primary">{progress.completionPercentage ?? 0}%</span>
+            <span className="text-xs font-bold text-primary">{percentage}%</span>
           </div>
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
-            {progress.chaptersCount || 0} Chapters in total
+            {chaptersCount} Chapters in total
           </p>
         </div>
         <div className="text-right shrink-0">
           <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
             <div
               className={cn('h-full rounded-full transition-all',
-                (progress.completionPercentage ?? 0) >= 80 ? 'bg-emerald-500' :
-                  (progress.completionPercentage ?? 0) >= 40 ? 'bg-blue-500' : 'bg-amber-500'
+                percentage >= 80 ? 'bg-emerald-500' :
+                  percentage >= 40 ? 'bg-blue-500' : 'bg-amber-500'
               )}
-              style={{ width: `${progress.completionPercentage ?? 0}%` }}
+              style={{ width: `${percentage}%` }}
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-tighter font-bold">
@@ -96,7 +99,7 @@ export default function ClassDetailPage() {
   // Derive classSectionId from teacher's mapping or class teacher assignment (more reliable)
   const teacherClassSectionId = useMemo(() => {
     if (user?.classTeacherClass?.className === className && user?.classTeacherClass?.sectionName === sectionName) {
-      return user.classTeacherClass.classDtlsId;
+      return (user.classTeacherClass as any).classDtlsId;
     }
     return mySubjects.length > 0 ? mySubjects[0].classDtlsId : undefined;
   }, [user, className, sectionName, mySubjects]);
@@ -512,7 +515,7 @@ export default function ClassDetailPage() {
                       key={sd.id}
                       subjectId={sd.subjectDtlsId}
                       classSectionId={resolvedClassSectionId}
-                      subjectName={sd.subjectName}
+                      subjectName={sd.subjectName ?? ''}
                     />
                   ))}
                 </div>

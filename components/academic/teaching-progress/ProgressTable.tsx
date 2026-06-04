@@ -21,9 +21,9 @@ export const ProgressTable = React.memo(function ProgressTable({ items, isLoadin
         </div>
       ),
     },
-    { key: 'class', header: 'Class', render: (item) => <Badge className="bg-slate-100 text-slate-600 border-none px-3 py-1 rounded-lg font-bold text-[10px]">{item.className} – {item.sectionName}</Badge> },
+    { key: 'class', header: 'Class', render: (item) => <Badge className="bg-slate-100 text-slate-600 border-none px-3 py-1 rounded-lg font-bold text-[10px]">{(item as any).className} – {(item as any).sectionName}</Badge> },
     { key: 'status', header: 'Status', render: (item) => <StatusBadge status={item.status} /> },
-    { key: 'completed', header: 'Completed On', render: (item) => <span className="text-xs text-slate-500">{item.completedOn ? new Date(item.completedOn).toLocaleDateString() : '—'}</span> },
+    { key: 'completed', header: 'Completed On', render: (item) => <span className="text-xs text-slate-500">{(item as any).completedOn ? new Date((item as any).completedOn).toLocaleDateString() : '—'}</span> },
     {
       key: 'actions', header: 'Actions',
       render: (item) => (

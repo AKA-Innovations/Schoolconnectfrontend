@@ -206,9 +206,10 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
                     value={field.value}
                     error={errors.assignmentKey?.message}
                     onChange={(val, detail) => {
+                      console.log("detail", detail);
                       field.onChange(val);
                       setSelectedClassName(detail?.className);
-                      setSelectedSubjectId(detail?.subjectId);
+                      setSelectedSubjectId(detail?.subjectDtlsId ? String(detail.subjectDtlsId) : undefined);
                       setSelectedClassSectionId(detail?.classSectionId);
                       setSelectedSubjectDtlsId(detail?.subjectDtlsId);
                       setValue('chapterId', '');
@@ -298,7 +299,7 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
             <div className="flex flex-col gap-3 max-w-[240px] mx-auto pt-2">
               <Button asChild className="rounded-xl h-12 gap-2 relative">
                 <label className="cursor-pointer">
-                  <Plus className="h-4 w-4" /> 
+                  <Plus className="h-4 w-4" />
                   {uploadAttachment.isPending ? 'Uploading...' : 'Attach Document'}
                   <input
                     type="file"

@@ -721,9 +721,9 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
     );
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     if (!confirm('Remove this pedagogical mapping?')) return;
-    deleteMutation.mutate(id, {
+    deleteMutation.mutate(id as any, {
       onError: (err: any) => alert(err.response?.data?.message || 'Failed to delete mapping.'),
     });
   };

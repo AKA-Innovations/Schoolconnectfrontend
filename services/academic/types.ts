@@ -91,6 +91,7 @@ export interface CreateTeachingProgressPayload {
 export interface UpdateTeachingProgressPayload {
   status?: string;
   completionPercentage?: number;
+  completedOn?: string;
 }
 
 // ─── Progress Summaries ─────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ export interface SubjectProgressSummary {
 }
 
 export interface TopicProgressSummary {
+  id?: number;
   topicId: number;
   topicName: string;
   status: string;
@@ -118,6 +120,7 @@ export interface TopicProgressSummary {
 }
 
 export interface ChapterProgressSummary {
+  id?: number;
   chapterId: number;
   chapterName?: string;
   status: string;

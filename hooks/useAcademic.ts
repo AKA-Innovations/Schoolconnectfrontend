@@ -15,6 +15,7 @@ import type {
   UpdateStudyMaterialPayload,
   SubjectProgressSummary,
   ChapterProgressSummary,
+  TeachingProgress,
 } from '@/services/academic/types';
 
 // ─── Query key factories ──────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ export const academicKeys = {
   homeworkSubs: (hwId: number) => ['academic', 'hw-subs', hwId] as const,
   classworks: (classId?: string) => ['academic', 'classworks', classId] as const,
   materials: (classId?: string) => ['academic', 'materials', classId] as const,
+  teachingProgress: (teacherId?: string) => ['academic', 'teaching-progress', teacherId] as const,
 };
 
 // ─── Subject Chapters ─────────────────────────────────────────────────────────
@@ -107,11 +109,23 @@ export function useDeleteTopic() {
 
 // ─── Teaching Progress ────────────────────────────────────────────────────────
 
+export function useTeachingProgressList(teacherId?: string) {
+  return useQuery({
+    queryKey: academicKeys.teachingProgress(teacherId),
+    queryFn: () => academicService.getTeachingProgress(teacherId),
+  });
+}
+
 export function useCreateProgress() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateTeachingProgressPayload) => academicService.createTeachingProgress(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'progress'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['academic', 'progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'chapter-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'subject-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'teaching-progress'] });
+    },
   });
 }
 
@@ -120,7 +134,12 @@ export function useUpdateProgress() {
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateTeachingProgressPayload }) =>
       academicService.updateTeachingProgress(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'progress'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['academic', 'progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'chapter-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'subject-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'teaching-progress'] });
+    },
   });
 }
 
@@ -128,7 +147,12 @@ export function useDeleteProgress() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => academicService.deleteTeachingProgress(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'progress'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['academic', 'progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'chapter-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'subject-progress'] });
+      qc.invalidateQueries({ queryKey: ['academic', 'teaching-progress'] });
+    },
   });
 }
 
@@ -177,10 +201,10 @@ export function useUpdateHomework() {
   });
 }
 
-export function useDeleteHomework(id: number) {
+export function useDeleteHomework() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => academicService.deleteHomework(id),
+    mutationFn: (id: number) => academicService.deleteHomework(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['academic', 'homeworks'] }),
   });
 }

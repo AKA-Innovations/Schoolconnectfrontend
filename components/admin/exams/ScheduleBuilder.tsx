@@ -10,8 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useExams } from '@/services/exam/queries';
 import { useCreateBulkSchedules } from '@/services/exam/mutations';
 import { groupExamsByName } from '@/services/exam/transformers';
-import { classService } from '@/services/class/service';
-import { useQuery } from '@tanstack/react-query';
+import { useSchoolClasses, useSubjectOptions, useSchoolSections } from '@/hooks/useClasses';
 import { Calendar, Save, AlertTriangle, ArrowRight } from 'lucide-react';
 
 interface GridRow {
@@ -37,21 +36,13 @@ export function ScheduleBuilder() {
   const { data: exams } = useExams(session);
   const groupedExams = exams ? groupExamsByName(exams) : [];
 
-  const { data: schoolClasses } = useQuery({
-    queryKey: ['schoolClasses'],
-    queryFn: () => classService.getSchoolClasses('school_id_placeholder'), // Replace with actual schoolId
-  });
+  const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const { data: subjects } = useQuery({
-    queryKey: ['schoolSubjects'],
-    queryFn: () => classService.getSubjectOptions('school_id_placeholder'),
-  });
+  const { data: subjects = [] } = useSubjectOptions();
 
-  const { data: classSections } = useQuery({
-    queryKey: ['schoolSections', selectedClassId],
-    queryFn: () => classService.getSchoolSections('school_id_placeholder', Number(selectedClassId)),
-    enabled: !!selectedClassId,
-  });
+  const { data: classSections = [] } = useSchoolSections(
+    selectedClassId ? Number(selectedClassId) : undefined
+  );
 
   const createBulkSchedules = useCreateBulkSchedules();
 

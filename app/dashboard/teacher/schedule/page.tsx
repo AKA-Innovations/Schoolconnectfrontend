@@ -102,6 +102,7 @@ export default function TeacherSchedulePage() {
   const [prefill, setPrefill] = React.useState<{ 
     className: string; 
     sectionName: string; 
+    subjectName: string;
     subjectId: string;
     classSectionId: number;
     subjectDtlsId: number;
@@ -137,6 +138,7 @@ export default function TeacherSchedulePage() {
     setPrefill({ 
       className: e.className, 
       sectionName: e.sectionName, 
+      subjectName: e.subjectName || '',
       subjectId: e.classSubjectId,
       classSectionId: e.classSectionId,
       subjectDtlsId: e.subjectDtlsId
@@ -148,6 +150,7 @@ export default function TeacherSchedulePage() {
     setPrefill({ 
       className: e.className, 
       sectionName: e.sectionName, 
+      subjectName: e.subjectName || '',
       subjectId: e.classSubjectId,
       classSectionId: e.classSectionId,
       subjectDtlsId: e.subjectDtlsId
@@ -159,6 +162,7 @@ export default function TeacherSchedulePage() {
     setPrefill({ 
       className: e.className, 
       sectionName: e.sectionName, 
+      subjectName: e.subjectName || '',
       subjectId: e.classSubjectId,
       classSectionId: e.classSectionId,
       subjectDtlsId: e.subjectDtlsId

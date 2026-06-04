@@ -51,7 +51,7 @@ export function ResultEntry() {
     }
   };
 
-  const { teacherId, schoolId } = useTeacherProfile();
+  const { user } = useTeacherProfile();
   
   // Fetching Data
   const { data: exams } = useExams(session);
@@ -76,7 +76,7 @@ export function ResultEntry() {
           studentId: student.id,
           name: `${student.firstName} ${student.lastName}`.trim(),
           rollNo: academic?.rollNumber || '-',
-          marksObtained: '',
+          marksObtained: '' as const,
           maxMarks: 100, // Ideally pulled from Exam config, defaulting to 100
           status: 'PRESENT' as const,
           remarks: ''

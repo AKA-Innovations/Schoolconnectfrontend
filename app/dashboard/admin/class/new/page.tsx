@@ -15,6 +15,8 @@ import { classService } from '@/services/class.service';
 import { teacherService } from '@/services/teacher.service';
 import { TeacherSelectDropdown } from '@/components/admin/class/TeacherSelectDropdown';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { CURRENT_SESSION } from '@/lib/constants';
 
 const classSchema = z.object({
   className: z.string().min(1, 'Class name is required'),
@@ -39,6 +41,7 @@ function FG({ label, children, required, error }: { label: string; children: Rea
 
 export default function NewClassPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = React.useState(false);
 
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ClassFormValues>({
@@ -57,9 +60,16 @@ export default function NewClassPage() {
     setIsLoading(true);
 
     try {
+      const selectedSection = schoolSections.find(s => s.sectionName === data.sectionName);
+      if (!selectedSection) {
+        toast.error('Selected section not found in school structure');
+        setIsLoading(false);
+        return;
+      }
+
       const created = await classService.createClass({
-        className: data.className,
-        sectionName: data.sectionName,
+        session: CURRENT_SESSION,
+        classSectionsId: selectedSection.id,
         maxLimit: data.maxLimit ? parseInt(data.maxLimit) : undefined,
         classTeacherId: data.classTeacherId || undefined,
       });
@@ -68,6 +78,9 @@ export default function NewClassPage() {
       if (data.classTeacherId) {
         await teacherService.updateTeacherDetails(data.classTeacherId, { isClassTeacher: true });
       }
+
+      // Invalidate react-query cache to update dashboard stats immediately
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
 
       toast.success(`Class ${data.className}-${data.sectionName} mapping created`);
       router.push(created?.id ? `/dashboard/admin/class/${created.id}` : '/dashboard/admin/class');

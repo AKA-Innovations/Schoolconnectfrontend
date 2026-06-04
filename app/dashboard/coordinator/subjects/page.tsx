@@ -81,7 +81,7 @@ export default function CoordinatorSubjectsPage() {
           session: CURRENT_SESSION,
           teacherId: addTeacherId,
           classId,
-          classSectionId: selectedSection.id,
+          classSectionId: selectedSection.masterSectionId,
           subjectId: opt.id
         }]
       },
@@ -97,8 +97,8 @@ export default function CoordinatorSubjectsPage() {
     );
   };
 
-  const handleDelete = (id: number) => {
-    deleteMutation.mutate(id, {
+  const handleDelete = (id: string | number) => {
+    deleteMutation.mutate(id as any, {
       onSuccess: () => toast.success('Mapping removed'),
       onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to delete'),
     });

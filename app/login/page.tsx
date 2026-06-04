@@ -145,19 +145,19 @@ export default function LoginPage() {
           <div className="max-w-xl mx-auto lg:mx-0">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-10 group">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 bg-[#00A99D] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
                 <GraduationCap className="w-7 h-7 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 leading-none">SkoolConnect</h1>
-                <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600">Enterprise Edition</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-[#00A99D]">Enterprise Edition</span>
               </div>
             </div>
 
             <div className="space-y-6">
               <h2 className="text-4xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Managing education <br />
-                <span className="text-blue-600">made simple.</span>
+                <span className="text-[#00A99D]">made simple.</span>
               </h2>
               <p className="text-lg text-slate-500 leading-relaxed max-w-md">
                 The all-in-one platform designed to empower educators and inspire students through seamless administration.
@@ -206,7 +206,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                    <button type="button" className="text-xs text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                    <button type="button" className="text-xs text-[#00A99D] hover:text-[#00A99D] font-semibold transition-colors">
                       Reset Password?
                     </button>
                   </div>
@@ -238,7 +238,7 @@ export default function LoginPage() {
 
                 <Button
                   disabled={isLoading}
-                  className="w-full h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                  className="w-full h-12 text-base font-bold bg-[#00A99D] hover:bg-[#00897B] text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
                 >
                   {isLoading ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
@@ -265,9 +265,9 @@ export default function LoginPage() {
             </div>
           </div>
           <nav className="flex gap-8 text-[13px] font-semibold text-slate-500">
-            <a href="#" className="hover:text-blue-600 transition-colors">Documentation</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Contact</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Documentation</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Privacy</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Contact</a>
           </nav>
         </div>
       </footer>

@@ -11,6 +11,7 @@ interface Props {
     totalTopics: number;
     completedTopics: number;
     overallPercentage: number;
+    chaptersCount?: number;
   };
 }
 

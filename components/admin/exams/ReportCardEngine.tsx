@@ -8,24 +8,18 @@ import { Label } from '@/components/ui/label';
 import { useExams, useExamResults } from '@/services/exam/queries';
 import { consolidateReportCards, StudentReportCard } from '@/services/exam/calculations';
 import { FileText, Printer, Download, Search } from 'lucide-react';
-import { classService } from '@/services/class/service';
-import { useQuery } from '@tanstack/react-query';
+import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
 
 export function ReportCardEngine() {
   const [session] = useState('2026-27');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
 
-  const { data: schoolClasses } = useQuery({
-    queryKey: ['schoolClasses'],
-    queryFn: () => classService.getSchoolClasses('school_id_placeholder'),
-  });
+  const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const { data: classSections } = useQuery({
-    queryKey: ['schoolSections', selectedClassId],
-    queryFn: () => classService.getSchoolSections('school_id_placeholder', Number(selectedClassId)),
-    enabled: !!selectedClassId,
-  });
+  const { data: classSections = [] } = useSchoolSections(
+    selectedClassId ? Number(selectedClassId) : undefined
+  );
 
   // In a real scenario, you'd fetch all results for this class section across ALL exams
   const { data: results, isLoading: loadingResults } = useExamResults({ session, classSectionId: Number(selectedSectionId) });

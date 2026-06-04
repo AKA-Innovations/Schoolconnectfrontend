@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/FormField';
-import { useCreateProgress, useUpdateProgress, useSubjectChapters, useSubjectTopics, useChapterProgress } from '@/hooks/useAcademic';
+import { useCreateProgress, useUpdateProgress, useSubjectChapters, useSubjectTopics, useChapterProgress, useTeachingProgressList } from '@/hooks/useAcademic';
 import { useAuthStore } from '@/store/authStore';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ interface Props {
   prefill?: {
     className: string;
     sectionName: string;
+    subjectName: string;
     subjectId: string; // mapping ID (display name)
     classSectionId: number;
     subjectDtlsId: number;
@@ -65,6 +66,10 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
     CURRENT_SESSION
   );
 
+  const { data: rawProgressList = [] } = useTeachingProgressList(
+    user?.role === 'teacher' ? user.id : undefined
+  );
+
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       status: 'not_started',
@@ -91,27 +96,39 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
     }
   }, [editItem, reset, open]);
 
-  // Update form when chapter progress is fetched (default if no topic selected)
+  // Update form when chapter/topic selection changes based on rawProgressList or currentProgress fallback
   useEffect(() => {
-    if (!isEditing && currentProgress && !selectedTopicId) {
-      setValue('completionPercentage', currentProgress.completionPercentage || 0);
-      setValue('status', currentProgress.status || 'not_started');
-    }
-  }, [currentProgress, isEditing, setValue, selectedTopicId]);
-
-  // Update form when topic selection changes
-  useEffect(() => {
-    if (!isEditing && currentProgress?.topics && selectedTopicId) {
-      const topicProgress = currentProgress.topics.find(t => String(t.topicId) === selectedTopicId);
-      if (topicProgress) {
-        setValue('completionPercentage', topicProgress.completionPercentage || 0);
-        setValue('status', topicProgress.status || 'not_started');
+    if (!isEditing && selectedChapterId) {
+      const foundMatch = rawProgressList.find(p => 
+        p.classSectionId === classSectionId &&
+        p.subjectId === subjectId &&
+        String(p.chapterId) === selectedChapterId &&
+        (selectedTopicId ? String(p.topicId) === selectedTopicId : !p.topicId)
+      );
+      if (foundMatch) {
+        setValue('completionPercentage', foundMatch.completionPercentage || 0);
+        setValue('status', foundMatch.status || 'not_started');
       } else {
-        setValue('completionPercentage', 0);
-        setValue('status', 'not_started');
+        // Fallback to currentProgress calculation if no raw match is loaded yet but we have it from chapter aggregates
+        if (!selectedTopicId && currentProgress) {
+          setValue('completionPercentage', currentProgress.completionPercentage || 0);
+          setValue('status', currentProgress.status || 'not_started');
+        } else if (selectedTopicId && currentProgress?.topics) {
+          const topicProgress = currentProgress.topics.find(t => String(t.topicId) === selectedTopicId);
+          if (topicProgress) {
+            setValue('completionPercentage', topicProgress.completionPercentage || 0);
+            setValue('status', topicProgress.status || 'not_started');
+          } else {
+            setValue('completionPercentage', 0);
+            setValue('status', 'not_started');
+          }
+        } else {
+          setValue('completionPercentage', 0);
+          setValue('status', 'not_started');
+        }
       }
     }
-  }, [selectedTopicId, currentProgress, isEditing, setValue]);
+  }, [isEditing, selectedChapterId, selectedTopicId, rawProgressList, currentProgress, classSectionId, subjectId, setValue]);
 
   // Reset topic when chapter changes
   useEffect(() => {
@@ -139,6 +156,7 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
           data: {
             status: values.status,
             completionPercentage: values.completionPercentage,
+            ...(values.status === 'completed' ? { completedOn: new Date().toISOString() } : {}),
           }
         },
         { onSuccess }
@@ -149,20 +167,59 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
         return;
       }
 
-      createMutation.mutate(
-        {
-          session: CURRENT_SESSION,
-          classSectionId: classSectionId,
-          subjectId: subjectId,
-          chapterId: Number(selectedChapterId),
-          topicId: selectedTopicId ? Number(selectedTopicId) : undefined,
-          status: values.status,
-          completionPercentage: values.completionPercentage || 0,
-        },
-        { onSuccess }
+      // Check if progress already exists for this topic/chapter using the rawProgressList source of truth
+      let existingProgressId: number | undefined;
+      const foundMatch = rawProgressList.find(p => 
+        p.classSectionId === classSectionId &&
+        p.subjectId === subjectId &&
+        String(p.chapterId) === selectedChapterId &&
+        (selectedTopicId ? String(p.topicId) === selectedTopicId : !p.topicId)
       );
+      if (foundMatch) {
+        existingProgressId = foundMatch.id;
+      }
+
+      if (existingProgressId) {
+        // Progress already exists — update instead of creating a duplicate
+        updateMutation.mutate(
+          {
+            id: existingProgressId,
+            data: {
+              status: values.status,
+              completionPercentage: values.completionPercentage,
+              ...(values.status === 'completed' ? { completedOn: new Date().toISOString() } : {}),
+            },
+          },
+          { onSuccess }
+        );
+      } else {
+        createMutation.mutate(
+          {
+            session: CURRENT_SESSION,
+            classSectionId: classSectionId,
+            subjectId: subjectId,
+            chapterId: Number(selectedChapterId),
+            topicId: selectedTopicId ? Number(selectedTopicId) : undefined,
+            status: values.status,
+            completionPercentage: values.completionPercentage || 0,
+          },
+          { onSuccess }
+        );
+      }
     }
   };
+
+  // Detect if we'll be updating existing progress (for UI feedback)
+  const hasExistingProgress = useMemo(() => {
+    if (isEditing) return false;
+    const foundMatch = rawProgressList.find(p => 
+      p.classSectionId === classSectionId &&
+      p.subjectId === subjectId &&
+      String(p.chapterId) === selectedChapterId &&
+      (selectedTopicId ? String(p.topicId) === selectedTopicId : !p.topicId)
+    );
+    return !!foundMatch;
+  }, [isEditing, rawProgressList, classSectionId, subjectId, selectedChapterId, selectedTopicId]);
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -170,7 +227,7 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Update Progress' : 'Log Progress'}</DialogTitle>
+          <DialogTitle>{isEditing || hasExistingProgress ? 'Update Progress' : 'Log Progress'}</DialogTitle>
           {prefill && !isEditing && (
             <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg border border-border/50">
               Logging for: <span className="font-bold text-foreground">Class {prefill.className}-{prefill.sectionName}</span> | <span className="font-bold text-foreground">{prefill.subjectName}</span>
@@ -239,7 +296,7 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending}>{isPending ? 'Saving...' : isEditing ? 'Update' : 'Save'}</Button>
+            <Button type="submit" disabled={isPending}>{isPending ? 'Saving...' : (isEditing || hasExistingProgress) ? 'Update' : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>

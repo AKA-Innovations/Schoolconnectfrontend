@@ -118,8 +118,8 @@ export const teacherService = {
     // Fetch teacher profile AND subject mappings in parallel
     const [teacherRes, subjectsRes] = await Promise.all([
       api.get(API_ENDPOINTS.TEACHER.BY_ID(userId)),
-      api.get(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, { 
-        params: { teacherId: userId, session: CURRENT_SESSION } 
+      api.get(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, {
+        params: { teacherId: userId, session: CURRENT_SESSION }
       })
     ]).catch(err => {
       console.error('Teacher Summary Parallel Fetch Error:', err);
@@ -161,23 +161,23 @@ export const teacherService = {
     }));
 
     const mappedClasses = [...coordinatorClasses, ...classTeacherClasses, ...subjectTeacherClasses];
-    
+
     // Calculate unique teaching classes
     const uniqueTeachingClasses = new Set(subjectTeacherClasses.map(c => c.name));
 
     return {
       kpis: [
-        { 
-          label: 'Assigned Classes', 
-          value: uniqueTeachingClasses.size, 
-          trendType: 'neutral', 
-          iconName: 'Users' 
+        {
+          label: 'Assigned Classes',
+          value: uniqueTeachingClasses.size,
+          trendType: 'neutral',
+          iconName: 'Users'
         },
-        { 
-          label: 'Total Mappings', 
-          value: subjectTeacherClasses.length, 
-          trendType: 'neutral', 
-          iconName: 'BookOpen' 
+        {
+          label: 'Total Mappings',
+          value: subjectTeacherClasses.length,
+          trendType: 'neutral',
+          iconName: 'BookOpen'
         },
       ],
       classes: mappedClasses,

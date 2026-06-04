@@ -47,7 +47,7 @@ export default function SubjectDetailsPage() {
 
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | number | null>(null);
   // classSectionId is the id of the selected ClassSectionItem (used to resolve className/sectionName)
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -83,7 +83,7 @@ export default function SubjectDetailsPage() {
         session: CURRENT_SESSION,
         teacherId: form.teacherId,
         classId,
-        classSectionId: selectedSection.id,
+        classSectionId: selectedSection.masterSectionId,
         subjectId: selectedSubject.id,
       }]
     };
@@ -97,7 +97,7 @@ export default function SubjectDetailsPage() {
     }
     try {
       if (editId) {
-        await updateMutation.mutateAsync({ id: editId, data: payload });
+        await updateMutation.mutateAsync({ id: editId as any, data: payload });
         toast.success('Mapping updated');
       } else {
         await createMutation.mutateAsync(payload);
@@ -109,7 +109,7 @@ export default function SubjectDetailsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string | number) => {
     try {
       await deleteMutation.mutateAsync(id);
       toast.success('Mapping deleted');
@@ -126,7 +126,7 @@ export default function SubjectDetailsPage() {
     );
     setForm({ 
       teacherId: m.teacherId, 
-      classSectionId: cs?.id || 0, 
+      classSectionId: cs?.masterSectionId || 0, 
       subjectId: m.subjectId 
     });
     setShowAdd(true);

@@ -25,7 +25,7 @@ interface Props {
 export const AssignmentSelector = ({ value, onChange, error }: Props) => {
   const user = useAuthStore((s) => s.user);
   // If coordinator or admin, fetch all assignments for the school. If teacher, fetch only theirs.
-  const isPowerUser = user?.role === 'coordinator' || user?.role === 'school_admin' || user?.role === 'principal';
+  const isPowerUser = user?.role === 'subject_coordinator' || user?.role === 'school_admin' || user?.role === 'principal';
   const { data: allSubjectDetails = [], isLoading } = useSubjectDetails(
     isPowerUser ? undefined : user?.id, 
     'all'

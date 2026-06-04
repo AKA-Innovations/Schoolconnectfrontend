@@ -8,7 +8,10 @@ import { Label } from '@/components/ui/label';
 import { BookOpen, Edit2, Save, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useStudent, useAddAcademic, useUpdateAcademic } from '@/hooks/useStudents';
 import { CURRENT_SESSION } from '@/lib/constants';
-import { useClassList, useSectionsByClassName } from '@/hooks/useClasses';
+import { useClassList, useSectionsByClassName, useClassSectionLists } from '@/hooks/useClasses';
+import { useAuthStore } from '@/store/authStore';
+import { classService } from '@/services/class.service';
+import { useQuery } from '@tanstack/react-query';
 import type { CreateAcademicPayload } from '@/services/student.service';
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
@@ -35,6 +38,8 @@ const fields: { label: string; key: keyof CreateAcademicPayload }[] = [
 export function AcademicTab({ studentId }: { studentId: string }) {
   const { data: student } = useStudent(studentId);
   const { data: classNames = [] } = useClassList();
+  const schoolId = useAuthStore((s) => s.schoolId);
+  const { data: allSections = [] } = useClassSectionLists();
   const addMutation = useAddAcademic(studentId);
   const updateMutation = useUpdateAcademic(studentId);
   const [editing, setEditing] = useState(false);
@@ -47,15 +52,21 @@ export function AcademicTab({ studentId }: { studentId: string }) {
 
   const record = student?.academics?.[0] ?? null;
   const hasRecord = !!record;
+  console.log("record", record)
+  const resolvedClassName = record?.className || ((record as any)?.classSectionId ? allSections.find(s => (s.masterSectionId || s.id) === (record as any).classSectionId)?.className : '');
+  const resolvedSectionName = record?.sectionName || ((record as any)?.classSectionId ? allSections.find(s => (s.masterSectionId || s.id) === (record as any).classSectionId)?.sectionName : '');
 
   const startEdit = () => {
     if (record) {
-      setSelectedClassName(record.className);
+      setSelectedClassName(resolvedClassName || '');
       setForm({
         session: (record as any).session ?? CURRENT_SESSION,
-        className: record.className, sectionName: record.sectionName,
-        rollNumber: record.rollNumber, admissionNumber: record.admissionNumber,
-        admissionDate: record.admissionDate, convenceMode: record.convenceMode,
+        className: resolvedClassName || '',
+        sectionName: resolvedSectionName || '',
+        rollNumber: record.rollNumber,
+        admissionNumber: record.admissionNumber,
+        admissionDate: record.admissionDate,
+        convenceMode: record.convenceMode || (record as any).convenceMode || '',
         convenceModeNumber: record.convenceModeNumber ?? '',
       });
     } else {
@@ -78,13 +89,34 @@ export function AcademicTab({ studentId }: { studentId: string }) {
       return;
     }
 
+    const selectedSectionItem = allSections.find(
+      (s) => s.className === selectedClassName && s.sectionName === form.sectionName
+    );
+    console.log("Selected sectons items", selectedSectionItem)
+    const classSectionId = selectedSectionItem?.masterSectionId || selectedSectionItem?.id;
+
+    if (!classSectionId || classSectionId < 0) {
+      setError('Selected Class/Section mapping not found in the active list.');
+      return;
+    }
+
+    const payload = {
+      session: form.session,
+      classSectionId: classSectionId,
+      rollNumber: form.rollNumber,
+      admissionNumber: form.admissionNumber,
+      admissionDate: form.admissionDate,
+      convenceMode: form.convenceMode,
+      convenceModeNumber: form.convenceModeNumber,
+    };
+
     if (hasRecord) {
-      updateMutation.mutate({ academicId: record.id, data: form }, {
+      updateMutation.mutate({ academicId: record.id, data: payload as any }, {
         onSuccess: () => { setEditing(false); setSuccess(true); setTimeout(() => setSuccess(false), 3000); },
         onError: (err: any) => setError(err?.response?.data?.message ?? 'Update failed'),
       });
     } else {
-      addMutation.mutate(form, {
+      addMutation.mutate(payload as any, {
         onSuccess: () => { setEditing(false); setSuccess(true); setTimeout(() => setSuccess(false), 3000); },
         onError: (err: any) => setError(err?.response?.data?.message ?? 'Failed to add academic record'),
       });
@@ -102,92 +134,92 @@ export function AcademicTab({ studentId }: { studentId: string }) {
           </div>
         )}
         <div className="grid grid-cols-2 gap-4">
-        
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div className="space-y-2">
-    <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-      Class
-    </Label>
-    <div className="relative">
-      <select
-        value={selectedClassName}
-        onChange={(e) => {
-          const nextClass = e.target.value;
-          setSelectedClassName(nextClass);
-          setForm((prev) => ({
-            ...prev,
-            className: nextClass,
-            sectionName: '',
-          }));
-        }}
-        className="w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-10 h-11 text-sm font-medium text-foreground shadow-sm transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-primary/40"
-      >
-        <option value="">Select class</option>
-        {classNames.map((className) => (
-          <option key={className} value={className}>
-            {className}
-          </option>
-        ))}
-      </select>
-
-      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </div>
-  </div>
-
-  <div className="space-y-2">
-    <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-      Section
-    </Label>
-    <div className="relative">
-      <select
-        value={form.sectionName}
-        onChange={(e) =>
-          setForm((prev) => ({ ...prev, sectionName: e.target.value }))
-        }
-        className="w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-10 h-11 text-sm font-medium text-foreground shadow-sm transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-primary/40 disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground disabled:border-border/60"
-        disabled={!selectedClassName}
-      >
-        <option value="">
-          {selectedClassName ? 'Select section' : 'Select class first'}
-        </option>
-        {sectionNames.map((sectionName) => (
-          <option key={sectionName} value={sectionName}>
-            {sectionName}
-          </option>
-        ))}
-      </select>
-
-      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </div>
-  </div>
-</div>
 
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Class
+              </Label>
+              <div className="relative">
+                <select
+                  value={selectedClassName}
+                  onChange={(e) => {
+                    const nextClass = e.target.value;
+                    setSelectedClassName(nextClass);
+                    setForm((prev) => ({
+                      ...prev,
+                      className: nextClass,
+                      sectionName: '',
+                    }));
+                  }}
+                  className="w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-10 h-11 text-sm font-medium text-foreground shadow-sm transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-primary/40"
+                >
+                  <option value="">Select class</option>
+                  {classNames.map((className) => (
+                    <option key={className} value={className}>
+                      {className}
+                    </option>
+                  ))}
+                </select>
 
-          
+                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Section
+              </Label>
+              <div className="relative">
+                <select
+                  value={form.sectionName}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, sectionName: e.target.value }))
+                  }
+                  className="w-full appearance-none rounded-2xl border border-border bg-background px-4 pr-10 h-11 text-sm font-medium text-foreground shadow-sm transition-all outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary hover:border-primary/40 disabled:cursor-not-allowed disabled:bg-muted/40 disabled:text-muted-foreground disabled:border-border/60"
+                  disabled={!selectedClassName}
+                >
+                  <option value="">
+                    {selectedClassName ? 'Select section' : 'Select class first'}
+                  </option>
+                  {sectionNames.map((sectionName) => (
+                    <option key={sectionName} value={sectionName}>
+                      {sectionName}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted-foreground">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
+
           {fields.slice(2).map(({ label, key }) => (
             <div key={key} className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
@@ -235,8 +267,8 @@ export function AcademicTab({ studentId }: { studentId: string }) {
           <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
             <CardContent className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <InfoRow label="Class" value={record.className} />
-                <InfoRow label="Section" value={record.sectionName} />
+                <InfoRow label="Class" value={resolvedClassName} />
+                <InfoRow label="Section" value={resolvedSectionName} />
                 <InfoRow label="Roll No" value={record.rollNumber} />
                 <InfoRow label="Admission No" value={record.admissionNumber} />
                 <InfoRow label="Admission Date" value={record.admissionDate ? new Date(record.admissionDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : undefined} />

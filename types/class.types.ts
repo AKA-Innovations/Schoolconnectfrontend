@@ -42,15 +42,13 @@ export interface ClassTeacher {
 }
 
 export interface CreateClassPayload {
-  className: string;
-  sectionName: string;
+  session: string;
+  classSectionsId: number;
   maxLimit?: number;
   classTeacherId?: string;
 }
 
 export interface UpdateClassPayload {
-  className?: string;
-  sectionName?: string;
   maxLimit?: number;
   classTeacherId?: string;
 }
@@ -143,7 +141,7 @@ export interface CreateSubjectBulkPayload {
 // ─── Legacy/Old mappings (keep for compatibility if needed) ──────────────────
 
 export interface SubjectDetail {
-  id: string; 
+  id: string;
   classDtlsId: number;
   subjectDtlsId: number;
   teacherId: string;

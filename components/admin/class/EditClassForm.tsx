@@ -58,8 +58,6 @@ export function EditClassForm() {
           onSuccess: async () => {
             // Update remaining fields separately if any changed
             await updateClassMutation.mutateAsync({
-              className: formData.className || undefined,
-              sectionName: formData.sectionName || undefined,
               maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
             });
             toast.success('Class updated — teacher assignment applied successfully');
@@ -71,8 +69,6 @@ export function EditClassForm() {
     } else {
       updateClassMutation.mutate(
         {
-          className: formData.className || undefined,
-          sectionName: formData.sectionName || undefined,
           maxLimit: formData.maxLimit ? parseInt(formData.maxLimit) : undefined,
           classTeacherId: formData.classTeacherId || undefined,
         },
@@ -130,29 +126,27 @@ export function EditClassForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Class Name */}
             <div className="space-y-2">
-              <Label htmlFor="className" className="text-xs font-bold uppercase tracking-widest">
-                Class Name
+              <Label htmlFor="className" className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">
+                Class Name (Managed via Structure)
               </Label>
               <Input
                 id="className"
                 value={formData.className}
-                onChange={(e) => setFormData({ ...formData, className: e.target.value })}
-                placeholder="e.g., Class 1, Class 10"
-                className="rounded-xl h-10"
+                disabled
+                className="rounded-xl h-10 bg-muted/50 cursor-not-allowed"
               />
             </div>
 
             {/* Section Name */}
             <div className="space-y-2">
-              <Label htmlFor="sectionName" className="text-xs font-bold uppercase tracking-widest">
-                Section Name
+              <Label htmlFor="sectionName" className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">
+                Section Name (Managed via Structure)
               </Label>
               <Input
                 id="sectionName"
                 value={formData.sectionName}
-                onChange={(e) => setFormData({ ...formData, sectionName: e.target.value })}
-                placeholder="e.g., A, B, C"
-                className="rounded-xl h-10"
+                disabled
+                className="rounded-xl h-10 bg-muted/50 cursor-not-allowed"
               />
             </div>
 

@@ -60,7 +60,7 @@ export function CurriculumBuilder() {
   const { data: subjectOptions = [], isLoading: loadingSubjects } = useSubjectOptions(selectedClass);
 
   const selectedSubjectName = useMemo(
-    () => subjectOptions.find((s) => s.id === selectedSubjectId)?.subjectName ?? '',
+    () => subjectOptions.find((s) => String(s.id) === String(selectedSubjectId))?.subjectName ?? '',
     [subjectOptions, selectedSubjectId],
   );
 

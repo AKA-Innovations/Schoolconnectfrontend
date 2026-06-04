@@ -9,9 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { 
   useSchoolClasses, 
   useCreateSchoolClasses, 
+  useUpdateSchoolClass,
+  useDeleteSchoolClass,
   useSchoolSections, 
   useCreateSchoolSections,
-  useUpdateSchoolSection 
+  useUpdateSchoolSection,
+  useDeleteSchoolSection
 } from '@/hooks/useClasses';
 import { 
   Plus, 

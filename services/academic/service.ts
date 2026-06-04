@@ -64,7 +64,9 @@ export const academicService = {
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_TOPIC, {
       params: { chapterId, subjectId, session },
     });
+
     const raw = response.data;
+    console.log("raw", raw)
     if (Array.isArray(raw)) return raw;
     if (raw?.data && Array.isArray(raw.data)) return raw.data;
     if (raw?.topics && Array.isArray(raw.topics)) return raw.topics;
@@ -84,7 +86,7 @@ export const academicService = {
   deleteSubjectTopic: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.ACADEMIC.SUBJECT_TOPIC_BY_ID(id));
   },
-  
+
   getSubjectProgress: async (subjectId: number | string, classSectionId: number | string, session?: string): Promise<SubjectProgressSummary | null> => {
     if (!subjectId || !classSectionId) return null;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_PROGRESS, {
@@ -102,6 +104,13 @@ export const academicService = {
   },
 
   // ─── Teaching Progress ─────────────────────────────────────────────────────
+
+  getTeachingProgress: async (teacherId?: string): Promise<TeachingProgress[]> => {
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, {
+      params: teacherId ? { teacherId } : undefined,
+    });
+    return response.data ?? [];
+  },
 
   createTeachingProgress: async (data: CreateTeachingProgressPayload): Promise<TeachingProgress> => {
     const response = await api.post(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, data);

@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useClassSectionLists, useSubjectDetails, useTimetable, usePeriodSlots,
   useCreateSubjectDetail, useDeleteSubjectDetail, useSubjectOptions,
-  useSchoolClasses,
+  useSchoolClasses, useCreateTimetableEntry, useUpdateTimetableEntry,
+  useDeleteTimetableEntry,
 } from '@/hooks/useClasses';
 import { useTeacherList, useAddClassTeacher, useRemoveClassTeacher } from '@/hooks/useTeachers';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
@@ -367,9 +368,9 @@ function SubjectsTab({
     );
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     if (!confirm('Remove this subject-teacher mapping?')) return;
-    deleteMutation.mutate(id, {
+    deleteMutation.mutate(id as any, {
       onSuccess: () => toast.success('Mapping removed'),
       onError: () => toast.error('Failed to remove'),
     });
