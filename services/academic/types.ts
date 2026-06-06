@@ -269,6 +269,7 @@ export interface StudyMaterial {
   subjectId: number;
   chapterId?: number;
   topicId?: number;
+  teacherId?: string;
   description: string;
   documentPath: string;
   signedUrl?: string;

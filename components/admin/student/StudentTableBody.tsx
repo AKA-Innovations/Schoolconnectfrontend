@@ -15,9 +15,11 @@ type Props = {
   isLoading: boolean;
   hasFilters: boolean;
   onClearFilters: () => void;
+  onRowClick?: (student: StudentListItem) => void;
+  customViewUrl?: (id: string) => string;
 };
 
-export function StudentTableBody({ students, isLoading, hasFilters, onClearFilters }: Props) {
+export function StudentTableBody({ students, isLoading, hasFilters, onClearFilters, onRowClick, customViewUrl }: Props) {
   return (
     <Table>
       <TableHeader>
@@ -55,7 +57,14 @@ export function StudentTableBody({ students, isLoading, hasFilters, onClearFilte
             const academic = student.academics?.[0];
             const initials = `${student.firstName[0]}${student.lastName[0]}`.toUpperCase();
             return (
-              <TableRow key={student.id} className="group hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-none">
+              <TableRow 
+                key={student.id} 
+                className={cn(
+                  "group hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-none",
+                  onRowClick && "cursor-pointer"
+                )}
+                onClick={() => onRowClick?.(student)}
+              >
                 <TableCell className="py-5 pl-8">
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 text-sm">
@@ -98,8 +107,8 @@ export function StudentTableBody({ students, isLoading, hasFilters, onClearFilte
                     {student.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right pr-8">
-                  <Link href={`/dashboard/admin/student/${student.id}`}>
+                <TableCell className="text-right pr-8" onClick={(e) => e.stopPropagation()}>
+                  <Link href={customViewUrl ? customViewUrl(student.id) : `/dashboard/admin/student/${student.id}`}>
                     <Button variant="ghost" size="sm" className="rounded-xl h-9 px-4 text-xs font-bold opacity-0 group-hover:opacity-100 hover:bg-indigo-50 hover:text-indigo-600 transition-all translate-x-2 group-hover:translate-x-0">
                       View <ArrowRight size={14} className="ml-1.5" />
                     </Button>

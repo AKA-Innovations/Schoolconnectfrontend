@@ -17,21 +17,9 @@ export function ClassesOverview() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useClasses({ page, limit: 10, className: searchClass || undefined });
-  const deleteClassMutation = useDeleteClass();
-
   const classes = data?.items || [];
   const pagination = data?.pagination;
   const total = pagination?.totalPages || 1;
-
-  const handleDelete = (classDtlsId: number) => {
-    deleteClassMutation.mutate(classDtlsId, {
-      onSuccess: () => {
-        setDeleteConfirm(null);
-        refetch();
-      },
-      onError: () => alert('Failed to delete class'),
-    });
-  };
 
   const router = useRouter();
 
@@ -138,9 +126,18 @@ export function ClassesOverview() {
                         <p className="font-semibold text-foreground">{cls.maxLimit ?? '-'}</p>
                       </td>
                       <td className="px-8 py-4">
-                        <p className="text-sm text-muted-foreground font-mono text-xs">
-                          {cls.classTeacherId ? cls.classTeacherId.slice(0, 8) + '…' : '-'}
-                        </p>
+                        {cls.classTeacherId ? (
+                          <div>
+                            <p className="font-semibold text-slate-800 text-xs">
+                              {(cls as any).classTeacherName || (cls as any).teacherName || 'Assigned'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                              {cls.classTeacherId.slice(0, 8) + '…'}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground font-semibold text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-8 py-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -161,15 +158,6 @@ export function ClassesOverview() {
                             onClick={() => router.push(`/dashboard/admin/class/${cls.id}/edit`)}
                           >
                             <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                            title="Delete"
-                            onClick={() => setDeleteConfirm(cls.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -219,40 +207,6 @@ export function ClassesOverview() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      {deleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
-          <Card className="w-96 rounded-2xl">
-            <CardHeader className="bg-muted/10 border-b border-border/50">
-              <CardTitle className="text-lg font-bold tracking-tight">Delete Class</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground mb-6">
-                Are you sure you want to delete this class? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDeleteConfirm(null)}
-                  className="rounded-xl"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDelete(deleteConfirm)}
-                  disabled={deleteClassMutation.isPending}
-                  className="rounded-xl"
-                >
-                  {deleteClassMutation.isPending ? 'Deleting...' : 'Delete'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

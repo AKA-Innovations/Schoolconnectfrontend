@@ -18,6 +18,7 @@ export interface SchoolSection {
   classId: number;
   className: string;
   sectionName: string;
+  schoolId?: string;
 }
 
 export interface CreateSchoolClassPayload {

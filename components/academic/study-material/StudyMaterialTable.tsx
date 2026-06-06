@@ -22,9 +22,14 @@ interface Props {
   onDelete: (id: number) => void; 
 }
 
+import { useAuthStore } from '@/store/authStore';
+
 export const StudyMaterialTable = React.memo(function StudyMaterialTable({ materials, isLoading, onDelete }: Props) {
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [previewFilename, setPreviewFilename] = React.useState<string>('');
+
+  const role = useAuthStore((s) => s.role);
+  const canManage = role === 'teacher' || role === 'subject_coordinator';
 
   const columns = useMemo<ColumnDef<EnrichedStudyMaterial>[]>(() => [
     {
@@ -90,13 +95,15 @@ export const StudyMaterialTable = React.memo(function StudyMaterialTable({ mater
               <Eye size={16} className="text-teal-500" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onDelete(item.id)}>
-            <Trash2 size={16} />
-          </Button>
+          {canManage && (
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onDelete(item.id)}>
+              <Trash2 size={16} />
+            </Button>
+          )}
         </div>
       ),
     },
-  ], [onDelete]);
+  ], [onDelete, canManage]);
 
   return (
     <>

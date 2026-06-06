@@ -9,7 +9,9 @@ import { AcademicPageHeader } from '../shared/AcademicPageHeader';
 import { AcademicFilterBar } from '../shared/AcademicFilterBar';
 import { ClassworkTable } from './ClassworkTable';
 import { ClassworkFormModal } from './ClassworkFormModal';
+import { ClassworkDetailView } from './ClassworkDetailView';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
+import { useAuthStore } from '@/store/authStore';
 import type { Classwork } from '@/services/academic/types';
 
 export function ClassworkManagement() {
@@ -17,7 +19,11 @@ export function ClassworkManagement() {
   const [classIdFilter, setClassIdFilter] = useState('');
   const [isFormOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<Classwork | null>(null);
+  const [viewItem, setViewItem] = useState<Classwork | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  const role = useAuthStore((s) => s.role);
+  const canUpload = role === 'teacher' || role === 'subject_coordinator';
 
   const debouncedSearch = useDebounce(search, 400);
   const { data, isLoading, isFetching, refetch } = useClassworks(classIdFilter || undefined);
@@ -31,11 +37,16 @@ export function ClassworkManagement() {
   }, [data, debouncedSearch]);
 
   const handleEdit = useCallback((cw: Classwork) => { setEditItem(cw); setFormOpen(true); }, []);
+  const handleView = useCallback((cw: Classwork) => setViewItem(cw), []);
   const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget == null) return;
     deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) });
   }, [deleteTarget, deleteMutation]);
+
+  if (viewItem) {
+    return <ClassworkDetailView classwork={viewItem} onBack={() => setViewItem(null)} />;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -43,9 +54,11 @@ export function ClassworkManagement() {
         <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
-        <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl">
-          <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Add Classwork</span>
-        </Button>
+        {canUpload && (
+          <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl">
+            <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Add Classwork</span>
+          </Button>
+        )}
       </AcademicPageHeader>
 
       <AcademicFilterBar searchTerm={search} onSearchChange={setSearch} searchPlaceholder="Search classwork..."
@@ -54,7 +67,7 @@ export function ClassworkManagement() {
           className="h-10 pl-4 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500/20 transition-all w-44" />
       </AcademicFilterBar>
 
-      <ClassworkTable classworks={classworks} isLoading={isLoading} onEdit={handleEdit} onDelete={handleDelete} />
+      <ClassworkTable classworks={classworks} isLoading={isLoading} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
 
       <ClassworkFormModal open={isFormOpen} onOpenChange={setFormOpen} editItem={editItem}
         onSuccess={() => { setFormOpen(false); setEditItem(null); }} />

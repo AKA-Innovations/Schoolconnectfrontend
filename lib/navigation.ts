@@ -4,7 +4,7 @@ import {
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
   Sparkles, Building2, UserCog, Grid3X3, Users2, Menu,
-  Clock, Compass, LucideIcon
+  Clock, Compass, Shield, LucideIcon
 } from 'lucide-react';
 import { Role } from '../types/roles';
 
@@ -108,19 +108,46 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
   ],
   principal: [
-    { name: 'Dashboard', href: '/dashboard/principal', icon: LayoutDashboard },
-    { 
-      name: 'Staff & Students', 
-      href: '/dashboard/principal/teachers', 
-      icon: Users,
+    {
+      name: 'Overview',
+      href: '/dashboard/principal?tab=overview',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Academic Activity',
+      href: '/dashboard/principal?tab=academic',
+      icon: BookOpen,
       subLinks: [
-        { name: 'Teachers', href: '/dashboard/principal/teachers' },
-        { name: 'Students', href: '/dashboard/principal/students' },
+        { name: 'Homework', href: '/dashboard/principal?tab=academic&sub=homework' },
+        { name: 'Classwork', href: '/dashboard/principal?tab=academic&sub=classwork' },
+        { name: 'Syllabus Progress', href: '/dashboard/principal?tab=academic&sub=progress' },
+        { name: 'Study Materials', href: '/dashboard/principal?tab=academic&sub=materials' },
       ]
     },
-    { name: 'Timetable', href: '/dashboard/principal/timetable', icon: Calendar },
-    { name: 'Announcements', href: '/dashboard/principal/announcements', icon: MessageSquare },
-    { name: 'Reports', href: '/dashboard/principal/reports', icon: BarChart3 },
+    {
+      name: 'Teachers',
+      href: '/dashboard/principal?tab=teachers',
+      icon: Users,
+    },
+    {
+      name: 'Students',
+      href: '/dashboard/principal?tab=students',
+      icon: GraduationCap,
+    },
+    {
+      name: 'Timetable',
+      href: '/dashboard/principal?tab=timetable',
+      icon: Calendar,
+    },
+    {
+      name: 'Exams',
+      href: '/dashboard/principal?tab=exams',
+      icon: FileText,
+      subLinks: [
+        { name: 'Exam List', href: '/dashboard/principal?tab=exams&sub=list' },
+        { name: 'Exam Schedules', href: '/dashboard/principal?tab=exams&sub=schedules' },
+      ]
+    },
   ],
   teacher: [
     { 
@@ -131,6 +158,12 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Overview', href: '/dashboard/teacher' },
         { name: 'Schedule', href: '/dashboard/teacher/schedule' },
       ]
+    },
+    {
+      name: 'Principal View',
+      href: '/dashboard/principal',
+      icon: Shield,
+      requiresTeacherRole: 'isPrincipal',
     },
     { 
       name: 'Classroom', 
@@ -240,4 +273,22 @@ export const isLinkActive = (link: SidebarLink, pathname: string, searchParams: 
   if (link.subLinks?.some(sub => checkMatch(sub.href))) return true;
 
   return false;
+};
+
+export const getSidebarLinks = (role: Role | null, teacherRoles: any): SidebarLink[] => {
+  if (!role) return [];
+  if (role === 'teacher' && teacherRoles.isPrincipal) {
+    return baseSidebarLinks['principal'].map(link => ({
+      ...link,
+      // Principal links inside teacher context are identical, but we also append Profile link
+    })).concat([
+      { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog }
+    ]);
+  }
+  
+  const base = baseSidebarLinks[role] || [];
+  return base.filter((link) => {
+    if (!link.requiresTeacherRole) return true;
+    return teacherRoles[link.requiresTeacherRole];
+  });
 };

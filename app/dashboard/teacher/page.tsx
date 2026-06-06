@@ -16,11 +16,21 @@ import { ClassworkFormModal } from '../../../components/academic/classwork/Class
 import { ProgressFormModal } from '../../../components/academic/teaching-progress/ProgressFormModal';
 import { ProgressDashboardCards } from '../../../components/academic/teaching-progress/ProgressDashboardCards';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export default function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
+
+  // Redirect principal to principal dashboard
+  React.useEffect(() => {
+    if (user?.isPrincipal) {
+      router.replace('/dashboard/principal');
+    }
+  }, [user, router]);
+
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useTeacherDashboard();
-  const { data: subjectDetails = [] } = useSubjectDetails(user?.id);
+  const { data: subjectDetails = [] } = useSubjectDetails(user?.isPrincipal ? undefined : user?.id);
   
   // Get today's day of week
   const today = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());
@@ -132,6 +142,10 @@ export default function TeacherDashboard() {
   };
 
   const isLoading = isSummaryLoading || isTimetableLoading;
+
+  if (user?.isPrincipal) {
+    return null;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 p-4 lg:p-8">

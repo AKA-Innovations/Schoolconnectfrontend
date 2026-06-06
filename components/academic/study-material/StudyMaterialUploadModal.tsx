@@ -114,7 +114,7 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
                 onChange={(val, detail) => {
                   field.onChange(val);
                   setSelectedClassName(detail?.className);
-                  setSelectedSubjectId(detail?.subjectId);
+                  setSelectedSubjectId(detail?.subjectDtlsId ? String(detail.subjectDtlsId) : undefined);
                   setSelectedClassId(detail?.classId);
                   setSelectedClassSectionId(detail?.classSectionId);
                   setSelectedSubjectDtlsId(detail?.subjectDtlsId);

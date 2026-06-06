@@ -9,6 +9,8 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { formatDate } from '@/lib/dateUtils';
 import type { Homework } from '@/services/academic/types';
 
+import { useAuthStore } from '@/store/authStore';
+
 interface Props {
   homeworks: Homework[];
   isLoading: boolean;
@@ -25,6 +27,9 @@ function getHomeworkStatus(hw: Homework): string {
 }
 
 export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLoading, onView, onEdit, onDelete }: Props) {
+  const role = useAuthStore((s) => s.role);
+  const canManage = role === 'teacher' || role === 'subject_coordinator';
+
   const columns = useMemo<ColumnDef<Homework>[]>(() => [
     {
       key: 'title', header: 'Homework',
@@ -62,16 +67,20 @@ export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLo
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onView(item)}>
             <Eye size={16} className="text-slate-400" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onEdit(item)}>
-            <Edit size={16} className="text-slate-400" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onDelete(item.id)}>
-            <Trash2 size={16} />
-          </Button>
+          {canManage && (
+            <>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onEdit(item)}>
+                <Edit size={16} className="text-slate-400" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onDelete(item.id)}>
+                <Trash2 size={16} />
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
-  ], [onView, onEdit, onDelete]);
+  ], [onView, onEdit, onDelete, canManage]);
 
   return <AcademicTable columns={columns} data={homeworks} isLoading={isLoading} rowKey={(i) => i.id} emptyIcon={<ClipboardList size={48} />} emptyMessage="No Homework Found" />;
 });

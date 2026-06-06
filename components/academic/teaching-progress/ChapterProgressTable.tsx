@@ -32,15 +32,36 @@ function ChapterProgressRow({
   const displayProgress = useMemo(() => {
     if (!progress) return null;
     
-    // If top-level completion is 0 but we have topics with progress, calculate average
-    if (progress.completionPercentage === 0 && progress.topics && progress.topics.length > 0) {
-      const total = progress.topics.reduce((acc, t) => acc + (t.completionPercentage || 0), 0);
-      return {
-        ...progress,
-        completionPercentage: Math.round(total / progress.topics.length)
-      };
+    const topics = progress.topics || [];
+    const topicsCount = topics.length;
+    
+    let completionPercentage = progress.completionPercentage;
+    if ((completionPercentage === undefined || completionPercentage === null || completionPercentage === 0) && topicsCount > 0) {
+      const total = topics.reduce((acc, t) => acc + (t.completionPercentage || 0), 0);
+      completionPercentage = Math.round(total / topicsCount);
     }
-    return progress;
+
+    let status = progress.status;
+    if (!status && topicsCount > 0) {
+      const allCompleted = topics.every(t => t.status === 'completed' || t.completionPercentage === 100);
+      const allNotStarted = topics.every(t => t.status === 'not_started' || (t.completionPercentage || 0) === 0);
+      if (allCompleted) {
+        status = 'completed';
+      } else if (allNotStarted) {
+        status = 'not_started';
+      } else {
+        status = 'IN_PROGRESS';
+      }
+    } else if (!status) {
+      status = 'not_started';
+    }
+
+    return {
+      ...progress,
+      completionPercentage: completionPercentage || 0,
+      status,
+      topicsCount
+    };
   }, [progress]);
 
   return (
@@ -104,8 +125,8 @@ function ChapterProgressRow({
         )}
       </td>
       <td className="py-4 px-6">
-        {progress ? (
-          <span className="text-xs text-slate-500">{progress.topicsCount || 0} Topics</span>
+        {displayProgress ? (
+          <span className="text-xs text-slate-500">{displayProgress.topicsCount || 0} Topics</span>
         ) : (
           <span className="text-xs text-slate-300">—</span>
         )}

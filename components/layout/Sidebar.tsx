@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useTeacherRoles } from '../../lib/permissions';
-import { baseSidebarLinks, SidebarLink, isLinkActive } from '../../lib/navigation';
+import { getSidebarLinks, SidebarLink, isLinkActive } from '../../lib/navigation';
 
 type SidebarProps = {
   onClose?: () => void;
@@ -27,13 +27,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   const teacherRoles = useTeacherRoles();
   const [collapsed, setCollapsed] = React.useState(false);
 
-  // Filter links based on teacher sub-roles
+  // Filter links based on teacher sub-roles and Principal override
   const links = React.useMemo(() => {
-    const base = role ? baseSidebarLinks[role] : [];
-    return base.filter((link) => {
-      if (!link.requiresTeacherRole) return true;
-      return teacherRoles[link.requiresTeacherRole];
-    });
+    return getSidebarLinks(role, teacherRoles);
   }, [role, teacherRoles]);
 
   const showLabels = !collapsed;

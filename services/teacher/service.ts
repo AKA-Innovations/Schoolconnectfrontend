@@ -163,7 +163,7 @@ export const teacherService = {
     const mappedClasses = [...coordinatorClasses, ...classTeacherClasses, ...subjectTeacherClasses];
 
     // Calculate unique teaching classes
-    const uniqueTeachingClasses = new Set(subjectTeacherClasses.map(c => c.name));
+    const uniqueTeachingClasses = new Set(subjectTeacherClasses.map((c: any) => c.name));
 
     return {
       kpis: [

@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '../../lib/utils';
 import { useAuthStore } from '../../store/authStore';
 import { useTeacherRoles } from '../../lib/permissions';
-import { baseSidebarLinks, isLinkActive } from '../../lib/navigation';
+import { getSidebarLinks, isLinkActive } from '../../lib/navigation';
 
 export function SubNavbar() {
   const pathname = usePathname();
@@ -14,14 +14,14 @@ export function SubNavbar() {
   const { role } = useAuthStore();
   const teacherRoles = useTeacherRoles();
 
-  // Find the active main section
+  // Find the active main section using role and teacherRoles dynamic links
   const activeSection = React.useMemo(() => {
     if (!role) return null;
-    const links = baseSidebarLinks[role];
+    const links = getSidebarLinks(role, teacherRoles);
     const currentParams = new URLSearchParams(searchParams?.toString());
     
     return links.find(link => isLinkActive(link, pathname || '', currentParams));
-  }, [role, pathname, searchParams]);
+  }, [role, pathname, searchParams, teacherRoles]);
 
   // Filter sub-links based on teacher roles
   const subLinks = React.useMemo(() => {

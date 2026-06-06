@@ -175,8 +175,20 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
         String(p.chapterId) === selectedChapterId &&
         (selectedTopicId ? String(p.topicId) === selectedTopicId : !p.topicId)
       );
-      if (foundMatch) {
+      if (foundMatch && foundMatch.id) {
         existingProgressId = foundMatch.id;
+      }
+
+      // Fallback/alternative check using currentProgress query which has topic-level ids
+      if (!existingProgressId && currentProgress) {
+        if (selectedTopicId && currentProgress.topics) {
+          const topicProgress = currentProgress.topics.find(t => String(t.topicId) === selectedTopicId);
+          if (topicProgress && topicProgress.id) {
+            existingProgressId = topicProgress.id;
+          }
+        } else if (!selectedTopicId && currentProgress.id) {
+          existingProgressId = currentProgress.id;
+        }
       }
 
       if (existingProgressId) {
@@ -218,8 +230,20 @@ export const ProgressFormModal = React.memo(function ProgressFormModal({
       String(p.chapterId) === selectedChapterId &&
       (selectedTopicId ? String(p.topicId) === selectedTopicId : !p.topicId)
     );
-    return !!foundMatch;
-  }, [isEditing, rawProgressList, classSectionId, subjectId, selectedChapterId, selectedTopicId]);
+    if (foundMatch && foundMatch.id) return true;
+
+    if (currentProgress) {
+      if (selectedTopicId && currentProgress.topics) {
+        const topicProgress = currentProgress.topics.find(t => String(t.topicId) === selectedTopicId);
+        if (topicProgress && topicProgress.id) {
+          return true;
+        }
+      } else if (!selectedTopicId && currentProgress.id) {
+        return true;
+      }
+    }
+    return false;
+  }, [isEditing, rawProgressList, classSectionId, subjectId, selectedChapterId, selectedTopicId, currentProgress]);
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 

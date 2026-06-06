@@ -110,6 +110,21 @@ export interface TeacherRegistrationData {
   classes: TeacherClass[];
   classTeacherClass?: { className: string; sectionName: string };
   coordinatorClasses?: string[];
+  bloodGroup?: string;
+  maritalStatus?: string;
+  nationality?: string;
+  religion?: string;
+  highestQualification?: string;
+  specialization?: string;
+  university?: string;
+  passingYear?: string;
+  designation?: string;
+  totalExperience?: string;
+  previousSchool?: string;
+  fatherName?: string;
+  motherName?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface TeacherUpdateDetails {

@@ -56,7 +56,7 @@ export const adminService = {
       kpis: [
         { label: 'Total Teachers', value: teacherCount, trendType: 'neutral', iconName: 'Users' },
         { label: 'Total Students', value: studentCount, trendType: 'neutral', iconName: 'GraduationCap' },
-        { label: 'Total Classes', value: classCount, trendType: 'neutral', iconName: 'Building2' },
+        // { label: 'Total Classes', value: classCount, trendType: 'neutral', iconName: 'Building2' },
       ],
       school: {
         id: schoolDataRaw?.id || schoolId,
@@ -82,10 +82,8 @@ export const adminService = {
     const response = await api.get(API_ENDPOINTS.ADMIN.TEACHERS, {
       params: {
         page,
-        limit,
-        ...rest,
         pageSize: limit,
-        pageNumber: page,
+        ...rest,
       }
     });
     return response.data;

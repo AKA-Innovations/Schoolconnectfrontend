@@ -112,7 +112,6 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
           id: editItem.id,
           data: {
             description: values.description,
-            conductedOn: new Date(values.conductedOn).toISOString(),
           },
         },
         { onSuccess },
@@ -171,7 +170,7 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
                   onChange={(val, detail) => {
                     field.onChange(val);
                     setSelectedClassName(detail?.className);
-                    setSelectedSubjectId(detail?.subjectId);
+                    setSelectedSubjectId(detail?.subjectDtlsId ? String(detail.subjectDtlsId) : undefined);
                     setSelectedClassSectionId(detail?.classSectionId);
                     setSelectedSubjectDtlsId(detail?.subjectDtlsId);
                     setValue('chapterId', '');
@@ -182,40 +181,42 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
             />
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <Controller
-              name="chapterId"
-              control={control}
-              render={({ field }) => (
-                <ChapterSelect
-                  className={selectedClassName}
-                  subjectId={selectedSubjectId}
-                  value={field.value}
-                  onChange={(val) => {
-                    field.onChange(val);
-                    setValue('topicId', '');
-                  }}
-                  error={errors.chapterId?.message}
-                  disabled={!assignmentKey}
-                />
-              )}
-            />
+          {!isEditing && (
+            <div className="grid grid-cols-2 gap-4">
+              <Controller
+                name="chapterId"
+                control={control}
+                render={({ field }) => (
+                  <ChapterSelect
+                    className={selectedClassName}
+                    subjectId={selectedSubjectId}
+                    value={field.value}
+                    onChange={(val) => {
+                      field.onChange(val);
+                      setValue('topicId', '');
+                    }}
+                    error={errors.chapterId?.message}
+                    disabled={!assignmentKey}
+                  />
+                )}
+              />
 
-            <Controller
-              name="topicId"
-              control={control}
-              render={({ field }) => (
-                <TopicSelect
-                  chapterId={chapterId}
-                  subjectId={selectedSubjectDtlsId}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.topicId?.message}
-                  disabled={!chapterId}
-                />
-              )}
-            />
-          </div>
+              <Controller
+                name="topicId"
+                control={control}
+                render={({ field }) => (
+                  <TopicSelect
+                    chapterId={chapterId}
+                    subjectId={selectedSubjectDtlsId}
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.topicId?.message}
+                    disabled={!chapterId}
+                  />
+                )}
+              />
+            </div>
+          )}
 
           <FormField label="Description / What was covered" error={errors.description?.message} required>
             <textarea
@@ -225,13 +226,15 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
             />
           </FormField>
 
-          <FormField label="Conducted On" error={errors.conductedOn?.message} required>
-            <input
-              {...register('conductedOn', { required: 'Required' })}
-              type="date"
-              className="field"
-            />
-          </FormField>
+          {!isEditing && (
+            <FormField label="Conducted On" error={errors.conductedOn?.message} required>
+              <input
+                {...register('conductedOn', { required: 'Required' })}
+                type="date"
+                className="field"
+              />
+            </FormField>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
