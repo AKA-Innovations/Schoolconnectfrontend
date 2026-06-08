@@ -4,7 +4,7 @@ import {
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
   Sparkles, Building2, UserCog, Grid3X3, Users2, Menu,
-  Clock, Compass, Shield, LucideIcon
+  Clock, Compass, Shield, LucideIcon, Megaphone
 } from 'lucide-react';
 import { Role } from '../types/roles';
 
@@ -106,6 +106,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       href: '/dashboard/admin/profile', 
       icon: UserCog,
     },
+    {
+      name: 'Announcements',
+      href: '/dashboard/admin/announcements',
+      icon: Megaphone,
+    },
   ],
   principal: [
     {
@@ -147,6 +152,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Exam List', href: '/dashboard/principal?tab=exams&sub=list' },
         { name: 'Exam Schedules', href: '/dashboard/principal?tab=exams&sub=schedules' },
       ]
+    },
+    {
+      name: 'Announcements',
+      href: '/dashboard/principal/announcements',
+      icon: Megaphone,
     },
   ],
   teacher: [
@@ -207,6 +217,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
     { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog },
+    {
+      name: 'Announcements',
+      href: '/dashboard/teacher/announcements',
+      icon: Megaphone,
+    },
   ],
   subject_coordinator: [
     { name: 'Dashboard', href: '/dashboard/coordinator', icon: LayoutDashboard },
@@ -230,6 +245,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Mapping', href: '/dashboard/coordinator/subject-mapping' },
       ]
     },
+    {
+      name: 'Announcements',
+      href: '/dashboard/coordinator/announcements',
+      icon: Megaphone,
+    },
   ],
   student: [
     { 
@@ -240,6 +260,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'My Schedule', href: '/dashboard/student/exams/schedule' },
         { name: 'Report Cards', href: '/dashboard/student/exams/report-card' },
       ]
+    },
+    {
+      name: 'Announcements',
+      href: '/dashboard/student/announcements',
+      icon: Megaphone,
     },
   ],
   parent: [],

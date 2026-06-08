@@ -6,13 +6,88 @@ import { Bell, BellOff, Search, User, ChevronDown, Menu, LogOut } from 'lucide-r
 import { cn } from '../../lib/utils';
 import { GlobalSearch } from './GlobalSearch';
 
+import { announcementService } from '../../services/announcement/service';
+import { CURRENT_SESSION } from '../../lib/constants';
+import { Megaphone } from 'lucide-react';
+
 type TopbarProps = {
   onMobileMenuClick?: () => void;
 };
 
 export function Topbar({ onMobileMenuClick }: TopbarProps) {
   const { user, role, clearAuth } = useAuthStore();
-  const [isMuted, setIsMuted] = React.useState(false);
+  const [unreadAnnouncements, setUnreadAnnouncements] = React.useState<any[]>([]);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  const loadUnread = React.useCallback(async () => {
+    try {
+      const res = await announcementService.getAnnouncements({ limit: 15, session: CURRENT_SESSION });
+      const readIdsRaw = localStorage.getItem('read-announcements');
+      const readIds = readIdsRaw ? JSON.parse(readIdsRaw) : [];
+      const unread = (res.data || []).filter((ann: any) => !readIds.includes(ann.id));
+      setUnreadAnnouncements(unread);
+    } catch (err) {
+      console.error('Failed to load unread notices for topbar bell:', err);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadUnread();
+    
+    // Listen to local read updates
+    window.addEventListener('announcement-read', loadUnread);
+    window.addEventListener('storage', loadUnread);
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(loadUnread, 30000);
+    return () => {
+      window.removeEventListener('announcement-read', loadUnread);
+      window.removeEventListener('storage', loadUnread);
+      clearInterval(interval);
+    };
+  }, [loadUnread]);
+
+  React.useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleAnnouncementClick = async (ann: any) => {
+    try {
+      // Mark as read in localStorage
+      const readIdsRaw = localStorage.getItem('read-announcements');
+      const readIds = readIdsRaw ? JSON.parse(readIdsRaw) : [];
+      if (!readIds.includes(ann.id)) {
+        readIds.push(ann.id);
+        localStorage.setItem('read-announcements', JSON.stringify(readIds));
+      }
+      setUnreadAnnouncements(prev => prev.filter(a => a.id !== ann.id));
+      
+      // Mark as read on backend
+      await announcementService.getAnnouncementDetails(ann.id);
+      
+      setIsOpen(false);
+
+      // Route to page
+      const announcementsPaths: Record<string, string> = {
+        school_admin: '/dashboard/admin/announcements',
+        principal: '/dashboard/principal/announcements',
+        teacher: '/dashboard/teacher/announcements',
+        student: '/dashboard/student/announcements',
+        subject_coordinator: '/dashboard/coordinator/announcements',
+      };
+      const path = role ? announcementsPaths[role] : '/dashboard';
+      window.location.href = path;
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const roleLabels: Record<string, string> = {
     super_admin: 'Super Admin',
@@ -40,23 +115,75 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
 
       {/* Right actions */}
       <div className="flex items-center gap-3 sm:gap-4 ml-auto">
-        {/* Notification bell */}
-        <button
-          onClick={() => setIsMuted(!isMuted)}
-          className="relative p-2.5 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-300 group"
-          title={isMuted ? "Unmute notifications" : "Mute notifications"}
-        >
-          {isMuted ? (
-            <BellOff size={20} className="text-muted-foreground/50" />
-          ) : (
+        {/* Notification bell dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="relative p-2.5 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-300 group"
+            title="Notifications notice board"
+          >
             <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+            {unreadAnnouncements.length > 0 && (
+              <span className="absolute top-1 right-1 min-w-5 h-5 flex items-center justify-center bg-rose-500 border border-background text-[10px] font-black text-white px-1 rounded-full animate-bounce">
+                {unreadAnnouncements.length}
+              </span>
+            )}
+          </button>
+
+          {/* Notices Dropdown Panel */}
+          {isOpen && (
+            <div className="absolute right-0 mt-2 w-80 py-3 bg-background border border-border rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="px-4 pb-2 border-b flex items-center justify-between">
+                <span className="font-bold text-sm text-foreground">School Notices</span>
+                <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold">
+                  {unreadAnnouncements.length} New
+                </span>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto mt-2 divide-y divide-border/60">
+                {unreadAnnouncements.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    <Megaphone className="h-6 w-6 mx-auto opacity-20 mb-2" />
+                    No new announcements.
+                  </div>
+                ) : (
+                  unreadAnnouncements.map((ann) => (
+                    <button
+                      key={ann.id}
+                      onClick={() => handleAnnouncementClick(ann)}
+                      className="w-full text-left px-4 py-3 hover:bg-accent/50 transition flex items-start gap-2.5"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate pr-2">{ann.title}</p>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">{ann.content}</p>
+                        <p className="text-[9px] text-muted-foreground/60">{new Date(ann.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="px-4 pt-2 border-t text-center">
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    const announcementsPaths: Record<string, string> = {
+                      school_admin: '/dashboard/admin/announcements',
+                      principal: '/dashboard/principal/announcements',
+                      teacher: '/dashboard/teacher/announcements',
+                      student: '/dashboard/student/announcements',
+                      subject_coordinator: '/dashboard/coordinator/announcements',
+                    };
+                    const path = role ? announcementsPaths[role] : '/dashboard';
+                    window.location.href = path;
+                  }}
+                  className="text-[11px] font-bold text-primary hover:underline"
+                >
+                  View All Notices
+                </button>
+              </div>
+            </div>
           )}
-          {!isMuted && (
-            <span
-              className="absolute top-2 right-2 w-2.5 h-2.5 bg-destructive border-2 border-background rounded-full"
-            />
-          )}
-        </button>
+        </div>
 
         <div className="h-6 w-px bg-border mx-1" />
 

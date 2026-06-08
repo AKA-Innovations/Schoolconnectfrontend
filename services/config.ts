@@ -118,4 +118,12 @@ export const API_ENDPOINTS = {
     EXAM_RESULT: '/academic/exam-result',
     EXAM_RESULT_BY_ID: (id: number) => `/academic/exam-result/${id}`,
   },
+  ANNOUNCEMENT: {
+    BASE: '/announcement',
+    BY_ID: (id: number) => `/announcement/${id}`,
+    ATTACHMENT: (id: number) => `/announcement/attachment/${id}`,
+    REMOVE_ATTACHMENT: (attachmentId: number) => `/announcement/attachment/${attachmentId}`,
+    TOGGLE_PIN: (id: number) => `/announcement/${id}/pin`,
+    READ_RECEIPTS: (id: number) => `/announcement/${id}/read-receipts`,
+  },
 } as const;

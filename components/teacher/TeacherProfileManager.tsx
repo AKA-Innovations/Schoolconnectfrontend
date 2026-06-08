@@ -337,7 +337,6 @@ export function TeacherProfileManager() {
             <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <SnapshotItem label="Employee ID" value={teacher.employeeId || 'Not set'} />
               <SnapshotItem label="Joining Date" value={teacher.joiningDate ? new Date(teacher.joiningDate).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'Not set'} />
-              <SnapshotItem label="School ID" value={teacher.schoolId || 'Not set'} />
               <SnapshotItem label="Personal Email" value={teacher.emailId || 'Not set'} />
               <SnapshotItem label="Professional Email" value={teacher.employeeEmail || 'Not set'} />
               <SnapshotItem label="Role Stack" value={[teacher.isPrincipal && 'Principal', teacher.isCoordinator && 'Coordinator', teacher.isClassTeacher && 'Class Teacher', teacher.isSubjectTeacher && 'Subject Teacher'].filter(Boolean).join(' • ') || 'No roles assigned'} />

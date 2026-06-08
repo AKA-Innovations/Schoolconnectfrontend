@@ -85,6 +85,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={onClose}
                 className={cn(
                   'flex items-center rounded-2xl text-sm transition-all duration-300 group relative',
                   collapsed ? 'justify-center gap-0 px-0 py-3 mx-auto w-12' : 'gap-4 px-5 py-3',
@@ -119,7 +120,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         {/* FOOTER */}
         <div className={cn('space-y-3 border-t border-white/5 bg-black/30 backdrop-blur z-10', collapsed ? 'p-3' : 'p-5')}>
           {showLabels && role === 'school_admin' && (
-            <Link href="/dashboard/admin/student/register" className="flex items-center justify-center w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold tracking-widest transition hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]">
+            <Link href="/dashboard/admin/student/register" onClick={onClose} className="flex items-center justify-center w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold tracking-widest transition hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]">
               Quick Onboard
             </Link>
           )}
@@ -130,6 +131,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               document.cookie = 'auth-token=; Max-Age=0; path=/';
               document.cookie = 'user-role=; Max-Age=0; path=/';
               window.location.href = '/login';
+              if (onClose) onClose();
             }}
             className={cn(
               'flex items-center justify-center gap-2 text-white/30 hover:text-rose-400 text-[11px] font-bold tracking-widest w-full rounded-xl transition hover:bg-rose-500/5',
