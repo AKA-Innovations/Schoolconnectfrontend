@@ -17,6 +17,11 @@ import { ProgressFormModal } from '../../../components/academic/teaching-progres
 import { ProgressDashboardCards } from '../../../components/academic/teaching-progress/ProgressDashboardCards';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { eventService } from '../../../services/event/service';
+import { ShieldAlert } from 'lucide-react';
+import { Badge } from '../../../components/ui/badge';
+
+
 
 export default function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
@@ -42,6 +47,53 @@ export default function TeacherDashboard() {
   });
 
   const { data: periodSlots = [] } = usePeriodSlots();
+
+  // Fetch today's events
+  const [todayEvents, setTodayEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  const fetchTodayEvents = async () => {
+    try {
+      setLoadingEvents(true);
+      // Format today as YYYY-MM-DD local time
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const sessionVal = CURRENT_SESSION;
+      const res = await eventService.listEvents({
+        session: sessionVal,
+      });
+      
+      const filtered = (res || []).filter((evt: any) => {
+        const start = evt.startDate.split('T')[0];
+        const end = evt.endDate.split('T')[0];
+        const isActiveToday = todayStr >= start && todayStr <= end;
+        if (!isActiveToday) return false;
+        
+        // Filter by target audience and teacher's classes
+        if (evt.targetAudience === 'ALL' || evt.targetAudience === 'TEACHERS') return true;
+        if (evt.targetAudience === 'SPECIFIC_CLASS') {
+          return evt.targetedClasses?.some((tc: any) => {
+            return subjectDetails.some(sd => 
+              Number(sd.classDtlsId || (sd as any).classSectionId) === Number(tc.sectionId) ||
+              Number((sd as any).classId) === Number(tc.classId)
+            );
+          });
+        }
+        return false;
+      });
+      setTodayEvents(filtered);
+    } catch (err) {
+      console.error('Failed to fetch today events:', err);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (user?.id && subjectDetails.length > 0) {
+      fetchTodayEvents();
+    }
+  }, [user, subjectDetails]);
 
   // Build a periodId → PeriodSlot lookup for normalization
   const periodSlotMap = useMemo(() => {
@@ -97,6 +149,61 @@ export default function TeacherDashboard() {
     }).sort((a, b) => (a.periodNumber || 0) - (b.periodNumber || 0));
   }, [rawTimetable, subjectDetails, periodSlotMap, periodSlots]);
 
+  // Combine timetable entries with timed events
+  const combinedTimeline = useMemo(() => {
+    const items: any[] = timetable.map(t => ({ ...t, type: 'class' }));
+    
+    // Add timed events
+    todayEvents.forEach((evt: any) => {
+      if (!evt.isFullDay) {
+        items.push({
+          type: 'event',
+          id: evt.id,
+          title: evt.title,
+          description: evt.description,
+          eventType: evt.eventType,
+          startTime: evt.startTime,
+          endTime: evt.endTime,
+          isHoliday: evt.isHoliday,
+          location: evt.location,
+          targetAudience: evt.targetAudience,
+          targetedClasses: evt.targetedClasses,
+        });
+      }
+    });
+
+    // Helper to parse "HH:MM AM/PM" to total minutes
+    const toMinutes = (timeStr: string) => {
+      if (!timeStr) return 0;
+      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)?$/i);
+      if (!match) return 0;
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const ampm = match[3];
+      if (ampm) {
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      }
+      return hours * 60 + minutes;
+    };
+
+    return items.sort((a, b) => {
+      const aMin = toMinutes(a.startTime);
+      const bMin = toMinutes(b.startTime);
+      return aMin - bMin;
+    });
+  }, [timetable, todayEvents]);
+
+  // Extract full-day events
+  const fullDayEvents = useMemo(() => {
+    return todayEvents.filter(e => e.isFullDay);
+  }, [todayEvents]);
+
+  // Extract holidays
+  const isTodayHoliday = useMemo(() => {
+    return todayEvents.some(e => e.isHoliday);
+  }, [todayEvents]);
+
   const [isHomeworkModalOpen, setHomeworkModalOpen] = useState(false);
   const [isClassworkModalOpen, setClassworkModalOpen] = useState(false);
   const [isProgressModalOpen, setProgressModalOpen] = useState(false);
@@ -141,11 +248,24 @@ export default function TeacherDashboard() {
     setProgressModalOpen(true);
   };
 
-  const isLoading = isSummaryLoading || isTimetableLoading;
+  const isLoading = isSummaryLoading || isTimetableLoading || loadingEvents;
 
   if (user?.isPrincipal) {
     return null;
   }
+
+  // Helper to style event type badges
+  const getEventBadgeColor = (type: string) => {
+    switch (type) {
+      case 'HOLIDAY': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'EXAM': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'MEETING': return 'bg-teal-50 text-teal-700 border-teal-200';
+      case 'CULTURAL': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'SPORTS': return 'bg-green-50 text-green-700 border-green-200';
+      case 'PTM': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 p-4 lg:p-8">
@@ -157,14 +277,35 @@ export default function TeacherDashboard() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => { refetchSummary(); refetchTimetable(); }}
+            onClick={() => { refetchSummary(); refetchTimetable(); fetchTodayEvents(); }}
             className="rounded-xl h-11 bg-white/50 backdrop-blur-sm border-slate-200"
           >
-            <RefreshCw className={cn("h-4 w-4 mr-2 text-muted-foreground", (isSummaryLoading || isTimetableLoading) && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4 mr-2 text-muted-foreground", isLoading && "animate-spin")} />
             Refresh
           </Button>
         </div>
       </div>
+
+      {isTodayHoliday && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50/50 p-4 text-rose-800 text-sm font-semibold flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5 text-rose-600" />
+          Today is marked as a Holiday! Enjoy the break.
+        </div>
+      )}
+
+      {fullDayEvents.length > 0 && (
+        <div className="space-y-2">
+          {fullDayEvents.map((fe: any) => (
+            <div key={fe.id} className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 text-purple-900 text-sm flex items-center justify-between">
+              <div>
+                <span className="font-bold">Full Day Event: {fe.title}</span>
+                {fe.location && <span className="text-xs text-purple-700 ml-2">📍 {fe.location}</span>}
+              </div>
+              <Badge className={cn("rounded-lg", getEventBadgeColor(fe.eventType))}>{fe.eventType}</Badge>
+            </div>
+          ))}
+        </div>
+      )}
 
       <StatsRow stats={summary?.kpis} isLoading={isSummaryLoading} />
 
@@ -186,7 +327,7 @@ export default function TeacherDashboard() {
                     <div className="h-32 bg-slate-50/50 rounded-2xl animate-pulse border border-slate-100" />
                   </div>
                 ))
-              ) : timetable.length === 0 ? (
+              ) : combinedTimeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center ml-4">
                   <div className="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center mb-4">
                     <BookOpen className="h-8 w-8 text-slate-300" />
@@ -195,58 +336,78 @@ export default function TeacherDashboard() {
                   <p className="text-sm text-slate-500 max-w-[200px]">You have a free day today! Take some rest or plan ahead.</p>
                 </div>
               ) : (
-                timetable.map((cls, idx) => (
-                  <div key={`${cls.id}-${idx}`} className="relative ml-8 group">
+                combinedTimeline.map((item, idx) => (
+                  <div key={item.type === 'class' ? `class-${item.id}-${idx}` : `event-${item.id}-${idx}`} className="relative ml-8 group">
                     <div className={cn(
                       "absolute -left-[41px] top-1 w-5 h-5 rounded-full border-4 border-white shadow-sm transition-all duration-500 group-hover:scale-125",
-                      idx === 0 ? "bg-primary animate-pulse" : "bg-slate-300 group-hover:bg-primary/50"
+                      item.type === 'event' ? "bg-purple-500" : idx === 0 ? "bg-primary animate-pulse" : "bg-slate-300 group-hover:bg-primary/50"
                     )} />
                     
-                    <div className="p-5 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-500">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-                              Period {cls.periodNumber}
-                            </span>
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter">
-                              Class {cls.className} — {cls.sectionName}
-                            </span>
+                    {item.type === 'class' ? (
+                      <div className="p-5 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-500">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                                Period {item.periodNumber}
+                              </span>
+                              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter">
+                                Class {item.className} — {item.sectionName}
+                              </span>
+                            </div>
+                            <h4 className="text-xl font-bold text-slate-900 leading-tight">{item.subjectName}</h4>
                           </div>
-                          <h4 className="text-xl font-bold text-slate-900 leading-tight">{cls.subjectName}</h4>
-                        </div>
 
-                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-none"
-                            onClick={() => handleAddHomework(cls)}
-                          >
-                            <FilePlus className="h-3 w-3 mr-1" />
-                            HW
-                          </Button>
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white transition-all border-none"
-                            onClick={() => handleAddClasswork(cls)}
-                          >
-                            <PenLine className="h-3 w-3 mr-1" />
-                            CW
-                          </Button>
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all border-none"
-                            onClick={() => handleUpdateProgress(cls)}
-                          >
-                            <BarChart3 className="h-3 w-3 mr-1" />
-                            PROG
-                          </Button>
+                          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-none"
+                              onClick={() => handleAddHomework(item)}
+                            >
+                              <FilePlus className="h-3 w-3 mr-1" />
+                              HW
+                            </Button>
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white transition-all border-none"
+                              onClick={() => handleAddClasswork(item)}
+                            >
+                              <PenLine className="h-3 w-3 mr-1" />
+                              CW
+                            </Button>
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all border-none"
+                              onClick={() => handleUpdateProgress(item)}
+                            >
+                              <BarChart3 className="h-3 w-3 mr-1" />
+                              PROG
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-5 bg-purple-50/20 rounded-3xl border border-purple-100 shadow-sm hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-300 transition-all duration-500">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider">
+                                Event ({item.startTime} - {item.endTime})
+                              </span>
+                              <Badge className={cn("text-[9px] rounded-lg", getEventBadgeColor(item.eventType))}>
+                                {item.eventType}
+                              </Badge>
+                            </div>
+                            <h4 className="text-xl font-bold text-slate-900 leading-tight">{item.title}</h4>
+                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                            {item.location && <p className="text-[11px] text-purple-600 mt-1 font-semibold">📍 Location: {item.location}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -327,4 +488,5 @@ export default function TeacherDashboard() {
     </div>
   );
 }
+
 

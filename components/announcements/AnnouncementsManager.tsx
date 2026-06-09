@@ -40,6 +40,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   // List State
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState(CURRENT_SESSION);
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [audienceFilter, setAudienceFilter] = useState<string>('ALL');
@@ -65,6 +66,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   );
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [targetSectionId, setTargetSectionId] = useState<string>('');
+  const [selectedTargetClasses, setSelectedTargetClasses] = useState<Array<{ classId: number; sectionId?: number }>>([]);
   const [publishAt, setPublishAt] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [isPublished, setIsPublished] = useState(true);
@@ -80,6 +82,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   // Load list of announcements
   const fetchAnnouncements = async () => {
     setLoading(true);
+    setError(null);
     try {
       const params: any = {
         session,
@@ -90,10 +93,12 @@ export function AnnouncementsManager({ role: userRole }: Props) {
       if (audienceFilter !== 'ALL') params.targetAudience = audienceFilter;
       
       const res = await announcementService.getAnnouncements(params);
-      setAnnouncements(res.data);
-      setTotalPages(res.meta.pages || 1);
+      setAnnouncements(res?.data || []);
+      setTotalPages(res?.meta?.pages || 1);
     } catch (err: any) {
-      toast.error('Failed to load announcements');
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to load announcements';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error(err);
     } finally {
       setLoading(false);
@@ -113,6 +118,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     const loadOptions = async () => {
       try {
         const activeSchoolId = schoolId || user?.schoolId || '';
+        if (!activeSchoolId) return;
         const [mSections, mapped] = await Promise.all([
           classService.getSchoolSections(activeSchoolId),
           classService.getClassSectionLists(activeSchoolId, CURRENT_SESSION)
@@ -156,7 +162,8 @@ export function AnnouncementsManager({ role: userRole }: Props) {
           const subjectMappings = await classService.getSubjectDetails({ teacherId: user.id });
           setTeacherDetailClasses(subjectMappings);
         }
-      } catch (err) {
+      } catch (err: any) {
+        toast.error('Failed to load class selection options');
         console.error('Failed to load class options:', err);
       }
     };
@@ -210,6 +217,18 @@ export function AnnouncementsManager({ role: userRole }: Props) {
 
     return allowed;
   }, [classSectionOptions, teacherDetailClasses, userRole, teacherRoles, user]);
+
+  const groupedClassSections = useMemo(() => {
+    const groups: { [key: string]: typeof filteredClassSections } = {};
+    filteredClassSections.forEach(cs => {
+      const key = cs.className;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(cs);
+    });
+    return groups;
+  }, [filteredClassSections]);
 
   // Search and local filters
   const filteredAnnouncements = useMemo(() => {
@@ -317,14 +336,12 @@ export function AnnouncementsManager({ role: userRole }: Props) {
       if (expiresAt) payload.expiresAt = new Date(expiresAt).toISOString();
 
       if (targetAudience === 'SPECIFIC_CLASS') {
-        if (!targetClassId) {
-          toast.error('Please select a target class');
+        if (selectedTargetClasses.length === 0) {
+          toast.error('Please select at least one target class/section');
           setSubmitting(false);
           return;
         }
-        const selectedCS = filteredClassSections.find(c => String(c.id) === targetClassId);
-        payload.targetClassId = selectedCS?.classId;
-        payload.targetSectionId = selectedCS?.masterSectionId || selectedCS?.classSectionId;
+        payload.targetClasses = selectedTargetClasses;
       }
 
       let savedAnnouncement: Announcement;
@@ -364,12 +381,18 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     setTargetAudience(ann.targetAudience);
     
     // Find class section ID matching classId and sectionId
-    if (ann.targetClassId) {
-      const matched = classSectionOptions.find(cs => cs.classId === ann.targetClassId && cs.masterSectionId === ann.targetSectionId);
-      if (matched) {
-        setTargetClassId(String(matched.id));
-        setTargetSectionId(String(matched.id));
-      }
+    if (ann.targetedClasses && Array.isArray(ann.targetedClasses) && ann.targetedClasses.length > 0) {
+      setSelectedTargetClasses(ann.targetedClasses.map((tc: any) => ({
+        classId: Number(tc.classId),
+        sectionId: tc.sectionId ? Number(tc.sectionId) : undefined
+      })));
+    } else if (ann.targetClassId) {
+      setSelectedTargetClasses([{
+        classId: Number(ann.targetClassId),
+        sectionId: ann.targetSectionId ? Number(ann.targetSectionId) : undefined
+      }]);
+    } else {
+      setSelectedTargetClasses([]);
     }
     
     setPublishAt(ann.publishAt ? new Date(ann.publishAt).toISOString().slice(0, 16) : '');
@@ -388,6 +411,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     setTargetAudience(userRole === 'teacher' && !teacherRoles.isPrincipal ? 'SPECIFIC_CLASS' : 'ALL');
     setTargetClassId('');
     setTargetSectionId('');
+    setSelectedTargetClasses([]);
     setPublishAt('');
     setExpiresAt('');
     setIsPublished(true);
@@ -402,7 +426,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
@@ -496,6 +520,21 @@ export function AnnouncementsManager({ role: userRole }: Props) {
             <div key={i} className="h-32 bg-muted rounded-2xl animate-pulse" />
           ))}
         </div>
+      ) : error ? (
+        <Card className="border border-destructive/20 bg-destructive/5 dark:bg-destructive/10">
+          <CardContent className="p-16 text-center space-y-4 flex flex-col items-center justify-center">
+            <AlertCircle className="h-12 w-12 text-destructive animate-bounce" />
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Server Connection Error</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                {error}. Please check your connection or try again.
+              </p>
+            </div>
+            <Button onClick={fetchAnnouncements} className="rounded-xl flex items-center gap-2">
+              <RotateCw className="h-4 w-4" /> Retry Loading
+            </Button>
+          </CardContent>
+        </Card>
       ) : filteredAnnouncements.length === 0 ? (
         <Card className="border border-dashed border-border/80">
           <CardContent className="p-16 text-center">
@@ -541,7 +580,17 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                       {ann.priority} Priority
                     </Badge>
                     <Badge variant="secondary" className="rounded-lg text-[10px]">
-                      Audience: {ann.targetAudience === 'SPECIFIC_CLASS' ? `Class ${ann.targetClassName || ''}-${ann.targetSectionName || ''}` : ann.targetAudience}
+                      Audience: {ann.targetAudience === 'SPECIFIC_CLASS' ? (
+                        ann.targetedClasses && ann.targetedClasses.length > 0 ? (
+                          `Classes: ${ann.targetedClasses.map((tc: any) => {
+                            const className = tc.className || tc.class?.className || tc.class?.name || `Class ${tc.classId}`;
+                            const sectionName = tc.sectionName || tc.section?.sectionName || tc.section?.name;
+                            return sectionName ? `${className}-${sectionName}` : className;
+                          }).join(', ')}`
+                        ) : (
+                          `Class ${ann.targetClassName || ''}-${ann.targetSectionName || ''}`
+                        )
+                      ) : ann.targetAudience}
                     </Badge>
                   </div>
 
@@ -609,7 +658,19 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="outline" className="rounded-lg">{selectedAnnouncement.priority}</Badge>
-                    <Badge variant="secondary" className="rounded-lg">Audience: {selectedAnnouncement.targetAudience}</Badge>
+                    <Badge variant="secondary" className="rounded-lg">
+                      Audience: {selectedAnnouncement.targetAudience === 'SPECIFIC_CLASS' ? (
+                        selectedAnnouncement.targetedClasses && selectedAnnouncement.targetedClasses.length > 0 ? (
+                          `Classes: ${selectedAnnouncement.targetedClasses.map((tc: any) => {
+                            const className = tc.className || tc.class?.className || tc.class?.name || tc.classId;
+                            const sectionName = tc.sectionName || tc.section?.sectionName || tc.section?.name;
+                            return sectionName ? `${className}-${sectionName}` : className;
+                          }).join(', ')}`
+                        ) : (
+                          `Class ${selectedAnnouncement.targetClassName || ''}-${selectedAnnouncement.targetSectionName || ''}`
+                        )
+                      ) : selectedAnnouncement.targetAudience}
+                    </Badge>
                   </div>
                   <h2 className="text-2xl font-bold">{selectedAnnouncement.title}</h2>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -769,30 +830,105 @@ export function AnnouncementsManager({ role: userRole }: Props) {
 
             {/* Target Class Section Selectors */}
             {targetAudience === 'SPECIFIC_CLASS' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/20 p-4 rounded-xl border border-border/60">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-muted-foreground">Class-Section</label>
-                  <select
-                    value={targetClassId}
-                    onChange={e => {
-                      setTargetClassId(e.target.value);
-                      setTargetSectionId(e.target.value); // Set section identifier as well
-                    }}
-                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm"
-                    required
-                  >
-                    <option value="">— Select Class Section —</option>
-                    {filteredClassSections.map(cs => (
-                      <option key={cs.id} value={String(cs.id)}>
-                        Class {cs.className} - {cs.sectionName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="flex items-center text-xs text-muted-foreground pt-4">
-                  <AlertCircle className="h-4 w-4 mr-1 text-primary" />
-                  Notices will target students and parents of this specific class.
+              <div className="space-y-3 bg-muted/20 p-4 rounded-xl border border-border/60">
+                <label className="text-xs font-bold text-muted-foreground block">Target Classes & Sections</label>
+                <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1">
+                  {Object.entries(groupedClassSections).map(([className, sections]) => {
+                    const classId = sections[0]?.classId;
+                    if (!classId) return null;
+
+                    // Check if all sections are selected or if the whole class is selected
+                    const isWholeClassSelected = selectedTargetClasses.some(tc => tc.classId === classId && tc.sectionId === undefined);
+                    const areAllSectionsSelected = sections.every(s => 
+                      selectedTargetClasses.some(tc => tc.classId === classId && tc.sectionId === s.masterSectionId)
+                    );
+
+                    const handleToggleWholeClass = () => {
+                      if (isWholeClassSelected || areAllSectionsSelected) {
+                        setSelectedTargetClasses(prev => prev.filter(tc => tc.classId !== classId));
+                      } else {
+                        setSelectedTargetClasses(prev => [
+                          ...prev.filter(tc => tc.classId !== classId),
+                          { classId }
+                        ]);
+                      }
+                    };
+
+                    return (
+                      <div key={className} className="border-b border-border/40 pb-3 last:border-b-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isWholeClassSelected || areAllSectionsSelected}
+                              onChange={handleToggleWholeClass}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            Class {className} (All Sections)
+                          </label>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pl-6">
+                          {sections.map(s => {
+                            const isSectionSelected = selectedTargetClasses.some(
+                              tc => tc.classId === classId && (tc.sectionId === s.masterSectionId || tc.sectionId === undefined)
+                            );
+
+                            const handleToggleSection = () => {
+                              setSelectedTargetClasses(prev => {
+                                const wholeClassSelected = prev.some(tc => tc.classId === classId && tc.sectionId === undefined);
+                                if (wholeClassSelected) {
+                                  const otherSections = sections
+                                    .filter(sect => sect.masterSectionId !== s.masterSectionId)
+                                    .map(sect => ({ classId, sectionId: sect.masterSectionId }));
+                                  return [
+                                    ...prev.filter(tc => tc.classId !== classId),
+                                    ...otherSections
+                                  ];
+                                }
+
+                                const exists = prev.some(tc => tc.classId === classId && tc.sectionId === s.masterSectionId);
+                                if (exists) {
+                                  return prev.filter(tc => !(tc.classId === classId && tc.sectionId === s.masterSectionId));
+                                } else {
+                                  const newSelection = [...prev, { classId, sectionId: s.masterSectionId }];
+                                  const allSecsSelectedNow = sections.every(sect =>
+                                    sect.masterSectionId === s.masterSectionId || 
+                                    newSelection.some(tc => tc.classId === classId && tc.sectionId === sect.masterSectionId)
+                                  );
+                                  if (allSecsSelectedNow) {
+                                    return [
+                                      ...newSelection.filter(tc => tc.classId !== classId),
+                                      { classId }
+                                    ];
+                                  }
+                                  return newSelection;
+                                }
+                              });
+                            };
+
+                            return (
+                              <label
+                                key={s.id}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs cursor-pointer select-none transition-all ${
+                                  isSectionSelected
+                                    ? 'bg-primary/10 border-primary text-primary font-medium'
+                                    : 'bg-background hover:bg-muted/50 border-border/80 text-muted-foreground'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSectionSelected}
+                                  onChange={handleToggleSection}
+                                  className="sr-only"
+                                />
+                                {s.sectionName}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

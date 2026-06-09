@@ -126,4 +126,15 @@ export const API_ENDPOINTS = {
     TOGGLE_PIN: (id: number) => `/announcement/${id}/pin`,
     READ_RECEIPTS: (id: number) => `/announcement/${id}/read-receipts`,
   },
+  EVENT: {
+    BASE: '/event',
+    BY_ID: (id: number) => `/event/${id}`,
+    CALENDAR: '/event/calendar',
+    UPCOMING: '/event/upcoming',
+    HOLIDAYS: '/event/holidays',
+  },
+  EVENT_TYPE: {
+    BASE: '/event-type',
+    BY_ID: (id: number) => `/event-type/${id}`,
+  },
 } as const;

@@ -119,11 +119,11 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {/* FOOTER */}
         <div className={cn('space-y-3 border-t border-white/5 bg-black/30 backdrop-blur z-10', collapsed ? 'p-3' : 'p-5')}>
-          {showLabels && role === 'school_admin' && (
+          {/* {showLabels && role === 'school_admin' && (
             <Link href="/dashboard/admin/student/register" onClick={onClose} className="flex items-center justify-center w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold tracking-widest transition hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]">
               Quick Onboard
             </Link>
-          )}
+          )} */}
 
           <button
             onClick={() => {

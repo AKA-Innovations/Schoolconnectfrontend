@@ -1,5 +1,12 @@
-import { AnnouncementsManager } from '@/components/announcements/AnnouncementsManager';
+import CommunicationsHub from '@/components/announcements/CommunicationsHub';
+import { Suspense } from 'react';
 
 export default function StudentAnnouncementsPage() {
-  return <AnnouncementsManager role="student" />;
+  return (
+    <Suspense fallback={<div className="h-64 bg-muted/20 animate-pulse rounded-2xl" />}>
+      <CommunicationsHub role="student" />
+    </Suspense>
+  );
 }
+
+

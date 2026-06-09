@@ -108,8 +108,15 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     {
       name: 'Announcements',
-      href: '/dashboard/admin/announcements',
+      href: '/dashboard/admin/announcements?tab=notices',
       icon: Megaphone,
+      subLinks: [
+        { name: 'Notices', href: '/dashboard/admin/announcements?tab=notices' },
+        { name: 'Events', href: '/dashboard/admin/announcements?tab=events' },
+        { name: 'Calendar', href: '/dashboard/admin/announcements?tab=calendar' },
+        { name: 'Holidays', href: '/dashboard/admin/announcements?tab=holidays' },
+        { name: 'Event Types', href: '/dashboard/admin/announcements?tab=event-types' },
+      ]
     },
   ],
   principal: [
@@ -155,8 +162,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     {
       name: 'Announcements',
-      href: '/dashboard/principal/announcements',
+      href: '/dashboard/principal/announcements?tab=notices',
       icon: Megaphone,
+      subLinks: [
+        { name: 'Notices', href: '/dashboard/principal/announcements?tab=notices' },
+        { name: 'Events', href: '/dashboard/principal/announcements?tab=events' },
+        { name: 'Calendar', href: '/dashboard/principal/announcements?tab=calendar' },
+        { name: 'Holidays', href: '/dashboard/principal/announcements?tab=holidays' },
+      ]
     },
   ],
   teacher: [
@@ -219,8 +232,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog },
     {
       name: 'Announcements',
-      href: '/dashboard/teacher/announcements',
+      href: '/dashboard/teacher/announcements?tab=notices',
       icon: Megaphone,
+      subLinks: [
+        { name: 'Notices', href: '/dashboard/teacher/announcements?tab=notices' },
+        { name: 'Events', href: '/dashboard/teacher/announcements?tab=events' },
+        { name: 'Calendar', href: '/dashboard/teacher/announcements?tab=calendar' },
+        { name: 'Holidays', href: '/dashboard/teacher/announcements?tab=holidays' },
+      ]
     },
   ],
   subject_coordinator: [
@@ -247,8 +266,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     {
       name: 'Announcements',
-      href: '/dashboard/coordinator/announcements',
+      href: '/dashboard/coordinator/announcements?tab=notices',
       icon: Megaphone,
+      subLinks: [
+        { name: 'Notices', href: '/dashboard/coordinator/announcements?tab=notices' },
+        { name: 'Events', href: '/dashboard/coordinator/announcements?tab=events' },
+        { name: 'Calendar', href: '/dashboard/coordinator/announcements?tab=calendar' },
+        { name: 'Holidays', href: '/dashboard/coordinator/announcements?tab=holidays' },
+      ]
     },
   ],
   student: [
@@ -263,8 +288,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     {
       name: 'Announcements',
-      href: '/dashboard/student/announcements',
+      href: '/dashboard/student/announcements?tab=notices',
       icon: Megaphone,
+      subLinks: [
+        { name: 'Notices', href: '/dashboard/student/announcements?tab=notices' },
+        { name: 'Events', href: '/dashboard/student/announcements?tab=events' },
+        { name: 'Calendar', href: '/dashboard/student/announcements?tab=calendar' },
+        { name: 'Holidays', href: '/dashboard/student/announcements?tab=holidays' },
+      ]
     },
   ],
   parent: [],

@@ -12,8 +12,10 @@ import {
 import { CURRENT_SESSION } from '@/lib/constants';
 import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload, ClassSectionItem } from '@/types/class.types';
 import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
+import { eventService } from '@/services/event/service';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
@@ -62,7 +64,38 @@ export default function TimetablePage() {
     classId: resolvedClassId,
     classSectionId: currentSection?.masterSectionId,
   });
-  console.log("Hi" + currentSection?.id);
+
+  // Fetch events for the selected class section
+  const [classEvents, setClassEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  const fetchClassEvents = async () => {
+    if (!resolvedClassId) return;
+    try {
+      setLoadingEvents(true);
+      const res = await eventService.listEvents({
+        session: CURRENT_SESSION,
+      });
+      // Filter events by selected classId/sectionId or targetAudience === 'ALL'
+      const filtered = (res || []).filter((e: any) => {
+        if (e.targetAudience === 'ALL') return true;
+        return e.targetedClasses?.some((tc: any) => {
+          return Number(tc.classId) === Number(resolvedClassId) && 
+                 (!currentSection?.masterSectionId || !tc.sectionId || Number(tc.sectionId) === Number(currentSection.masterSectionId));
+        });
+      });
+      setClassEvents(filtered);
+    } catch (err) {
+      console.error('Failed to fetch class events:', err);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchClassEvents();
+  }, [resolvedClassId, currentSection]);
+
 
   // ── Derived data ──
   const sorted = useMemo(
@@ -452,10 +485,60 @@ export default function TimetablePage() {
                         const draft = drafts[key];
                         const conflict = conflictMap[key];
 
+                        // Find events overlapping with this period times on this day of the week
+                        const getEventsForDay = () => {
+                          const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          const dayIndex = DAYS_LIST.indexOf(day);
+                          if (dayIndex === -1) return [];
+                          
+                          const today = new Date();
+                          const currentDay = today.getDay();
+                          const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+                          const targetDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset + dayIndex);
+                          const targetDateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
+                          return classEvents.filter((evt: any) => {
+                            const start = evt.startDate.split('T')[0];
+                            const end = evt.endDate.split('T')[0];
+                            const isActiveOnDay = targetDateStr >= start && targetDateStr <= end;
+                            if (!isActiveOnDay) return false;
+
+                            if (evt.isFullDay || evt.isHoliday) return true;
+                            
+                            // Check time overlaps
+                            const toMinutes = (timeStr: string) => {
+                              if (!timeStr) return 0;
+                              const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)?$/i);
+                              if (!match) return 0;
+                              let hours = parseInt(match[1]);
+                              const minutes = parseInt(match[2]);
+                              const ampm = match[3];
+                              if (ampm) {
+                                if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+                                if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+                              }
+                              return hours * 60 + minutes;
+                            };
+
+                            const evtStart = toMinutes(evt.startTime);
+                            const evtEnd = toMinutes(evt.endTime);
+                            const slotStart = toMinutes(slot.startTime);
+                            const slotEnd = toMinutes(slot.endTime);
+
+                            return (evtStart < slotEnd && evtEnd > slotStart);
+                          });
+                        };
+
+                        const dayEvents = getEventsForDay();
+                        const hasEvent = dayEvents.length > 0;
+                        const hasClass = !!existing;
+                        const isHoliday = dayEvents.some(e => e.isHoliday);
+
                         return (
                           <td key={day} className={cn(
-                            'py-2 px-2 border-b border-r border-border/30 text-center align-top min-w-[130px]',
+                            'py-2 px-2 border-b border-r border-border/30 text-center align-top min-w-[130px] h-16 relative',
                             conflict && 'bg-amber-50',
+                            isHoliday && 'bg-rose-50/50'
                           )}>
                             {editMode ? (
                               <DraftSelect
@@ -464,7 +547,59 @@ export default function TimetablePage() {
                                 onChange={(csId) => handleDraftChange(day, slot.id, csId)}
                                 conflict={conflict}
                               />
-                            ) : existing ? (
+                            ) : hasEvent && hasClass ? (
+                              /* 3D Flip Card Container */
+                              <div className="group w-full h-full min-h-[50px] [perspective:1000px] cursor-pointer">
+                                <div className="relative w-full h-full duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)] transition-all">
+                                  {/* FRONT SIDE (Event / Holiday) */}
+                                  <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] flex items-center justify-center">
+                                    {isHoliday ? (
+                                      <div className="rounded-lg bg-rose-50 border border-rose-200/60 p-1 w-full h-full flex flex-col justify-center items-center">
+                                        <div className="text-[10px] font-black text-rose-600 uppercase">Holiday</div>
+                                        <div className="text-[8px] text-rose-500 font-bold truncate max-w-full">
+                                          {dayEvents.find(e => e.isHoliday)?.title || 'School Holiday'}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="rounded-lg bg-purple-50 border border-purple-200 p-1 w-full h-full flex flex-col justify-center items-center">
+                                        <div className="text-[10px] font-bold text-purple-700 truncate w-full" title={dayEvents[0].title}>
+                                          {dayEvents[0].title}
+                                        </div>
+                                        <div className="text-[8px] text-purple-500 font-semibold uppercase">{dayEvents[0].eventType}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* BACK SIDE (Suspended Scheduled Class) */}
+                                  <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] flex items-center justify-center bg-background">
+                                    <div className="rounded-lg bg-muted/40 border border-dashed border-rose-300 p-1 w-full h-full flex flex-col justify-center items-center">
+                                      <div className="text-[8px] font-bold text-rose-500 uppercase tracking-widest leading-none mb-0.5">Suspended</div>
+                                      <ExistingCell
+                                        entry={existing}
+                                        sd={sdMap.get(String(existing.classSubjectId))}
+                                        onDelete={handleDelete}
+                                        isDeleting={deleteMut.isPending}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : hasEvent ? (
+                              isHoliday ? (
+                                <div className="rounded-lg bg-rose-50 border border-rose-200/60 p-1.5 flex flex-col justify-center items-center">
+                                  <div className="text-[10px] font-black text-rose-600 uppercase">Holiday</div>
+                                  <div className="text-[8px] text-rose-500 font-bold truncate max-w-full">
+                                    {dayEvents.find(e => e.isHoliday)?.title || 'School Holiday'}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="rounded-lg bg-purple-50 p-1 border border-purple-100">
+                                  <div className="text-[10px] font-bold text-purple-700 truncate" title={dayEvents[0].title}>
+                                    {dayEvents[0].title}
+                                  </div>
+                                  <div className="text-[8px] text-purple-500 font-semibold">{dayEvents[0].eventType}</div>
+                                </div>
+                              )
+                            ) : hasClass ? (
                               <ExistingCell
                                 entry={existing}
                                 sd={sdMap.get(String(existing.classSubjectId))}

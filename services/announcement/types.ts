@@ -17,6 +17,7 @@ export interface Announcement {
   targetAudience: AnnouncementAudience;
   targetClassId: number | null;
   targetSectionId: number | null;
+  targetedClasses?: Array<{ classId: number; className?: string; sectionId?: number | null; sectionName?: string | null }>;
   publishAt: string | null;
   expiresAt: string | null;
   isPublished: boolean;
@@ -39,6 +40,7 @@ export interface CreateAnnouncementPayload {
   targetAudience?: AnnouncementAudience;
   targetClassId?: number;
   targetSectionId?: number;
+  targetClasses?: Array<{ classId: number; sectionId?: number }>;
   publishAt?: string;
   expiresAt?: string;
   isPinned?: boolean;
