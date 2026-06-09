@@ -94,7 +94,7 @@ export default function PrincipalDashboard() {
   const { data: allClassworks = [], isLoading: loadingClasswork, refetch: refetchCW } = useClassworks();
   const { data: allProgress = [], isLoading: loadingProgress, refetch: refetchProgress } = useTeachingProgressList();
   const { data: exams = [], isLoading: loadingExams } = useExams(CURRENT_SESSION);
-  const { data: examSchedules = [], isLoading: loadingSchedules } = useExamSchedules(CURRENT_SESSION);
+  const { data: examSchedules = [], isLoading: loadingSchedules } = useExamSchedules({ session: CURRENT_SESSION });
 
   const allTeachers: any[] = useMemo(() => (teachersData as any)?.items ?? (teachersData as any)?.data ?? [], [teachersData]);
   const allStudents: any[] = useMemo(() => (studentsData as any)?.items ?? (studentsData as any)?.data ?? [], [studentsData]);

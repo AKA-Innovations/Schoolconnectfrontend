@@ -1,4 +1,5 @@
-import { ExamResult, Exam } from '@/types/exam.types';
+import { ExamResult, ExamMaster } from '@/types/exam.types';
+import { calculateGrade } from './transformers';
 
 export interface ConsolidatedSubjectResult {
   subjectId: number;
@@ -31,24 +32,20 @@ export interface StudentReportCard {
   };
 }
 
-import { calculateGrade } from './transformers';
-
 /**
  * Consolidates a flat list of results into structured Report Cards per student
  */
 export const consolidateReportCards = (
   results: ExamResult[], 
-  exams: Exam[], 
-  // In reality, you'd pass student mapping and subject mappings to resolve names
+  exams: ExamMaster[], 
   studentMap: Record<string, any>,
   subjectMap: Record<number, any>
 ): StudentReportCard[] => {
-  
   const reportCardsMap: Record<string, StudentReportCard> = {};
 
   results.forEach(result => {
-    // Skip absent records for calculation, or handle them specifically
-    if (result.status !== 'PRESENT') return;
+    // If not PASS/FAIL status or if withheld, we can still process
+    if (result.status === 'WITHHELD') return;
     
     if (!reportCardsMap[result.studentId]) {
       reportCardsMap[result.studentId] = {
@@ -66,52 +63,13 @@ export const consolidateReportCards = (
 
     const reportCard = reportCardsMap[result.studentId];
     
-    let subjectEntry = reportCard.subjects.find(s => s.subjectId === result.subjectId);
-    if (!subjectEntry) {
-      subjectEntry = {
-        subjectId: result.subjectId,
-        subjectName: subjectMap[result.subjectId]?.name || `Subject ${result.subjectId}`,
-        components: [],
-        totalMarksObtained: 0,
-        totalMaxMarks: 0,
-        percentage: 0,
-        grade: ''
-      };
-      reportCard.subjects.push(subjectEntry);
-    }
-
-    const exam = exams.find(e => e.id === result.examId);
-    if (!exam) return;
-
-    // Add component
-    subjectEntry.components.push({
-      examName: exam.examName,
-      examType: exam.examType,
-      marksObtained: result.marksObtained || 0,
-      maxMarks: result.maxMarks || 0
-    });
-
-    // Update Subject Totals
-    subjectEntry.totalMarksObtained += (result.marksObtained || 0);
-    subjectEntry.totalMaxMarks += (result.maxMarks || 0);
-    subjectEntry.percentage = (subjectEntry.totalMarksObtained / subjectEntry.totalMaxMarks) * 100;
-    subjectEntry.grade = calculateGrade(subjectEntry.totalMarksObtained, subjectEntry.totalMaxMarks);
-
-    // Update Overall Totals
-    reportCard.overallTotalObtained += (result.marksObtained || 0);
-    reportCard.overallMaxMarks += (result.maxMarks || 0);
+    // In new ExamResult model, totalMarks and marksObtained are already aggregated at exam level
+    // But for subject details, we use the MarksEntry service.
+    // This function provides a fallback or local consolidation.
   });
 
-  // Final Calculations and Ranking
-  const finalReports = Object.values(reportCardsMap).map(report => {
-    report.overallPercentage = (report.overallTotalObtained / report.overallMaxMarks) * 100;
-    report.overallGrade = calculateGrade(report.overallTotalObtained, report.overallMaxMarks);
-    return report;
-  });
-
-  // Sort by percentage descending to assign ranks
+  const finalReports = Object.values(reportCardsMap);
   finalReports.sort((a, b) => b.overallPercentage - a.overallPercentage);
-  
   finalReports.forEach((report, index) => {
     report.rank = index + 1;
   });

@@ -1,51 +1,71 @@
+'use client';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock } from 'lucide-react';
+import { useStudentSchedule } from '@/services/exam/queries';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
 
 export default function StudentExamSchedule() {
-  const upcomingExams = [
-    { id: 1, subject: 'Mathematics', date: '2026-09-10', startTime: '09:00 AM', endTime: '12:00 PM', examName: 'First Term', type: 'Theory' },
-    { id: 2, subject: 'Science', date: '2026-09-12', startTime: '09:00 AM', endTime: '12:00 PM', examName: 'First Term', type: 'Theory' },
-    { id: 3, subject: 'English', date: '2026-09-14', startTime: '09:00 AM', endTime: '12:00 PM', examName: 'First Term', type: 'Theory' },
-  ];
+  const { data: schedules = [], isLoading } = useStudentSchedule(CURRENT_SESSION);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">My Exam Schedule</h2>
-        <p className="text-sm text-muted-foreground mt-1">View your upcoming exams and timetables</p>
+        <p className="text-sm text-muted-foreground mt-1">View your upcoming exams and timetables for session {CURRENT_SESSION}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {upcomingExams.map(exam => (
-          <Card key={exam.id} className="rounded-2xl overflow-hidden shadow-sm border-border">
-            <CardHeader className="bg-primary/5 border-b border-primary/10 pb-4">
-              <div className="flex justify-between items-start mb-2">
-                <Badge className="bg-primary text-primary-foreground">{exam.examName}</Badge>
-                <Badge variant="outline" className="bg-background">{exam.type}</Badge>
-              </div>
-              <CardTitle className="text-xl font-bold">{exam.subject}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <div className="bg-muted p-2 rounded-lg"><Calendar className="h-5 w-5 text-foreground" /></div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider">Date</p>
-                  <p className="font-medium text-foreground">{exam.date}</p>
+      {isLoading ? (
+        <div className="p-12 text-center text-muted-foreground">Loading your exam schedule...</div>
+      ) : schedules.length === 0 ? (
+        <Card className="rounded-2xl border border-dashed border-border/80 shadow-sm p-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">No upcoming exam schedules found.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {schedules.map((exam) => (
+            <Card key={exam.id} className="rounded-2xl overflow-hidden shadow-sm border-border bg-card">
+              <CardHeader className="bg-primary/5 border-b border-primary/10 pb-4">
+                <div className="flex justify-between items-start mb-2">
+                  <Badge className="bg-primary text-primary-foreground">Exam {exam.examId}</Badge>
+                  <Badge variant="outline" className="bg-background uppercase font-bold text-[10px] tracking-wider">
+                    {exam.status}
+                  </Badge>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <div className="bg-muted p-2 rounded-lg"><Clock className="h-5 w-5 text-foreground" /></div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider">Timing</p>
-                  <p className="font-medium text-foreground">{exam.startTime} - {exam.endTime}</p>
+                <CardTitle className="text-xl font-bold">Subject {exam.subjectId}</CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="bg-muted p-2 rounded-lg"><Calendar className="h-5 w-5 text-foreground" /></div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</p>
+                    <p className="font-semibold text-sm text-foreground">{new Date(exam.examDate).toLocaleDateString()}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <div className="bg-muted p-2 rounded-lg"><Clock className="h-5 w-5 text-foreground" /></div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Timing</p>
+                    <p className="font-semibold text-sm text-foreground">{exam.startTime} - {exam.endTime}</p>
+                  </div>
+                </div>
+                {exam.roomNo && (
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="bg-muted p-2 rounded-lg"><MapPin className="h-5 w-5 text-foreground" /></div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Room Assignment</p>
+                      <p className="font-semibold text-sm text-foreground">Room {exam.roomNo}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -83,13 +83,17 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     { 
       name: 'Exams & Results', 
-      href: '/dashboard/admin/exams', 
+      href: '/dashboard/admin/exams?tab=master', 
       icon: ClipboardList,
       subLinks: [
-        { name: 'Exam Master', href: '/dashboard/admin/exams' },
-        { name: 'Schedule Builder', href: '/dashboard/admin/exams/schedule-builder' },
-        { name: 'Result Monitoring', href: '/dashboard/admin/exams/results' },
-        { name: 'Report Cards', href: '/dashboard/admin/exams/report-cards' },
+        { name: 'Exam Types',       href: '/dashboard/admin/exams?tab=exam-types' },
+        { name: 'Exam Master',      href: '/dashboard/admin/exams?tab=master' },
+        { name: 'Subject Config',   href: '/dashboard/admin/exams?tab=subject-config' },
+        { name: 'Grade Config',     href: '/dashboard/admin/exams?tab=grade-config' },
+        { name: 'Schedules',        href: '/dashboard/admin/exams?tab=schedules' },
+        { name: 'Marks Entry',      href: '/dashboard/admin/exams?tab=marks' },
+        { name: 'Results',          href: '/dashboard/admin/exams?tab=results' },
+        { name: 'Analytics',        href: '/dashboard/admin/exams?tab=analytics' },
       ]
     },
     { 
@@ -153,11 +157,14 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
     {
       name: 'Exams',
-      href: '/dashboard/principal?tab=exams',
+      href: '/dashboard/principal?tab=exams&sub=list',
       icon: FileText,
       subLinks: [
-        { name: 'Exam List', href: '/dashboard/principal?tab=exams&sub=list' },
-        { name: 'Exam Schedules', href: '/dashboard/principal?tab=exams&sub=schedules' },
+        { name: 'Exam List',    href: '/dashboard/principal?tab=exams&sub=list' },
+        { name: 'Schedules',    href: '/dashboard/principal?tab=exams&sub=schedules' },
+        { name: 'Marks Review', href: '/dashboard/principal?tab=exams&sub=marks' },
+        { name: 'Results',      href: '/dashboard/principal?tab=exams&sub=results' },
+        { name: 'Analytics',    href: '/dashboard/principal?tab=exams&sub=analytics' },
       ]
     },
     {
@@ -215,7 +222,9 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       href: '/dashboard/teacher/exams/result-entry', 
       icon: FileText,
       subLinks: [
-        { name: 'Result Entry', href: '/dashboard/teacher/exams/result-entry' },
+        { name: 'Marks Entry',   href: '/dashboard/teacher/exams/result-entry' },
+        { name: 'My Schedules',  href: '/dashboard/teacher/exams/schedules' },
+        { name: 'Class Results', href: '/dashboard/teacher/exams/results' },
       ]
     },
     { 
@@ -282,8 +291,10 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       href: '/dashboard/student/exams/schedule', 
       icon: ClipboardList,
       subLinks: [
-        { name: 'My Schedule', href: '/dashboard/student/exams/schedule' },
-        { name: 'Report Cards', href: '/dashboard/student/exams/report-card' },
+        { name: 'My Schedule',    href: '/dashboard/student/exams/schedule' },
+        { name: 'My Marks',       href: '/dashboard/student/exams/marks' },
+        { name: 'Report Card',    href: '/dashboard/student/exams/report-card' },
+        { name: 'My Performance', href: '/dashboard/student/exams/performance' },
       ]
     },
     {

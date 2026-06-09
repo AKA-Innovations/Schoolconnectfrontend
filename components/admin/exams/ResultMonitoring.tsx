@@ -1,156 +1,321 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useExams, useExamSchedules, useExamResults } from '@/services/exam/queries';
-import { useSubjectOptions, useSchoolSections } from '@/hooks/useClasses';
-import { Eye, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/authStore';
+import { useExams, useClassResults } from '@/services/exam/queries';
+import {
+  useGenerateResults,
+  usePublishResults,
+  useUnpublishResults,
+  useUpdateTeacherRemarks,
+  useUpdatePrincipalRemarks,
+} from '@/services/exam/mutations';
+import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
+import { Eye, CheckCircle2, AlertCircle, RefreshCw, Send, Check, Play, Globe, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
-export function ResultMonitoring() {
-  const [session] = useState('2026-27');
-  
-  const { data: exams, isLoading: loadingExams } = useExams(session);
-  const { data: schedules, isLoading: loadingSchedules } = useExamSchedules(session);
-  const { data: results, isLoading: loadingResults } = useExamResults({ session });
+interface Props {
+  session: string;
+}
 
-  const { data: subjects = [] } = useSubjectOptions();
+export function ResultMonitoring({ session }: Props) {
+  const user = useAuthStore((s) => s.user);
+  const userRole = user?.role; // 'school_admin' or others
 
-  const { data: classSections = [] } = useSchoolSections();
+  const { data: exams = [] } = useExams(session);
+  const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const isLoading = loadingExams || loadingSchedules || loadingResults;
+  const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
+  const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
+  const [selectedSectionId, setSelectedSectionId] = useState<number | ''>('');
 
-  const evaluationProgress = schedules?.map(schedule => {
-    const exam = exams?.find(e => e.id === schedule.examId);
-    const subject = subjects?.find(s => s.id === schedule.subjectId);
-    const section = classSections?.find(s => s.id === schedule.classSectionId);
-    
-    const hasResults = results?.some(r => 
-      r.examId === schedule.examId && 
-      r.classSectionId === schedule.classSectionId && 
-      r.subjectId === schedule.subjectId
-    );
+  const { data: classSections = [] } = useSchoolSections(
+    selectedClassId ? Number(selectedClassId) : undefined
+  );
 
-    return {
-      id: schedule.id || Math.random(),
-      examName: exam?.examName || 'Unknown Exam',
-      examType: exam?.examType || 'Theory',
-      className: section?.sectionName || `Section ${schedule.classSectionId}`,
-      subject: subject?.subjectName || `Subject ${schedule.subjectId}`,
-      teacher: 'Assigned Teacher',
-      status: hasResults ? 'Submitted' : 'Pending',
-      timestamp: hasResults ? 'Recently' : '-',
+  const { data: results = [], isLoading: loadingResults, refetch: refetchResults } = useClassResults(
+    selectedExamId || 0,
+    selectedClassId || 0,
+    selectedSectionId || 0
+  );
+
+  const generateMutation = useGenerateResults();
+  const publishMutation = usePublishResults();
+  const unpublishMutation = useUnpublishResults();
+  const teacherRemarksMutation = useUpdateTeacherRemarks();
+  const principalRemarksMutation = useUpdatePrincipalRemarks();
+
+  // Local state for editing remarks
+  const [editingRemarks, setEditingRemarks] = useState<Record<number, { teacher: string; principal: string }>>({});
+
+  const handleRemarksChange = (resultId: number, type: 'teacher' | 'principal', value: string) => {
+    setEditingRemarks(prev => ({
+      ...prev,
+      [resultId]: {
+        ...(prev[resultId] || { teacher: '', principal: '' }),
+        [type]: value,
+      },
+    }));
+  };
+
+  const handleSaveRemarks = async (resultId: number, type: 'teacher' | 'principal') => {
+    const text = editingRemarks[resultId]?.[type];
+    if (text === undefined) return;
+
+    try {
+      if (type === 'teacher') {
+        await teacherRemarksMutation.mutateAsync({ id: resultId, remarks: text });
+      } else {
+        await principalRemarksMutation.mutateAsync({ id: resultId, remarks: text });
+      }
+      toast.success('Remarks updated successfully');
+      refetchResults();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update remarks');
+    }
+  };
+
+  const handleGenerateResults = async () => {
+    if (!selectedExamId || !selectedClassId || !selectedSectionId) return;
+
+    try {
+      await generateMutation.mutateAsync({
+        session,
+        examIds: [Number(selectedExamId)],
+        classId: Number(selectedClassId),
+        classSectionId: Number(selectedSectionId),
+      });
+      toast.success('Results consolidated and generated successfully');
+      refetchResults();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to generate results');
+    }
+  };
+
+  const handlePublishToggle = async (publish: boolean) => {
+    if (!selectedExamId || !selectedClassId || !selectedSectionId) return;
+
+    const payload = {
+      session,
+      examId: Number(selectedExamId),
+      classId: Number(selectedClassId),
+      classSectionId: Number(selectedSectionId),
     };
-  }) || [];
 
-  const pendingCount = evaluationProgress.filter(e => e.status === 'Pending').length;
-  const submittedCount = evaluationProgress.filter(e => e.status === 'Submitted').length;
+    try {
+      if (publish) {
+        await publishMutation.mutateAsync(payload);
+        toast.success('Results published to student dashboards');
+      } else {
+        await unpublishMutation.mutateAsync(payload);
+        toast.success('Results unpublished successfully');
+      }
+      refetchResults();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update publication state');
+    }
+  };
+
+  const isClassPublished = results.length > 0 && results.every(r => r.isPublished);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Header and filters */}
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Result Monitoring</h2>
-          <p className="text-sm text-muted-foreground mt-1">Track teacher evaluation progress and publish results</p>
+          <h2 className="text-2xl font-bold tracking-tight">Result Consolidation & Monitoring</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Consolidate student marks, compute percentages, write remarks, and publish class report cards.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <select
+            value={selectedExamId}
+            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
+            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">Select Exam</option>
+            {exams.map((e: any) => (
+              <option key={e.id} value={e.id}>{e.examName}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
+            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">Select Class</option>
+            {schoolClasses.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.className}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedSectionId}
+            onChange={(e) => setSelectedSectionId(e.target.value ? Number(e.target.value) : '')}
+            disabled={!selectedClassId}
+            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">Select Section</option>
+            {classSections.map((s: any) => (
+              <option key={s.id} value={s.id}>{s.sectionName}</option>
+            ))}
+          </select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetchResults()}
+            className="rounded-xl h-10 w-10 shrink-0"
+            disabled={!selectedSectionId}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="rounded-2xl bg-blue-500/5 border-blue-500/20">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="bg-blue-500/10 p-3 rounded-xl"><Clock className="h-6 w-6 text-blue-600" /></div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Pending Evaluations</p>
-              <h3 className="text-2xl font-bold text-foreground">{isLoading ? '...' : pendingCount}</h3>
-            </div>
-          </CardContent>
+      {!selectedSectionId || !selectedExamId ? (
+        <Card className="rounded-2xl border border-dashed border-border/80 shadow-sm p-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">Please select Exam, Class, and Section to monitor results.</p>
         </Card>
-        <Card className="rounded-2xl bg-amber-500/5 border-amber-500/20">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="bg-amber-500/10 p-3 rounded-xl"><AlertCircle className="h-6 w-6 text-amber-600" /></div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Schedules</p>
-              <h3 className="text-2xl font-bold text-foreground">{isLoading ? '...' : evaluationProgress.length}</h3>
+      ) : (
+        <div className="space-y-6">
+          {/* Action Ribbon */}
+          <Card className="rounded-2xl border border-border/85 shadow-sm bg-card p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2.5 rounded-xl text-primary">
+                <Play className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Actions for this Class Section</p>
+                <p className="text-xs text-muted-foreground">Consolidate subject marks or toggle dashboard visibility.</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl bg-green-500/5 border-green-500/20">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="bg-green-500/10 p-3 rounded-xl"><CheckCircle2 className="h-6 w-6 text-green-600" /></div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Submitted & Locked</p>
-              <h3 className="text-2xl font-bold text-foreground">{isLoading ? '...' : submittedCount}</h3>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Button
+                onClick={handleGenerateResults}
+                className="rounded-xl gap-2 font-bold w-full sm:w-auto"
+                disabled={generateMutation.isPending}
+              >
+                Generate Results
+              </Button>
+              {isClassPublished ? (
+                <Button
+                  variant="outline"
+                  onClick={() => handlePublishToggle(false)}
+                  className="rounded-xl gap-2 font-bold w-full sm:w-auto hover:bg-rose-50 text-rose-600 border-rose-200"
+                  disabled={unpublishMutation.isPending}
+                >
+                  <Lock className="h-4 w-4" /> Unpublish
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => handlePublishToggle(true)}
+                  className="rounded-xl gap-2 font-bold w-full sm:w-auto hover:bg-green-50 text-green-600 border-green-200"
+                  disabled={publishMutation.isPending}
+                >
+                  <Globe className="h-4 w-4" /> Publish to Student
+                </Button>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </Card>
 
-      <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
-        <CardHeader className="bg-muted/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-bold">Evaluation Progress</CardTitle>
-          <Button variant="outline" size="sm" className="rounded-xl">Publish Selected</Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/5 border-b border-border/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="p-4 font-semibold w-10">
-                    <input type="checkbox" className="rounded" />
-                  </th>
-                  <th className="p-4 font-semibold">Exam</th>
-                  <th className="p-4 font-semibold">Class/Section</th>
-                  <th className="p-4 font-semibold">Subject</th>
-                  <th className="p-4 font-semibold">Teacher</th>
-                  <th className="p-4 font-semibold">Status</th>
-                  <th className="p-4 font-semibold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">Loading evaluation data...</td>
-                  </tr>
-                ) : evaluationProgress.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">No exam schedules found. Create schedules to monitor evaluations.</td>
-                  </tr>
-                ) : evaluationProgress.map((sub) => (
-                  <tr key={sub.id} className="border-b border-border/50 hover:bg-muted/2">
-                    <td className="p-4">
-                      <input type="checkbox" className="rounded" disabled={sub.status !== 'Submitted'} />
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold">{sub.examName}</div>
-                      <div className="text-xs text-muted-foreground">{sub.examType}</div>
-                    </td>
-                    <td className="p-4 font-medium">{sub.className}</td>
-                    <td className="p-4">{sub.subject}</td>
-                    <td className="p-4 text-muted-foreground">{sub.teacher}</td>
-                    <td className="p-4">
-                      <Badge 
-                        variant="secondary" 
-                        className={
-                          sub.status === 'Submitted' ? 'bg-green-500/10 text-green-700 border-0' : 
-                          'bg-amber-500/10 text-amber-700 border-0'
-                        }
-                      >
-                        {sub.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" title="View Marks">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Results Sheet */}
+          <Card className="rounded-2xl border border-border/80 shadow-sm bg-card overflow-hidden">
+            <CardHeader className="border-b border-border/50 bg-muted/10">
+              <CardTitle className="text-lg font-bold">Consolidated Results List</CardTitle>
+              <CardDescription className="text-xs">Class-level summary sheet and remarks entry.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loadingResults ? (
+                <div className="p-12 text-center text-muted-foreground">Loading generated results...</div>
+              ) : results.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  No consolidated results found. Click "Generate Results" above to compute them.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20">
+                        <th className="p-4 px-6">Rank</th>
+                        <th className="p-4">Student ID</th>
+                        <th className="p-4 text-center">Marks</th>
+                        <th className="p-4 text-center">Pct %</th>
+                        <th className="p-4 text-center">Grade</th>
+                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4">Teacher Remarks</th>
+                        <th className="p-4">Principal Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50 text-sm">
+                      {results.map((res) => {
+                        const localTeacher = editingRemarks[res.id]?.teacher ?? res.teacherRemarks ?? '';
+                        const localPrincipal = editingRemarks[res.id]?.principal ?? res.principalRemarks ?? '';
+
+                        return (
+                          <tr key={res.id} className="hover:bg-muted/5 transition-colors">
+                            <td className="p-4 px-6 font-bold text-primary">#{res.rank || '-'}</td>
+                            <td className="p-4 font-semibold">{res.studentId}</td>
+                            <td className="p-4 text-center font-medium">
+                              {res.marksObtained} <span className="text-muted-foreground/60 text-xs">/ {res.totalMarks}</span>
+                            </td>
+                            <td className="p-4 text-center font-bold">{res.percentage.toFixed(1)}%</td>
+                            <td className="p-4 text-center font-bold text-indigo-600">{res.grade}</td>
+                            <td className="p-4 text-center">
+                              <Badge className={`rounded-lg ${res.status === 'PASS' ? 'bg-green-500/10 text-green-500 border-0' : 'bg-rose-500/10 text-rose-500 border-0'}`}>
+                                {res.status}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                <Input
+                                  value={localTeacher}
+                                  onChange={(e) => handleRemarksChange(res.id, 'teacher', e.target.value)}
+                                  className="h-8 rounded-lg text-xs w-48"
+                                  placeholder="Enter remarks..."
+                                />
+                                {localTeacher !== res.teacherRemarks && (
+                                  <Button size="icon" variant="ghost" onClick={() => handleSaveRemarks(res.id, 'teacher')} className="h-8 w-8 text-green-600">
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                <Input
+                                  value={localPrincipal}
+                                  onChange={(e) => handleRemarksChange(res.id, 'principal', e.target.value)}
+                                  className="h-8 rounded-lg text-xs w-48"
+                                  placeholder="Enter remarks..."
+                                  disabled={userRole !== 'school_admin' && (user as any)?.teacherProfile?.teacherRole !== 'PRINCIPAL'}
+                                />
+                                {localPrincipal !== res.principalRemarks && (
+                                  <Button size="icon" variant="ghost" onClick={() => handleSaveRemarks(res.id, 'principal')} className="h-8 w-8 text-green-600">
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

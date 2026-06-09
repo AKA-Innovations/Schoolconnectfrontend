@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useExams } from '@/services/exam/queries';
-import { useCreateBulkResults } from '@/services/exam/mutations';
+import { useEnterMarks } from '@/services/exam/mutations';
 import { calculateGrade } from '@/services/exam/transformers';
 import { Save, FileSpreadsheet, Send, CheckCircle2 } from 'lucide-react';
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
@@ -55,7 +55,7 @@ export function ResultEntry() {
   
   // Fetching Data
   const { data: exams } = useExams(session);
-  const createBulkResults = useCreateBulkResults();
+  const createBulkResults = useEnterMarks();
 
   // Fetch actual students for the selected section
   const { data: sectionStudents, isLoading: isLoadingStudents } = useQuery({
@@ -107,7 +107,7 @@ export function ResultEntry() {
 
     const payload = {
       session,
-      results: students.map(s => {
+      results: students.map((s: any) => {
         const isAbsent = s.status !== 'PRESENT';
         return {
           examId: Number(selectedExamId),
@@ -153,7 +153,7 @@ export function ResultEntry() {
                   <SelectValue placeholder="Select Exam" />
                 </SelectTrigger>
                 <SelectContent>
-                  {exams?.map(exam => (
+                  {exams?.map((exam: any) => (
                     <SelectItem key={exam.id} value={exam.id?.toString() || ''}>
                       {exam.examName} - {exam.examType}
                     </SelectItem>

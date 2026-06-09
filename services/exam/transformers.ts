@@ -1,40 +1,42 @@
-import { Exam, ExamSchedule, ExamSchedulePayload, ExamResultPayload, ExamResult } from '@/types/exam.types';
+import { ExamMaster, ExamSchedule, ExamTypeEnum } from '@/types/exam.types';
 
 /**
  * Transforms a multi-type exam creation form into an array of individual API payloads
- * e.g., First Term + [Theory, Practical] -> [{First Term, Theory}, {First Term, Practical}]
  */
-export const transformExamCreationToPayloads = (session: string, examName: string, examTypes: string[]): Omit<Exam, 'id'>[] => {
+export const transformExamCreationToPayloads = (
+  session: string,
+  examName: string,
+  examTypes: ExamTypeEnum[]
+): Omit<ExamMaster, 'id' | 'schoolId' | 'status' | 'isPublished' | 'createdAt' | 'updatedAt'>[] => {
   return examTypes.map(type => ({
     session,
     examName,
-    examType: type
+    examType: type,
   }));
 };
 
 /**
  * Groups a flat list of exams by their examName
- * e.g., [{First Term, Theory}, {First Term, Practical}] -> [{examName: 'First Term', types: [...]}]
  */
-export const groupExamsByName = (exams: Exam[]) => {
+export const groupExamsByName = (exams: ExamMaster[]) => {
   const grouped = exams.reduce((acc, exam) => {
     if (!acc[exam.examName]) {
       acc[exam.examName] = { examName: exam.examName, types: [] };
     }
     acc[exam.examName].types.push(exam);
     return acc;
-  }, {} as Record<string, { examName: string; types: Exam[] }>);
+  }, {} as Record<string, { examName: string; types: ExamMaster[] }>);
   
   return Object.values(grouped);
 };
 
 /**
- * Expands a single schedule rule (e.g. Class 10 Maths on 10 Sep) into schedules for all sections
+ * Expands a single schedule rule into schedules for all sections
  */
 export const expandScheduleToSections = (
-  baseSchedule: Omit<ExamSchedule, 'id' | 'classSectionId'>, 
+  baseSchedule: Omit<ExamSchedule, 'id' | 'schoolId' | 'classSectionId' | 'status' | 'createdAt' | 'updatedAt'>, 
   sectionIds: number[]
-): ExamSchedule[] => {
+): Omit<ExamSchedule, 'id' | 'schoolId' | 'status' | 'createdAt' | 'updatedAt'>[] => {
   return sectionIds.map(sectionId => ({
     ...baseSchedule,
     classSectionId: sectionId

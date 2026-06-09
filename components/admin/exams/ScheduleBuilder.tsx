@@ -1,332 +1,324 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useExams } from '@/services/exam/queries';
-import { useCreateBulkSchedules } from '@/services/exam/mutations';
-import { groupExamsByName } from '@/services/exam/transformers';
-import { useSchoolClasses, useSubjectOptions, useSchoolSections } from '@/hooks/useClasses';
-import { Calendar, Save, AlertTriangle, ArrowRight } from 'lucide-react';
+import { useExams, useExamSubjects, useExamSchedules } from '@/services/exam/queries';
+import { useCreateSchedules, useDeleteSchedule } from '@/services/exam/mutations';
+import { useSchoolClasses, useSchoolSections, useSubjectOptions } from '@/hooks/useClasses';
+import { Calendar, Save, Trash2, RefreshCw, Sparkles, HelpCircle, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { ExamScheduleItemDto } from '@/types/exam.types';
 
-interface GridRow {
-  id: string;
-  classId: number;
-  subjectId: number;
-  examDate: string;
-  startTime: string;
-  endTime: string;
+interface Props {
+  session: string;
 }
 
-export function ScheduleBuilder() {
-  const [session] = useState('2026-27');
-  const [selectedExamId, setSelectedExamId] = useState<string>('');
-  const [scope, setScope] = useState<'ALL' | 'CLASS'>('CLASS');
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
-  const [applyToAllSections, setApplyToAllSections] = useState(true);
-
-  const [gridRows, setGridRows] = useState<GridRow[]>([]);
-  const [conflicts, setConflicts] = useState<string[]>([]);
-
-  // Fetching Data
-  const { data: exams } = useExams(session);
-  const groupedExams = exams ? groupExamsByName(exams) : [];
-
+export function ScheduleBuilder({ session }: Props) {
+  const { data: exams = [] } = useExams(session);
   const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const { data: subjects = [] } = useSubjectOptions();
+  const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
+  const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
+  const [applyToAllSections, setApplyToAllSections] = useState(true);
 
+  // Fetch sections of class
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
   );
 
-  const createBulkSchedules = useCreateBulkSchedules();
+  // Fetch subjects configured for this class + exam
+  const { data: examSubjects = [] } = useExamSubjects(
+    session,
+    selectedExamId || 0,
+    selectedClassId || undefined
+  );
 
-  const handleAddRow = () => {
-    if (!selectedClassId) {
-      alert("Please select a class first");
-      return;
-    }
-    setGridRows([
-      ...gridRows, 
-      { id: Date.now().toString(), classId: Number(selectedClassId), subjectId: 0, examDate: '', startTime: '09:00', endTime: '12:00' }
-    ]);
-  };
+  // Fetch subject master options to resolve names
+  const selectedClassName = schoolClasses.find(c => c.id === selectedClassId)?.className || '';
+  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassName || undefined);
 
-  const handleUpdateRow = (id: string, field: keyof GridRow, value: any) => {
-    setGridRows(rows => rows.map(r => r.id === id ? { ...r, [field]: value } : r));
-  };
+  // Get current schedules to display
+  const { data: existingSchedules = [], refetch, isFetching } = useExamSchedules({
+    session,
+    examId: selectedExamId || undefined,
+    classId: selectedClassId || undefined,
+  });
 
-  const handleRemoveRow = (id: string) => {
-    setGridRows(rows => rows.filter(r => r.id !== id));
-  };
+  const createMutation = useCreateSchedules();
+  const deleteMutation = useDeleteSchedule();
 
-  const validateConflicts = () => {
-    const newConflicts: string[] = [];
-    const seen = new Set<string>();
+  // Grid inputs state for each subject
+  const [scheduleInputs, setScheduleInputs] = useState<Record<number, { date: string; start: string; end: string; room: string }>>({});
 
-    gridRows.forEach(row => {
-      if (!row.subjectId || !row.examDate) {
-        newConflicts.push(`Row missing subject or date.`);
-        return;
-      }
-      const key = `${row.classId}-${row.subjectId}-${row.examDate}`;
-      if (seen.has(key)) {
-        newConflicts.push(`Duplicate schedule found for a subject on ${row.examDate}`);
-      }
-      seen.add(key);
-    });
-
-    setConflicts(newConflicts);
-    return newConflicts.length === 0;
+  const handleInputChange = (subjectId: number, field: string, value: string) => {
+    setScheduleInputs(prev => ({
+      ...prev,
+      [subjectId]: {
+        ...(prev[subjectId] || { date: '', start: '09:00', end: '12:00', room: '' }),
+        [field]: value,
+      },
+    }));
   };
 
   const handleSubmit = async () => {
-    if (!selectedExamId || gridRows.length === 0) return;
-    if (!validateConflicts()) return;
+    if (!selectedExamId || !selectedClassId) return;
 
-    try {
-      // SMART EXPANSION LOGIC
-      // If applyToAllSections is true, expand each grid row to all sections of that class
-      const schedulesToCreate = [];
+    const schedulesToCreate: ExamScheduleItemDto[] = [];
 
-      for (const row of gridRows) {
-        if (applyToAllSections && classSections) {
-          classSections.forEach(section => {
-            schedulesToCreate.push({
-              examId: Number(selectedExamId),
-              classSectionId: section.id, // Assuming section.id is classSectionId
-              subjectId: row.subjectId,
-              examDate: new Date(row.examDate).toISOString(),
-              startTime: row.startTime,
-              endTime: row.endTime
-            });
-          });
-        } else {
-          // Manual fallback (if not expanding, would require explicit section selection per row, simplified here)
+    // Loop through configured exam subjects
+    for (const sub of examSubjects) {
+      const input = scheduleInputs[sub.subjectId];
+      if (!input || !input.date) continue; // Skip if date not entered
+
+      const baseItem = {
+        examId: Number(selectedExamId),
+        classId: Number(selectedClassId),
+        examSubjectDtlId: sub.id,
+        subjectId: sub.subjectId,
+        examDate: new Date(input.date).toISOString().split('T')[0],
+        startTime: input.start,
+        endTime: input.end,
+        roomNo: input.room || undefined,
+      };
+
+      if (applyToAllSections && classSections.length > 0) {
+        classSections.forEach(section => {
           schedulesToCreate.push({
-              examId: Number(selectedExamId),
-              classSectionId: Number(selectedClassId), // simplified
-              subjectId: row.subjectId,
-              examDate: new Date(row.examDate).toISOString(),
-              startTime: row.startTime,
-              endTime: row.endTime
+            ...baseItem,
+            classSectionId: section.id,
+          });
+        });
+      } else {
+        // Fallback: assign to the first section if not checking bulk
+        if (classSections[0]) {
+          schedulesToCreate.push({
+            ...baseItem,
+            classSectionId: classSections[0].id,
           });
         }
       }
+    }
 
-      await createBulkSchedules.mutateAsync({
+    if (schedulesToCreate.length === 0) {
+      toast.error('Please fill schedule details for at least one subject');
+      return;
+    }
+
+    try {
+      await createMutation.mutateAsync({
         session,
-        schedules: schedulesToCreate as any
+        schedules: schedulesToCreate,
       });
+      toast.success(`Generated ${schedulesToCreate.length} schedules successfully`);
+      setScheduleInputs({});
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to create exam schedules');
+    }
+  };
 
-      alert(`Successfully generated ${schedulesToCreate.length} schedules!`);
-      setGridRows([]);
-    } catch (error) {
-      console.error("Bulk scheduling failed", error);
-      alert("Failed to create schedules.");
+  const handleDeleteSchedule = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this exam schedule?')) return;
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success('Schedule deleted successfully');
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete schedule');
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Smart Schedule Builder</h2>
-          <p className="text-sm text-muted-foreground mt-1">Bulk generate timetables for entire classes at once</p>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            Exam Schedules
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Build dates and timings of exam components for each class and section.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <select
+            value={selectedExamId}
+            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
+            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+          >
+            <option value="">Select Exam</option>
+            {exams.map((e: any) => (
+              <option key={e.id} value={e.id}>{e.examName}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
+            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+          >
+            <option value="">Select Class</option>
+            {schoolClasses.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.className}</option>
+            ))}
+          </select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetch()}
+            className="rounded-xl h-10 w-10 shrink-0"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Step 1: Configuration */}
-        <Card className="rounded-2xl border-border shadow-sm md:col-span-1">
-          <CardHeader className="bg-muted/10 border-b border-border/50">
-            <CardTitle className="text-lg font-bold">1. Configuration</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 space-y-5">
-            <div className="space-y-2">
-              <Label>Select Exam</Label>
-              <Select value={selectedExamId} onValueChange={setSelectedExamId}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select Exam Component" />
-                </SelectTrigger>
-                <SelectContent>
-                  {exams?.map(exam => (
-                    <SelectItem key={exam.id} value={exam.id?.toString() || ''}>
-                      {exam.examName} - {exam.examType}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Scope</Label>
-              <Select value={scope} onValueChange={(v: any) => setScope(v)}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLASS">Specific Class</SelectItem>
-                  <SelectItem value="ALL">Entire School (Auto)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {scope === 'CLASS' && (
-              <div className="space-y-2 animate-in slide-in-from-top-2">
-                <Label>Class</Label>
-                <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="Select Class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schoolClasses?.map(c => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.className}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2 border rounded-xl p-4 bg-primary/5 border-primary/20">
-              <Checkbox 
-                id="applyAll" 
-                checked={applyToAllSections} 
-                onCheckedChange={(c: boolean) => setApplyToAllSections(c)} 
-              />
-              <Label htmlFor="applyAll" className="text-sm font-bold cursor-pointer text-primary">
-                Apply to all Sections
-              </Label>
-            </div>
-            {applyToAllSections && classSections && (
-              <p className="text-xs text-muted-foreground pl-6">
-                This will automatically generate schedules for {classSections.map(s => s.sectionName).join(', ')}.
-              </p>
-            )}
-          </CardContent>
+      {!selectedExamId || !selectedClassId ? (
+        <Card className="rounded-2xl border border-dashed border-border/80 shadow-sm p-12 text-center">
+          <HelpCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">Please select an Exam and a Class to build or view schedules.</p>
         </Card>
-
-        {/* Step 2: Timetable Grid */}
-        <Card className="rounded-2xl border-border shadow-sm md:col-span-2">
-          <CardHeader className="bg-muted/10 border-b border-border/50 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-bold">2. Timetable Grid</CardTitle>
-            <Button onClick={handleAddRow} size="sm" variant="outline" className="rounded-xl h-8">
-              + Add Subject
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {gridRows.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
-                <Calendar className="h-10 w-10 mb-3 opacity-20" />
-                <p>No subjects added to schedule yet.</p>
-                <p className="text-sm mt-1">Configure your class on the left and add subjects.</p>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Left/Middle Column: Schedule Builder Grid */}
+          <Card className="rounded-2xl border border-border/80 shadow-sm bg-card xl:col-span-2">
+            <CardHeader className="border-b border-border/50 bg-muted/10">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <CardTitle className="text-lg font-bold">Schedule Builder Grid</CardTitle>
+                  <CardDescription className="text-xs">Configure dates for mapped subject components.</CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="applyAll"
+                    checked={applyToAllSections}
+                    onChange={(e) => setApplyToAllSections(e.target.checked)}
+                    className="rounded text-primary focus:ring-primary/20 h-4 w-4"
+                  />
+                  <Label htmlFor="applyAll" className="text-xs font-bold cursor-pointer">
+                    Apply to all sections ({classSections.map(s => s.sectionName).join(', ')})
+                  </Label>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto p-6">
-                <table className="w-full text-sm border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-left text-muted-foreground text-xs uppercase tracking-wider">
-                      <th className="pb-2 font-semibold">Subject</th>
-                      <th className="pb-2 font-semibold">Date</th>
-                      <th className="pb-2 font-semibold">Start</th>
-                      <th className="pb-2 font-semibold">End</th>
-                      <th className="pb-2 font-semibold text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gridRows.map(row => (
-                      <tr key={row.id}>
-                        <td className="pr-2">
-                          <Select 
-                            value={row.subjectId ? row.subjectId.toString() : ''} 
-                            onValueChange={(v) => handleUpdateRow(row.id, 'subjectId', Number(v))}
-                          >
-                            <SelectTrigger className="h-10 rounded-lg">
-                              <SelectValue placeholder="Subject" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {subjects?.map((s: any) => (
-                                <SelectItem key={s.id} value={s.id.toString()}>
-                                  {s.subjectName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-2">
-                          <Input 
-                            type="date" 
-                            className="h-10 rounded-lg"
-                            value={row.examDate}
-                            onChange={(e) => handleUpdateRow(row.id, 'examDate', e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2">
-                          <Input 
-                            type="time" 
-                            className="h-10 rounded-lg"
-                            value={row.startTime}
-                            onChange={(e) => handleUpdateRow(row.id, 'startTime', e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2">
-                          <Input 
-                            type="time" 
-                            className="h-10 rounded-lg"
-                            value={row.endTime}
-                            onChange={(e) => handleUpdateRow(row.id, 'endTime', e.target.value)}
-                          />
-                        </td>
-                        <td className="text-right pl-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-destructive hover:bg-destructive/10 h-10 w-10 rounded-lg"
-                            onClick={() => handleRemoveRow(row.id)}
-                          >
-                            ×
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                
-                {conflicts.length > 0 && (
-                  <div className="mt-6 p-4 bg-destructive/10 text-destructive rounded-xl flex items-start gap-3 text-sm">
-                    <AlertTriangle className="h-5 w-5 shrink-0" />
-                    <div>
-                      <p className="font-bold mb-1">Conflicts Detected!</p>
-                      <ul className="list-disc pl-4">
-                        {conflicts.map((c, i) => <li key={i}>{c}</li>)}
-                      </ul>
-                    </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {examSubjects.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  No subjects configured for this class in Exam Subject Config. Define them first.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {examSubjects.map((sub) => {
+                    const optSub = subjectOptions.find(s => s.id === sub.subjectId);
+                    const values = scheduleInputs[sub.subjectId] || { date: '', start: '09:00', end: '12:00', room: '' };
+                    return (
+                      <div key={sub.id} className="p-5 flex flex-col md:flex-row items-start md:items-center gap-4 hover:bg-muted/5 transition-colors">
+                        <div className="w-full md:w-1/4 shrink-0">
+                          <p className="font-bold text-sm text-foreground">{optSub?.subjectName || `Subject ${sub.subjectId}`}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-wide font-medium">{sub.examType}</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 w-full">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Date</Label>
+                            <Input
+                              type="date"
+                              value={values.date}
+                              onChange={(e) => handleInputChange(sub.subjectId, 'date', e.target.value)}
+                              className="h-9 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Start Time</Label>
+                            <Input
+                              type="text"
+                              placeholder="09:00"
+                              value={values.start}
+                              onChange={(e) => handleInputChange(sub.subjectId, 'start', e.target.value)}
+                              className="h-9 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">End Time</Label>
+                            <Input
+                              type="text"
+                              placeholder="12:00"
+                              value={values.end}
+                              onChange={(e) => handleInputChange(sub.subjectId, 'end', e.target.value)}
+                              className="h-9 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Room No</Label>
+                            <Input
+                              type="text"
+                              placeholder="e.g. 101"
+                              value={values.room}
+                              onChange={(e) => handleInputChange(sub.subjectId, 'room', e.target.value)}
+                              className="h-9 rounded-lg text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="p-4 px-6 bg-muted/5 flex justify-end">
+                    <Button onClick={handleSubmit} className="rounded-xl gap-2 font-bold" disabled={createMutation.isPending}>
+                      <Save className="h-4 w-4" />
+                      {createMutation.isPending ? 'Generating...' : 'Save Schedules'}
+                    </Button>
                   </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="border-t border-border/50 p-6 flex justify-end bg-muted/5 rounded-b-2xl">
-            <Button 
-              className="rounded-xl gap-2 font-semibold shadow-md"
-              size="lg"
-              disabled={gridRows.length === 0 || createBulkSchedules.isPending || !selectedExamId}
-              onClick={handleSubmit}
-            >
-              {createBulkSchedules.isPending ? 'Generating...' : (
-                <>Generate Bulk Schedules <ArrowRight className="h-4 w-4" /></>
+                </div>
               )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+
+          {/* Right Column: Existing Schedules List */}
+          <Card className="rounded-2xl border border-border/80 shadow-sm bg-card overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Existing Schedules</CardTitle>
+              <CardDescription className="text-xs">Schedules already established.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {existingSchedules.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground text-xs">
+                  No existing schedules found for this selection.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50 max-h-[500px] overflow-y-auto">
+                  {existingSchedules.map((sch: any) => {
+                    const optSub = subjectOptions.find((s: any) => s.id === sch.subjectId);
+                    const sec = classSections.find((s: any) => s.id === sch.classSectionId);
+                    return (
+                      <div key={sch.id} className="p-4 hover:bg-muted/5 transition-colors flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-xs">{optSub?.subjectName || `Subject ${sch.subjectId}`} ({sec?.sectionName || `Section ${sch.classSectionId}`})</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {new Date(sch.examDate).toLocaleDateString()} | {sch.startTime} - {sch.endTime} {sch.roomNo && `| Room ${sch.roomNo}`}
+                          </p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteSchedule(sch.id)}
+                          className="rounded-lg h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
