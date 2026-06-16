@@ -214,7 +214,7 @@ export default function SubjectDetailsPage() {
       </div>
 
       {/* Table */}
-      <Card className="erp-card">
+      <Card className="erp-card overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">

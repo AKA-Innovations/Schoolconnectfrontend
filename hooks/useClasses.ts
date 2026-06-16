@@ -282,7 +282,7 @@ export function useSubjectDetails(teacherId?: string, session?: string, classSec
       session: session === 'all' ? undefined : (session !== undefined ? session : CURRENT_SESSION),
       classSectionId,
     }),
-    enabled: true,
+    enabled: teacherId === undefined || !!teacherId,
   });
 }
 

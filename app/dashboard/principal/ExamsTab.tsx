@@ -6,6 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Import the existing admin exam components to reuse them in the principal view
+import { ScheduleBuilder } from '@/components/admin/exams/ScheduleBuilder';
+import { MarksEntryManager } from '@/components/admin/exams/MarksEntryManager';
+import { ResultMonitoring } from '@/components/admin/exams/ResultMonitoring';
+import { ExamAnalyticsDashboard } from '@/components/admin/exams/ExamAnalyticsDashboard';
+
 interface ExamsTabProps {
   sub: string;
   exams: any[];
@@ -48,8 +54,8 @@ export function ExamsTab({
               <div className="space-y-3">
                 {exams.map((exam) => (
                   <div
-                    key={exam.id}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 hover:border-primary/20 transition-all"
+                     key={exam.id}
+                     className="flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 hover:border-primary/20 transition-all"
                   >
                     <div>
                       <h4 className="font-bold text-sm text-foreground">{exam.examName}</h4>
@@ -75,52 +81,24 @@ export function ExamsTab({
 
       {/* Exam Schedules */}
       {activeSub === 'schedules' && (
-        <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold">Exam Schedules</CardTitle>
-            <CardDescription className="text-xs">Scheduled examination dates & times</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingSchedules ? (
-              <TableSkeleton rows={8} cols={4} />
-            ) : examSchedules.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                <CalendarDays className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">No exam schedules published yet</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      {['Date', 'Time', 'Exam ID', 'Subject ID'].map((h) => (
-                        <th
-                          key={h}
-                          className="text-left py-2.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {examSchedules.slice(0, 20).map((s, i) => (
-                      <tr key={s.id ?? i} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-2.5 px-3 text-xs font-bold text-foreground">{s.examDate?.split('T')[0]}</td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground">
-                          {s.startTime} – {s.endTime}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground">{s.examId}</td>
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground">{s.subjectId}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ScheduleBuilder session={CURRENT_SESSION} />
+      )}
+
+      {/* Marks Review */}
+      {activeSub === 'marks' && (
+        <MarksEntryManager session={CURRENT_SESSION} />
+      )}
+
+      {/* Results Consolidation & Monitoring */}
+      {activeSub === 'results' && (
+        <ResultMonitoring session={CURRENT_SESSION} />
+      )}
+
+      {/* Exam Performance Analytics */}
+      {activeSub === 'analytics' && (
+        <ExamAnalyticsDashboard session={CURRENT_SESSION} />
       )}
     </div>
   );
 }
+

@@ -120,7 +120,8 @@ export function ResultMonitoring({ session }: Props) {
     }
   };
 
-  const isClassPublished = results.length > 0 && results.every(r => r.isPublished);
+  const resultsList = Array.isArray(results) ? results : [];
+  const isClassPublished = resultsList.length > 0 && resultsList.every(r => r.isPublished);
 
   return (
     <div className="space-y-6">
@@ -236,7 +237,7 @@ export function ResultMonitoring({ session }: Props) {
             <CardContent className="p-0">
               {loadingResults ? (
                 <div className="p-12 text-center text-muted-foreground">Loading generated results...</div>
-              ) : results.length === 0 ? (
+              ) : resultsList.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground">
                   No consolidated results found. Click "Generate Results" above to compute them.
                 </div>
@@ -256,7 +257,7 @@ export function ResultMonitoring({ session }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50 text-sm">
-                      {results.map((res) => {
+                      {resultsList.map((res) => {
                         const localTeacher = editingRemarks[res.id]?.teacher ?? res.teacherRemarks ?? '';
                         const localPrincipal = editingRemarks[res.id]?.principal ?? res.principalRemarks ?? '';
 

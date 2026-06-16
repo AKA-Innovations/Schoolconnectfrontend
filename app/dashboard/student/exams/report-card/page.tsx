@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, Suspense } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useExams, useReportCard } from '@/services/exam/queries';

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { eventService } from '@/services/event/service';
 import type { SchoolEvent } from '@/services/event/types';
+import { useHolidays } from '@/services/event/queries';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
 import { CalendarDays, RotateCw, Star, AlertCircle } from 'lucide-react';
@@ -25,27 +26,11 @@ interface Props {
 }
 
 export function HolidaysList({ role }: Props) {
-  const [holidays, setHolidays] = useState<SchoolEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(CURRENT_SESSION);
 
-
-  const fetchHolidays = async () => {
-    setLoading(true);
-    try {
-      const res = await eventService.getHolidays(session);
-      setHolidays(Array.isArray(res) ? res : []);
-    } catch (err) {
-      toast.error('Failed to load holidays');
-      setHolidays([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHolidays();
-  }, [session]);
+  // Fetch holidays using react-query
+  const { data: holidaysData, isLoading: loading, refetch: fetchHolidays } = useHolidays(session);
+  const holidays = Array.isArray(holidaysData) ? holidaysData : [];
 
   // Group by month
   const grouped = useMemo(() => {
@@ -85,7 +70,7 @@ export function HolidaysList({ role }: Props) {
             <option value="2026-27">Session 2026-27</option>
             <option value="2025-26">Session 2025-26</option>
           </select>
-          <Button variant="outline" size="icon" onClick={fetchHolidays} disabled={loading} className="rounded-xl h-9 w-9">
+          <Button variant="outline" size="icon" onClick={() => fetchHolidays()} disabled={loading} className="rounded-xl h-9 w-9">
             <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>

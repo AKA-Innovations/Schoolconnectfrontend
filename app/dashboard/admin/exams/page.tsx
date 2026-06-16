@@ -19,7 +19,6 @@ const TABS = [
   { id: 'subject-config', label: 'Subject Config' },
   { id: 'grade-config', label: 'Grade Config' },
   { id: 'schedules', label: 'Schedules' },
-  { id: 'marks', label: 'Marks Entry' },
   { id: 'results', label: 'Results' },
   { id: 'analytics', label: 'Analytics' },
 ];
@@ -48,8 +47,6 @@ export default function ExamsPage() {
         return <GradeConfigManager session={session} />;
       case 'schedules':
         return <ScheduleBuilder session={session} />;
-      case 'marks':
-        return <MarksEntryManager session={session} />;
       case 'results':
         return <ResultMonitoring session={session} />;
       case 'analytics':

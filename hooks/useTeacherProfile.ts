@@ -11,10 +11,14 @@ export function useTeacherProfile() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const role = useAuthStore((s) => s.role);
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    if (!user?.id || !token) return;
+    if (!user?.id || !token || !role) return;
+    
+    // Only fetch/sync teacher profile if the user actually holds a teacher-related role
+    if (role !== 'teacher' && role !== 'principal' && role !== 'subject_coordinator') return;
 
     // Only sync if the current user profile might be stale (e.g., missing sub-roles)
     // or if we are on a page that explicitly requires high-integrity role data.

@@ -138,13 +138,13 @@ export default function LoginPage() {
         <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-indigo-50 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2" />
       </div>
 
-      <div className="relative z-10 flex flex-col lg:flex-row flex-1">
+      <div className="relative z-10 flex flex-col lg:flex-row flex-1 w-full">
 
         {/* LEFT SIDE: Branding & Value Prop */}
-        <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-20">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 pt-12 pb-6 lg:py-12 lg:px-20">
           <div className="max-w-xl mx-auto lg:mx-0">
             {/* Logo */}
-            <div className="flex items-center gap-3 mb-10 group">
+            <div className="flex items-center gap-3 mb-6 lg:mb-10 group">
               <div className="w-12 h-12 bg-[#00A99D] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
                 <GraduationCap className="w-7 h-7 text-white" />
               </div>
@@ -155,11 +155,11 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-6">
-              <h2 className="text-4xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Managing education <br />
                 <span className="text-[#00A99D]">made simple.</span>
               </h2>
-              <p className="text-lg text-slate-500 leading-relaxed max-w-md">
+              <p className="text-base sm:text-lg text-slate-500 leading-relaxed max-w-md">
                 The all-in-one platform designed to empower educators and inspire students through seamless administration.
               </p>
 
@@ -182,8 +182,8 @@ export default function LoginPage() {
         </div>
 
         {/* RIGHT SIDE: Login Form */}
-        <div className="flex-1 flex items-center justify-center px-4 py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
-          <Card className="cardprime w-full max-w-105 rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
+        <div className="w-full lg:w-1/2 flex items-center justify-center px-4 pb-12 pt-6 lg:py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
+          <Card className="cardprime w-full max-w-md rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
             <CardHeader className="space-y-1 text-center pb-8">
               <CardTitle className="text-2xl font-bold text-slate-900">Dashboard Login</CardTitle>
               <CardDescription className="text-slate-500">Enter your official credentials below</CardDescription>

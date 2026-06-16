@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Bell, BellOff, Search, User, ChevronDown, Menu, LogOut } from 'lucide-react';
+import { Bell, BellOff, Search, User, ChevronDown, Menu, LogOut, Sun, Moon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { GlobalSearch } from './GlobalSearch';
 
-import { announcementService } from '../../services/announcement/service';
+import { useAnnouncements } from '../../services/announcement/queries';
 import { CURRENT_SESSION } from '../../lib/constants';
 import { Megaphone } from 'lucide-react';
+import { announcementService } from '../../services/announcement/service';
 
 type TopbarProps = {
   onMobileMenuClick?: () => void;
@@ -16,37 +17,66 @@ type TopbarProps = {
 
 export function Topbar({ onMobileMenuClick }: TopbarProps) {
   const { user, role, clearAuth } = useAuthStore();
-  const [unreadAnnouncements, setUnreadAnnouncements] = React.useState<any[]>([]);
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const loadUnread = React.useCallback(async () => {
+  const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      setTheme('dark');
+      document.documentElement.classList.add('dark-theme');
+    } else {
+      setTheme('light');
+      document.documentElement.classList.remove('dark-theme');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (theme === 'light') {
+      setTheme('dark');
+      document.documentElement.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      setTheme('light');
+      document.documentElement.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Fetch announcements using react-query with refetchInterval
+  const { data: announcementsData } = useAnnouncements({
+    limit: 15,
+    session: CURRENT_SESSION,
+  });
+
+  const [readIds, setReadIds] = React.useState<number[]>([]);
+
+  const loadReadIds = React.useCallback(() => {
     try {
-      const res = await announcementService.getAnnouncements({ limit: 15, session: CURRENT_SESSION });
       const readIdsRaw = localStorage.getItem('read-announcements');
-      const readIds = readIdsRaw ? JSON.parse(readIdsRaw) : [];
-      const unread = (res.data || []).filter((ann: any) => !readIds.includes(ann.id));
-      setUnreadAnnouncements(unread);
-    } catch (err) {
-      console.error('Failed to load unread notices for topbar bell:', err);
+      setReadIds(readIdsRaw ? JSON.parse(readIdsRaw) : []);
+    } catch (e) {
+      console.error(e);
     }
   }, []);
 
   React.useEffect(() => {
-    loadUnread();
-    
-    // Listen to local read updates
-    window.addEventListener('announcement-read', loadUnread);
-    window.addEventListener('storage', loadUnread);
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(loadUnread, 30000);
+    loadReadIds();
+    window.addEventListener('announcement-read', loadReadIds);
+    window.addEventListener('storage', loadReadIds);
     return () => {
-      window.removeEventListener('announcement-read', loadUnread);
-      window.removeEventListener('storage', loadUnread);
-      clearInterval(interval);
+      window.removeEventListener('announcement-read', loadReadIds);
+      window.removeEventListener('storage', loadReadIds);
     };
-  }, [loadUnread]);
+  }, [loadReadIds]);
+
+  const unreadAnnouncements = React.useMemo(() => {
+    const list = announcementsData?.data || [];
+    return list.filter((ann: any) => !readIds.includes(ann.id));
+  }, [announcementsData, readIds]);
 
   React.useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -62,12 +92,12 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
     try {
       // Mark as read in localStorage
       const readIdsRaw = localStorage.getItem('read-announcements');
-      const readIds = readIdsRaw ? JSON.parse(readIdsRaw) : [];
-      if (!readIds.includes(ann.id)) {
-        readIds.push(ann.id);
-        localStorage.setItem('read-announcements', JSON.stringify(readIds));
+      const currentReadIds = readIdsRaw ? JSON.parse(readIdsRaw) : [];
+      if (!currentReadIds.includes(ann.id)) {
+        currentReadIds.push(ann.id);
+        localStorage.setItem('read-announcements', JSON.stringify(currentReadIds));
+        window.dispatchEvent(new Event('announcement-read'));
       }
-      setUnreadAnnouncements(prev => prev.filter(a => a.id !== ann.id));
       
       // Mark as read on backend
       await announcementService.getAnnouncementDetails(ann.id);
@@ -184,6 +214,19 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
             </div>
           )}
         </div>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-300 group"
+          title="Toggle light/dark theme"
+        >
+          {theme === 'light' ? (
+            <Moon size={20} className="group-hover:rotate-12 transition-transform" />
+          ) : (
+            <Sun size={20} className="group-hover:rotate-45 transition-transform" />
+          )}
+        </button>
 
         <div className="h-6 w-px bg-border mx-1" />
 

@@ -96,10 +96,14 @@ export const examService = {
   },
 
   getGrades: async (session: string) => {
-    const response = await api.get<GradeConfig[]>(API_ENDPOINTS.EXAMINATION.GRADE_CONFIG, {
+    const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.GRADE_CONFIG, {
       params: { session },
     });
-    return response.data;
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   deleteGrade: async (id: number) => {
@@ -157,18 +161,26 @@ export const examService = {
   },
 
   getSchedules: async (query: ExamScheduleQueryDto) => {
-    const response = await api.get<{ items: ExamSchedule[]; total: number } | ExamSchedule[]>(
+    const response = await api.get<any>(
       API_ENDPOINTS.EXAMINATION.SCHEDULE,
       { params: query }
     );
-    return Array.isArray(response.data) ? response.data : (response.data as any).items || [];
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   getStudentSchedule: async (session: string) => {
-    const response = await api.get<ExamSchedule[]>(API_ENDPOINTS.EXAMINATION.SCHEDULE_STUDENT, {
+    const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.SCHEDULE_STUDENT, {
       params: { session },
     });
-    return response.data;
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   // --- Marks Entry ---
@@ -198,24 +210,34 @@ export const examService = {
   },
 
   getMarks: async (examId: number, classId: number, classSectionId: number, subjectId?: number) => {
-    const response = await api.get<MarksEntry[]>(API_ENDPOINTS.EXAMINATION.MARKS, {
+    const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.MARKS, {
       params: { examId, classId, classSectionId, subjectId },
     });
-    return response.data;
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   getCompletionStatus: async (examId: number, session: string) => {
     const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.MARKS_COMPLETION, {
       params: { examId, session },
     });
-    return response.data;
+    const body = response.data;
+    if (body && body.data !== undefined) return body.data;
+    return body;
   },
 
   getStudentMarks: async (studentId: string, session: string) => {
     const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.MARKS_STUDENT(studentId), {
       params: { session },
     });
-    return response.data;
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   // --- Results ---
@@ -225,10 +247,14 @@ export const examService = {
   },
 
   getClassResults: async (examId: number, classId: number, classSectionId: number) => {
-    const response = await api.get<ExamResult[]>(API_ENDPOINTS.EXAMINATION.RESULT_CLASS, {
+    const response = await api.get<any>(API_ENDPOINTS.EXAMINATION.RESULT_CLASS, {
       params: { examId, classId, classSectionId },
     });
-    return response.data;
+    const body = response.data;
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.data)) return body.data;
+    if (body && Array.isArray(body.items)) return body.items;
+    return [];
   },
 
   updateTeacherRemarks: async (id: number, remarks: string) => {

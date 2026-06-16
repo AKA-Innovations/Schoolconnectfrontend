@@ -6,6 +6,19 @@ import { useTeacherRoles } from '@/lib/permissions';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { announcementService } from '@/services/announcement/service';
 import type { Announcement, AnnouncementAttachment, ReadReceipt } from '@/services/announcement/types';
+import { 
+  useAnnouncements, 
+  useAnnouncementDetails, 
+  useAnnouncementReadReceipts 
+} from '@/services/announcement/queries';
+import { 
+  useCreateAnnouncement, 
+  useUpdateAnnouncement, 
+  useDeleteAnnouncement, 
+  useTogglePinAnnouncement,
+  useUploadAnnouncementAttachment,
+  useDeleteAnnouncementAttachment
+} from '@/services/announcement/mutations';
 import { classService } from '@/services/class/service';
 import { teacherService } from '@/services/teacher/service';
 import { toast } from 'sonner';
@@ -38,16 +51,36 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   }, [userRole, teacherRoles]);
 
   // List State
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState(CURRENT_SESSION);
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [audienceFilter, setAudienceFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [readStatusFilter, setReadStatusFilter] = useState<'ALL' | 'READ' | 'UNREAD'>('ALL');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+
+  const queryParams = useMemo(() => {
+    const p: any = {
+      session,
+      page,
+      limit: 10,
+    };
+    if (priorityFilter !== 'ALL') p.priority = priorityFilter;
+    if (audienceFilter !== 'ALL') p.targetAudience = audienceFilter;
+    return p;
+  }, [session, priorityFilter, audienceFilter, page]);
+
+  const { data: queryData, isLoading: loading, error: queryError, refetch: fetchAnnouncements } = useAnnouncements(queryParams);
+
+  const announcements = queryData?.data || [];
+  const totalPages = queryData?.meta?.pages || 1;
+  const error = queryError ? ((queryError as any).response?.data?.message || (queryError as any).message || 'Failed to load announcements') : null;
+
+  // React Query Mutations
+  const createMutation = useCreateAnnouncement();
+  const updateMutation = useUpdateAnnouncement();
+  const deleteMutation = useDeleteAnnouncement();
+  const togglePinMutation = useTogglePinAnnouncement();
+  const uploadAttachmentMutation = useUploadAnnouncementAttachment();
 
   // Form / Modal States
   const [formOpen, setFormOpen] = useState(false);
@@ -79,37 +112,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   const [classSectionOptions, setClassSectionOptions] = useState<any[]>([]);
   const [teacherDetailClasses, setTeacherDetailClasses] = useState<any[]>([]);
 
-  // Load list of announcements
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: any = {
-        session,
-        page,
-        limit: 10,
-      };
-      if (priorityFilter !== 'ALL') params.priority = priorityFilter;
-      if (audienceFilter !== 'ALL') params.targetAudience = audienceFilter;
-      
-      const res = await announcementService.getAnnouncements(params);
-      setAnnouncements(res?.data || []);
-      setTotalPages(res?.meta?.pages || 1);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.message || 'Failed to load announcements';
-      setError(errorMsg);
-      toast.error(errorMsg);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const schoolId = useAuthStore((s) => s.schoolId);
-
-  useEffect(() => {
-    fetchAnnouncements();
-  }, [session, priorityFilter, audienceFilter, page]);
 
   // Load dropdown options for target audience selection
   useEffect(() => {
@@ -262,9 +265,8 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     
     // Mark as read on backend (triggered by simply fetching details)
     try {
-      const refreshed = await announcementService.getAnnouncementDetails(ann.id);
-      // Update local list item read status if needed
-      setAnnouncements(prev => prev.map(a => a.id === ann.id ? refreshed : a));
+      await announcementService.getAnnouncementDetails(ann.id);
+      fetchAnnouncements();
     } catch (err) {
       console.error('Failed to mark read receipt:', err);
     }
@@ -275,7 +277,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     e.stopPropagation();
     try {
       const nextPin = !ann.isPinned;
-      await announcementService.togglePin(ann.id, nextPin);
+      await togglePinMutation.mutateAsync({ id: ann.id, isPinned: nextPin });
       toast.success(nextPin ? 'Announcement pinned' : 'Announcement unpinned');
       fetchAnnouncements();
     } catch (err) {
@@ -288,7 +290,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this announcement?')) return;
     try {
-      await announcementService.deleteAnnouncement(id);
+      await deleteMutation.mutateAsync(id);
       toast.success('Announcement deleted successfully');
       fetchAnnouncements();
     } catch (err) {
@@ -346,17 +348,17 @@ export function AnnouncementsManager({ role: userRole }: Props) {
 
       let savedAnnouncement: Announcement;
       if (isEditMode && selectedAnnouncement) {
-        savedAnnouncement = await announcementService.updateAnnouncement(selectedAnnouncement.id, payload);
+        savedAnnouncement = await updateMutation.mutateAsync({ id: selectedAnnouncement.id, data: payload });
         toast.success('Announcement updated successfully');
       } else {
-        savedAnnouncement = await announcementService.createAnnouncement(payload);
+        savedAnnouncement = await createMutation.mutateAsync(payload);
         toast.success('Announcement created successfully');
       }
 
       // Upload Attachments if selected
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
-          await announcementService.uploadAttachment(savedAnnouncement.id, file);
+          await uploadAttachmentMutation.mutateAsync({ id: savedAnnouncement.id, file });
         }
         toast.success('Attachments uploaded successfully');
       }
@@ -445,7 +447,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
           <Button 
             variant="outline" 
             size="icon" 
-            onClick={fetchAnnouncements} 
+            onClick={() => fetchAnnouncements()} 
             disabled={loading} 
             className="rounded-xl border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
             title="Refresh Notice Board"
@@ -530,7 +532,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                 {error}. Please check your connection or try again.
               </p>
             </div>
-            <Button onClick={fetchAnnouncements} className="rounded-xl flex items-center gap-2">
+            <Button onClick={() => fetchAnnouncements()} className="rounded-xl flex items-center gap-2">
               <RotateCw className="h-4 w-4" /> Retry Loading
             </Button>
           </CardContent>

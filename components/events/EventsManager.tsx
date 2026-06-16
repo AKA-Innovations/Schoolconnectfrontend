@@ -7,6 +7,8 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { eventService } from '@/services/event/service';
 import { eventTypeService } from '@/services/event-type/service';
 import type { SchoolEvent, EventType, EventAudience } from '@/services/event/types';
+import { useEvents, useEventTypes } from '@/services/event/queries';
+import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '@/services/event/mutations';
 import { classService } from '@/services/class/service';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -55,21 +57,35 @@ export function EventsManager({ role: userRole }: Props) {
   }, [userRole, teacherRoles]);
 
   // List State
-  const [events, setEvents] = useState<SchoolEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState(CURRENT_SESSION);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [audienceFilter, setAudienceFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const queryParams = useMemo(() => {
+    const p: any = { session };
+    if (typeFilter !== 'ALL') p.eventType = typeFilter;
+    if (audienceFilter !== 'ALL') p.targetAudience = audienceFilter;
+    return p;
+  }, [session, typeFilter, audienceFilter]);
+
+  const { data: queryData, isLoading: loading, error: queryError, refetch: fetchEvents } = useEvents(queryParams);
+  const events = Array.isArray(queryData) ? queryData : [];
+  const error = queryError ? ((queryError as any).response?.data?.message || (queryError as any).message || 'Failed to load events') : null;
+
+  // Event Types using react-query
+  const { data: eventTypesData } = useEventTypes(session);
+  const eventTypes = Array.isArray(eventTypesData) ? eventTypesData : [];
+
+  // React Query Mutations
+  const createMutation = useCreateEvent();
+  const updateMutation = useUpdateEvent();
+  const deleteMutation = useDeleteEvent();
+
   // Form / Modal States
   const [formOpen, setFormOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SchoolEvent | null>(null);
-
-  // Event Types
-  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -92,42 +108,6 @@ export function EventsManager({ role: userRole }: Props) {
   // Dropdown Options
   const [classSectionOptions, setClassSectionOptions] = useState<any[]>([]);
   const [teacherDetailClasses, setTeacherDetailClasses] = useState<any[]>([]);
-
-  // Fetch events
-  const fetchEvents = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params: any = { session };
-      if (typeFilter !== 'ALL') params.eventType = typeFilter;
-      if (audienceFilter !== 'ALL') params.targetAudience = audienceFilter;
-      const res = await eventService.listEvents(params);
-      setEvents(Array.isArray(res) ? res : []);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.message || 'Failed to load events';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchEvents();
-  }, [session, typeFilter, audienceFilter]);
-
-  // Fetch event types
-  useEffect(() => {
-    const loadEventTypes = async () => {
-      try {
-        const types = await eventTypeService.listEventTypes(session);
-        setEventTypes(Array.isArray(types) ? types : []);
-      } catch (err) {
-        console.error('Failed to load event types:', err);
-      }
-    };
-    loadEventTypes();
-  }, [session]);
 
   // Load class/section options for SPECIFIC_CLASS targeting
   useEffect(() => {
@@ -236,7 +216,7 @@ export function EventsManager({ role: userRole }: Props) {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this event?')) return;
     try {
-      await eventService.deleteEvent(id);
+      await deleteMutation.mutateAsync(id);
       toast.success('Event deleted successfully');
       fetchEvents();
     } catch (err) {
@@ -280,10 +260,10 @@ export function EventsManager({ role: userRole }: Props) {
       }
 
       if (isEditMode && selectedEvent) {
-        await eventService.updateEvent(selectedEvent.id, payload);
+        await updateMutation.mutateAsync({ id: selectedEvent.id, data: payload });
         toast.success('Event updated successfully');
       } else {
-        await eventService.createEvent(payload);
+        await createMutation.mutateAsync(payload);
         toast.success('Event created successfully');
       }
       setFormOpen(false);
@@ -359,7 +339,7 @@ export function EventsManager({ role: userRole }: Props) {
           <Button
             variant="outline"
             size="icon"
-            onClick={fetchEvents}
+            onClick={() => fetchEvents()}
             disabled={loading}
             className="rounded-xl border border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
             title="Refresh Events"
@@ -432,7 +412,7 @@ export function EventsManager({ role: userRole }: Props) {
               <h3 className="text-lg font-bold text-foreground">Failed to Load Events</h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">{error}</p>
             </div>
-            <Button onClick={fetchEvents} className="rounded-xl flex items-center gap-2">
+            <Button onClick={() => fetchEvents()} className="rounded-xl flex items-center gap-2">
               <RotateCw className="h-4 w-4" /> Retry
             </Button>
           </CardContent>

@@ -26,7 +26,7 @@ export default function StudentExamSchedule() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {schedules.map((exam) => (
+          {schedules.map((exam: any) => (
             <Card key={exam.id} className="rounded-2xl overflow-hidden shadow-sm border-border bg-card">
               <CardHeader className="bg-primary/5 border-b border-primary/10 pb-4">
                 <div className="flex justify-between items-start mb-2">

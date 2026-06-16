@@ -91,7 +91,6 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Subject Config',   href: '/dashboard/admin/exams?tab=subject-config' },
         { name: 'Grade Config',     href: '/dashboard/admin/exams?tab=grade-config' },
         { name: 'Schedules',        href: '/dashboard/admin/exams?tab=schedules' },
-        { name: 'Marks Entry',      href: '/dashboard/admin/exams?tab=marks' },
         { name: 'Results',          href: '/dashboard/admin/exams?tab=results' },
         { name: 'Analytics',        href: '/dashboard/admin/exams?tab=analytics' },
       ]

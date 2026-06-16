@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { eventService } from '@/services/event/service';
 import type { SchoolEvent } from '@/services/event/types';
+import { useEvents, useUpcomingEvents } from '@/services/event/queries';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight, CalendarDays, Clock, MapPin, Star } from 'lucide-react';
@@ -32,52 +33,23 @@ export function EventCalendar({ role }: Props) {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [events, setEvents] = useState<SchoolEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dayDialogOpen, setDayDialogOpen] = useState(false);
   const [session] = useState(CURRENT_SESSION);
 
-  // Upcoming events state
-  const [upcomingEvents, setUpcomingEvents] = useState<SchoolEvent[]>([]);
-  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  // Fetch calendar events using react-query
+  const calendarParams = useMemo(() => ({
+    session,
+    month: currentMonth,
+    year: currentYear,
+  }), [session, currentMonth, currentYear]);
 
-  const fetchCalendarEvents = async () => {
-    setLoading(true);
-    try {
-      const res = await eventService.listEvents({
-        session,
-        month: currentMonth,
-        year: currentYear,
-      });
-      setEvents(Array.isArray(res) ? res : []);
-    } catch (err) {
-      toast.error('Failed to load calendar events');
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: calendarEventsData, isLoading: loading } = useEvents(calendarParams);
+  const events = Array.isArray(calendarEventsData) ? calendarEventsData : [];
 
-  const fetchUpcomingEvents = async () => {
-    setLoadingUpcoming(true);
-    try {
-      const res = await eventService.getUpcoming(session);
-      setUpcomingEvents(Array.isArray(res) ? res : []);
-    } catch (err) {
-      console.error('Failed to load upcoming events:', err);
-    } finally {
-      setLoadingUpcoming(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCalendarEvents();
-  }, [currentMonth, currentYear, session]);
-
-  useEffect(() => {
-    fetchUpcomingEvents();
-  }, [session]);
+  // Fetch upcoming events using react-query
+  const { data: upcomingEventsData, isLoading: loadingUpcoming } = useUpcomingEvents(session);
+  const upcomingEvents = Array.isArray(upcomingEventsData) ? upcomingEventsData : [];
 
   const prevMonth = () => {
     if (currentMonth === 1) {

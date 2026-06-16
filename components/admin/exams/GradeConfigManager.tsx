@@ -16,16 +16,18 @@ interface Props {
 }
 
 export function GradeConfigManager({ session }: Props) {
-  const { data: gradesData = [], isLoading, refetch, isFetching } = useGradeConfig(session);
+  const { data: gradesData, isLoading, refetch, isFetching } = useGradeConfig(session);
   const configureMutation = useConfigureGrades();
   const deleteMutation = useDeleteGrade();
 
   const [grades, setGrades] = useState<GradeMstrItemDto[]>([]);
 
   useEffect(() => {
+    if (!gradesData) return;
+    
     if (gradesData.length > 0) {
       setGrades(
-        gradesData.map(g => ({
+        gradesData.map((g: any) => ({
           gradeName: g.gradeName,
           minPercentage: g.minPercentage,
           maxPercentage: g.maxPercentage,

@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { useExams, useExamSubjects } from '@/services/exam/queries';
 import { useCreateExamSubjects, useDeleteExamSubject } from '@/services/exam/mutations';
 import { useSchoolClasses, useSubjectOptions } from '@/hooks/useClasses';
-import { Plus, Trash2, RefreshCw, AlertCircle, Sparkles, HelpCircle } from 'lucide-react';
+import { examService } from '@/services/exam/service';
+import { Plus, Trash2, RefreshCw, AlertCircle, Sparkles, HelpCircle, Copy, Grid } from 'lucide-react';
 import { toast } from 'sonner';
 import { GradingType } from '@/types/exam.types';
+import { cn } from '@/lib/utils';
 
 interface Props {
   session: string;
@@ -23,6 +25,8 @@ export function ExamSubjectConfig({ session }: Props) {
 
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
+
+  const [activeMode, setActiveMode] = useState<'single' | 'bulk' | 'copy'>('single');
 
   const selectedClassName = classes.find(c => c.id === selectedClassId)?.className || '';
 
@@ -50,6 +54,13 @@ export function ExamSubjectConfig({ session }: Props) {
   const [newGradingType, setNewGradingType] = useState<GradingType>(GradingType.MARKS_AND_GRADE);
   const [includeInFinal, setIncludeInFinal] = useState(true);
 
+  // Bulk Selection State
+  const [selectedBulkSubjectIds, setSelectedBulkSubjectIds] = useState<number[]>([]);
+
+  // Copy Setup State
+  const [copySourceExamId, setCopySourceExamId] = useState<number | ''>('');
+  const [copySourceClassId, setCopySourceClassId] = useState<number | ''>('');
+
   // Auto-update exam type matching the active exam definition
   const activeExam = exams.find((e: any) => e.id === Number(selectedExamId));
   const activeExamType = activeExam?.examType || '';
@@ -59,6 +70,10 @@ export function ExamSubjectConfig({ session }: Props) {
       setNewExamType(activeExamType);
     }
   }, [activeExamType]);
+
+  const unconfiguredSubjects = React.useMemo(() => {
+    return subjectOptions.filter(opt => !subjects.some((s: any) => s.subjectId === opt.id));
+  }, [subjectOptions, subjects]);
 
   const handleAddSubject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +108,87 @@ export function ExamSubjectConfig({ session }: Props) {
     }
   };
 
+  const handleAddBulkSubjects = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExamId || !selectedClassId || selectedBulkSubjectIds.length === 0) {
+      toast.error('Please select Exam, Class, and at least one Subject');
+      return;
+    }
+
+    const payload = selectedBulkSubjectIds.map(subId => ({
+      classId: Number(selectedClassId),
+      subjectId: subId,
+      examType: activeExamType || newExamType,
+      totalMarks: Number(newTotalMarks),
+      passingMarks: Number(newPassingMarks),
+      weightage: Number(newWeightage),
+      gradingType: newGradingType,
+      includeInFinalResult: includeInFinal,
+      displayOrder: 1,
+    }));
+
+    try {
+      await createMutation.mutateAsync({
+        session,
+        examId: Number(selectedExamId),
+        subjects: payload,
+      });
+      setSelectedBulkSubjectIds([]);
+      toast.success(`Successfully configured ${payload.length} subjects in bulk`);
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to add bulk configurations');
+    }
+  };
+
+  const handleCopyConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedExamId || !selectedClassId || !copySourceExamId || !copySourceClassId) {
+      toast.error('Please specify target and source configurations');
+      return;
+    }
+
+    try {
+      const sourceData = await examService.getExamSubjects(
+        session,
+        Number(copySourceExamId),
+        Number(copySourceClassId)
+      );
+      
+      const sourceList = Array.isArray(sourceData) 
+        ? sourceData 
+        : (sourceData as any)?.data || (sourceData as any)?.items || [];
+
+      if (sourceList.length === 0) {
+        toast.error('The selected source configuration has no configured subjects to copy.');
+        return;
+      }
+
+      const payload = sourceList.map((s: any) => ({
+        classId: Number(selectedClassId),
+        subjectId: s.subjectId,
+        examType: activeExamType || s.examType,
+        totalMarks: s.totalMarks,
+        passingMarks: s.passingMarks,
+        weightage: s.weightage,
+        gradingType: s.gradingType,
+        includeInFinalResult: s.includeInFinalResult,
+        displayOrder: s.displayOrder || 1,
+      }));
+
+      await createMutation.mutateAsync({
+        session,
+        examId: Number(selectedExamId),
+        subjects: payload,
+      });
+
+      toast.success(`Copied configuration of ${payload.length} subjects successfully`);
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to copy configuration');
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this subject configuration?')) return;
     try {
@@ -118,11 +214,10 @@ export function ExamSubjectConfig({ session }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Cascade filters */}
           <select
             value={selectedExamId}
             onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
           >
             <option value="">Select Exam</option>
             {exams.map((e: any) => (
@@ -133,7 +228,7 @@ export function ExamSubjectConfig({ session }: Props) {
           <select
             value={selectedClassId}
             onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
           >
             <option value="">Select Class</option>
             {classes.map((c: any) => (
@@ -160,108 +255,313 @@ export function ExamSubjectConfig({ session }: Props) {
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Add Subject Config Form */}
+          {/* Left Panel: Configuration tools (Form / Bulk / Copy) */}
           <Card className="rounded-2xl border border-border/80 shadow-sm bg-card h-fit">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Add Subject Config</CardTitle>
-              <CardDescription className="text-xs">Define subject evaluation details.</CardDescription>
+            <CardHeader className="pb-4">
+              <div className="flex bg-muted/40 p-1 rounded-xl border border-border/50">
+                <button
+                  onClick={() => setActiveMode('single')}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all",
+                    activeMode === 'single' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Single
+                </button>
+                <button
+                  onClick={() => setActiveMode('bulk')}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1",
+                    activeMode === 'bulk' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Grid className="h-3 w-3" /> Bulk
+                </button>
+                <button
+                  onClick={() => setActiveMode('copy')}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1",
+                    activeMode === 'copy' ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Copy className="h-3 w-3" /> Copy Setup
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleAddSubject} className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Subject</Label>
-                  <select
-                    value={newSubjectId}
-                    onChange={(e) => setNewSubjectId(e.target.value ? Number(e.target.value) : '')}
-                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    required
-                  >
-                    <option value="">Select Subject</option>
-                    {subjectOptions.map(opt => (
-                      <option key={opt.id} value={opt.id}>{opt.subjectName}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Exam Type</Label>
-                  <Input
-                    value={activeExamType || 'None selected'}
-                    readOnly
-                    disabled
-                    className="rounded-xl h-11 bg-muted font-bold text-muted-foreground"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              {/* Single Mode Form */}
+              {activeMode === 'single' && (
+                <form onSubmit={handleAddSubject} className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Total Marks</Label>
-                    <Input
-                      type="number"
-                      value={newTotalMarks}
-                      onChange={(e) => setNewTotalMarks(Number(e.target.value))}
-                      className="rounded-xl h-11"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Passing Marks</Label>
-                    <Input
-                      type="number"
-                      value={newPassingMarks}
-                      onChange={(e) => setNewPassingMarks(Number(e.target.value))}
-                      className="rounded-xl h-11"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Weightage %</Label>
-                    <Input
-                      type="number"
-                      value={newWeightage}
-                      onChange={(e) => setNewWeightage(Number(e.target.value))}
-                      className="rounded-xl h-11"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Grading Scheme</Label>
+                    <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Subject</Label>
                     <select
-                      value={newGradingType}
-                      onChange={(e) => setNewGradingType(e.target.value as GradingType)}
+                      value={newSubjectId}
+                      onChange={(e) => setNewSubjectId(e.target.value ? Number(e.target.value) : '')}
                       className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
                     >
-                      <option value={GradingType.MARKS_AND_GRADE}>Marks & Grade</option>
-                      <option value={GradingType.MARKS}>Marks Only</option>
-                      <option value={GradingType.GRADE}>Grade Only</option>
+                      <option value="">Select Subject</option>
+                      {subjectOptions.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.subjectName}</option>
+                      ))}
                     </select>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-2 pt-2">
-                  <input
-                    type="checkbox"
-                    id="includeInFinal"
-                    checked={includeInFinal}
-                    onChange={(e) => setIncludeInFinal(e.target.checked)}
-                    className="rounded text-primary focus:ring-primary/20 h-4 w-4"
-                  />
-                  <Label htmlFor="includeInFinal" className="text-sm font-semibold cursor-pointer">
-                    Include in final results calculation
-                  </Label>
-                </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Exam Type</Label>
+                    <Input
+                      value={activeExamType || 'None selected'}
+                      readOnly
+                      disabled
+                      className="rounded-xl h-11 bg-muted font-bold text-muted-foreground"
+                    />
+                  </div>
 
-                <Button
-                  type="submit"
-                  className="w-full rounded-xl bg-primary hover:bg-primary/90 mt-2"
-                  disabled={createMutation.isPending}
-                >
-                  {createMutation.isPending ? 'Saving...' : 'Add Subject Config'}
-                </Button>
-              </form>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Total Marks</Label>
+                      <Input
+                        type="number"
+                        value={newTotalMarks}
+                        onChange={(e) => setNewTotalMarks(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Passing Marks</Label>
+                      <Input
+                        type="number"
+                        value={newPassingMarks}
+                        onChange={(e) => setNewPassingMarks(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Weightage %</Label>
+                      <Input
+                        type="number"
+                        value={newWeightage}
+                        onChange={(e) => setNewWeightage(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Grading Scheme</Label>
+                      <select
+                        value={newGradingType}
+                        onChange={(e) => setNewGradingType(e.target.value as GradingType)}
+                        className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value={GradingType.MARKS_AND_GRADE}>Marks & Grade</option>
+                        <option value={GradingType.MARKS}>Marks Only</option>
+                        <option value={GradingType.GRADE}>Grade Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="includeInFinal"
+                      checked={includeInFinal}
+                      onChange={(e) => setIncludeInFinal(e.target.checked)}
+                      className="rounded text-primary focus:ring-primary/20 h-4 w-4"
+                    />
+                    <Label htmlFor="includeInFinal" className="text-sm font-semibold cursor-pointer">
+                      Include in final results calculation
+                    </Label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl bg-primary hover:bg-primary/90 mt-2 font-bold h-11"
+                    disabled={createMutation.isPending}
+                  >
+                    {createMutation.isPending ? 'Saving...' : 'Add Subject Config'}
+                  </Button>
+                </form>
+              )}
+
+              {/* Bulk Mode Form */}
+              {activeMode === 'bulk' && (
+                <form onSubmit={handleAddBulkSubjects} className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Select Subjects</Label>
+                      {unconfiguredSubjects.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedBulkSubjectIds.length === unconfiguredSubjects.length) {
+                              setSelectedBulkSubjectIds([]);
+                            } else {
+                              setSelectedBulkSubjectIds(unconfiguredSubjects.map(s => s.id));
+                            }
+                          }}
+                          className="text-[10px] font-bold text-primary hover:underline"
+                        >
+                          {selectedBulkSubjectIds.length === unconfiguredSubjects.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                    </div>
+                    {unconfiguredSubjects.length === 0 ? (
+                      <p className="text-xs text-muted-foreground bg-muted/30 p-4 rounded-xl border border-border text-center">
+                        All subjects in this class have already been configured.
+                      </p>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto border border-border rounded-xl p-3 space-y-2 bg-muted/10">
+                        {unconfiguredSubjects.map(opt => {
+                          const isChecked = selectedBulkSubjectIds.includes(opt.id);
+                          return (
+                            <label key={opt.id} className="flex items-center space-x-2.5 cursor-pointer text-xs font-semibold hover:bg-muted/40 p-1.5 rounded-lg transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedBulkSubjectIds(prev => [...prev, opt.id]);
+                                  } else {
+                                    setSelectedBulkSubjectIds(prev => prev.filter(id => id !== opt.id));
+                                  }
+                                }}
+                                className="rounded text-primary focus:ring-primary/20 h-4 w-4"
+                              />
+                              <span>{opt.subjectName}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Total Marks</Label>
+                      <Input
+                        type="number"
+                        value={newTotalMarks}
+                        onChange={(e) => setNewTotalMarks(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Passing Marks</Label>
+                      <Input
+                        type="number"
+                        value={newPassingMarks}
+                        onChange={(e) => setNewPassingMarks(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Weightage %</Label>
+                      <Input
+                        type="number"
+                        value={newWeightage}
+                        onChange={(e) => setNewWeightage(Number(e.target.value))}
+                        className="rounded-xl h-11"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Grading Scheme</Label>
+                      <select
+                        value={newGradingType}
+                        onChange={(e) => setNewGradingType(e.target.value as GradingType)}
+                        className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value={GradingType.MARKS_AND_GRADE}>Marks & Grade</option>
+                        <option value={GradingType.MARKS}>Marks Only</option>
+                        <option value={GradingType.GRADE}>Grade Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="includeInFinalBulk"
+                      checked={includeInFinal}
+                      onChange={(e) => setIncludeInFinal(e.target.checked)}
+                      className="rounded text-primary focus:ring-primary/20 h-4 w-4"
+                    />
+                    <Label htmlFor="includeInFinalBulk" className="text-sm font-semibold cursor-pointer">
+                      Include in final results calculation
+                    </Label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl bg-primary hover:bg-primary/90 mt-2 font-bold h-11"
+                    disabled={createMutation.isPending || selectedBulkSubjectIds.length === 0}
+                  >
+                    {createMutation.isPending ? 'Saving...' : `Configure Checked (${selectedBulkSubjectIds.length})`}
+                  </Button>
+                </form>
+              )}
+
+              {/* Copy Mode Form */}
+              {activeMode === 'copy' && (
+                <form onSubmit={handleCopyConfig} className="space-y-4">
+                  <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-semibold text-primary/80 flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4" /> Copy Instructions
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      This copies the exact subjects, max marks, passing thresholds, and grading schemes configured for another Class and Exam into your active selection.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Source Exam</Label>
+                    <select
+                      value={copySourceExamId}
+                      onChange={(e) => setCopySourceExamId(e.target.value ? Number(e.target.value) : '')}
+                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    >
+                      <option value="">Select Source Exam</option>
+                      {exams.map((e: any) => (
+                        <option key={e.id} value={e.id}>{e.examName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Source Class</Label>
+                    <select
+                      value={copySourceClassId}
+                      onChange={(e) => setCopySourceClassId(e.target.value ? Number(e.target.value) : '')}
+                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    >
+                      <option value="">Select Source Class</option>
+                      {classes.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.className}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl bg-primary hover:bg-primary/90 mt-2 font-bold h-11"
+                    disabled={createMutation.isPending || !copySourceExamId || !copySourceClassId}
+                  >
+                    {createMutation.isPending ? 'Copying...' : 'Copy Configuration'}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
 
@@ -276,7 +576,7 @@ export function ExamSubjectConfig({ session }: Props) {
                 <div className="p-12 text-center text-muted-foreground">Loading configurations...</div>
               ) : subjects.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground">
-                  No subjects configured yet. Add them using the form.
+                  No subjects configured yet. Configure them using the panel tools.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -292,7 +592,7 @@ export function ExamSubjectConfig({ session }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50 text-sm">
-                      {subjects.map((sub) => {
+                      {subjects.map((sub: any) => {
                         const optSubject = subjectOptions.find(o => o.id === sub.subjectId);
                         return (
                           <tr key={sub.id} className="hover:bg-muted/5 transition-colors">

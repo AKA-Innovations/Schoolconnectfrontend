@@ -2,25 +2,25 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-primary: #0d9488;
-  --color-primary-hover: #0f766e;
-  --color-accent: #06b6d4;
-  --color-ink: #0f172a;
-  --color-surface: #f8fafc;
-  --color-card: #ffffff;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-muted: var(--ink-light);
+  --color-border: var(--border-light);
 
-  --color-background: var(--color-surface);
-  --color-foreground: var(--color-ink);
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
 
   --font-sans: 'Outfit', sans-serif;
   --font-display: 'Outfit', sans-serif;
   --font-body: 'Outfit', sans-serif;
 
-  --shadow-card: 0 1px 3px rgba(13, 13, 20, 0.07), 0 4px 12px rgba(13, 13, 20, 0.05);
-  --shadow-card-hover: 0 4px 16px rgba(13, 13, 20, 0.12), 0 1px 4px rgba(13, 13, 20, 0.08);
-  --shadow-modal: 0 24px 64px rgba(13, 13, 20, 0.2);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 12px 24px -4px rgba(16, 185, 129, 0.12), 0 4px 12px -2px rgba(16, 185, 129, 0.06);
+  --shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.15);
 
   --animate-fade-up: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in: fadeIn 0.3s ease both;
@@ -29,33 +29,147 @@
 
 @layer base {
   :root {
-    --primary: #0d9488;
-    --primary-hover: #0f766e;
-    --accent: #06b6d4;
+    --primary: #10b981; /* Monochromatic Green (Emerald) */
+    --primary-hover: #059669;
+    --accent: #34d399;
     --ink: #0f172a;
-    --ink-light: #64748b;
+    --ink-light: #475569;
     --surface: #f8fafc;
-    --glass: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.5);
+    --card: #ffffff;
+    --glass: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(0, 0, 0, 0.06);
     --border-light: #e2e8f0;
   }
 
   .dark-theme {
-    --primary: #2dd4bf;
-    --primary-hover: #5eead4;
-    --accent: #22d3ee;
+    --primary: #10b981;
+    --primary-hover: #059669;
+    --accent: #34d399;
     --ink: #f8fafc;
-    --ink-light: #94a3b8;
-    --surface: #0f172a;
-    --glass: rgba(15, 23, 42, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --border-light: #1e293b;
+    --ink-light: #cbd5e1; /* High contrast readable light gray text */
+    --surface: #0f172a; /* Elegant dark navy/slate background */
+    --card: #1e293b; /* Consistent dark card slate */
+    --glass: rgba(30, 41, 59, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --border-light: #334155;
+
+    /* Override standard light mode classes on components in dark theme */
+    .bg-white {
+      background-color: var(--card) !important;
+    }
+    .bg-slate-50, .bg-slate-50\/50, .bg-slate-50\/80 {
+      background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+    .bg-slate-100 {
+      background-color: #1e293b !important;
+    }
+    .bg-slate-200 {
+      background-color: #334155 !important;
+    }
+    [class*="text-slate-900"], [class*="text-slate-800"] {
+      color: var(--ink) !important;
+    }
+    [class*="text-slate-700"], [class*="text-slate-600"] {
+      color: var(--ink-light) !important;
+    }
+    .border-slate-100, .border-slate-200, .border-slate-300 {
+      border-color: var(--border-light) !important;
+    }
+    .hover\:bg-slate-50:hover {
+      background-color: rgba(255, 255, 255, 0.04) !important;
+    }
+    .divide-slate-50 > :not([hidden]) ~ :not([hidden]) {
+      border-color: var(--border-light) !important;
+    }
+    .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+      border-color: var(--border-light) !important;
+    }
+
+    /* Fix light slate shadows and bright white glow in dark mode */
+    .shadow-xl, .shadow-md, .shadow-sm, .shadow-lg, .shadow-card, .shadow-card-hover, [class*="shadow-slate-"] {
+      box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5) !important;
+    }
+    
+    /* Correct transparent/translucent white card overlays to dark glass */
+    .bg-white\/40, .bg-white\/50, .bg-white\/30, .bg-white\/60, .bg-white\/70, .bg-white\/80, .bg-white\/90 {
+      background-color: rgba(30, 41, 59, 0.65) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    
+    /* Force high contrast text readability for all light/slate text utilities in dark theme */
+    .text-muted-foreground, [class*="text-slate-500"], [class*="text-slate-400"], [class*="text-slate-300"] {
+      color: var(--ink-light) !important;
+    }
+
+    /* Adjust priority tags for dark mode */
+    .text-rose-700 {
+      color: #fca5a5 !important;
+    }
+    .bg-rose-50\/50 {
+      background-color: rgba(244, 63, 94, 0.15) !important;
+      border-color: rgba(244, 63, 94, 0.3) !important;
+    }
+    .text-amber-700 {
+      color: #fde047 !important;
+    }
+    .bg-amber-50\/50 {
+      background-color: rgba(245, 158, 11, 0.15) !important;
+      border-color: rgba(245, 158, 11, 0.3) !important;
+    }
+    .text-blue-700 {
+      color: #93c5fd !important;
+    }
+    .bg-blue-50\/50 {
+      background-color: rgba(59, 130, 246, 0.15) !important;
+      border-color: rgba(59, 130, 246, 0.3) !important;
+    }
+
+    /* Input and Select Overrides */
+    input, select, textarea {
+      background-color: rgba(15, 23, 42, 0.6) !important;
+      border-color: var(--border-light) !important;
+      color: var(--ink) !important;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary) !important;
+    }
+    option {
+      background-color: var(--card) !important;
+      color: var(--ink) !important;
+    }
+
+    /* Dialog and Card Overrides */
+    div[role="dialog"], .DialogContent {
+      background-color: var(--card) !important;
+      border-color: var(--border-light) !important;
+      color: var(--ink) !important;
+    }
+
+    /* Fix Holiday List visibility in dark theme */
+    .border-rose-200\/60 {
+      border-color: rgba(244, 63, 94, 0.25) !important;
+    }
+    .bg-rose-50\/30 {
+      background-color: rgba(244, 63, 94, 0.08) !important;
+    }
+    .hover\:bg-rose-50\/60:hover {
+      background-color: rgba(244, 63, 94, 0.12) !important;
+    }
+    .bg-rose-100 {
+      background-color: rgba(244, 63, 94, 0.2) !important;
+    }
+    .text-rose-700 {
+      color: #fda4af !important; /* High contrast pink for date texts in dark mode */
+    }
   }
 
   * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
   body {
@@ -65,7 +179,6 @@
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
     letter-spacing: -0.01em;
-    zoom: 1.0;
   }
 
   /* Typography Overrides */
@@ -74,7 +187,7 @@
   h3,
   h4,
   .font-display {
-    color: #0f172a;
+    color: var(--ink);
     letter-spacing: -0.02em;
   }
 
@@ -96,7 +209,6 @@
 }
 
 @layer components {
-
   /* Glassomorphism Utilities */
   .glass {
     background: var(--glass);
@@ -105,30 +217,31 @@
     border: 1px solid var(--glass-border);
   }
 
-  .glass-dark {
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Custom Cards with consistent border and shadow */
+  .erp-card {
+    background: var(--card);
+    border: 1px solid var(--border-light);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
-  /* Sticky Header Utility */
-  .sticky-header {
-    @apply sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm;
+  .erp-card:hover {
+    box-shadow: var(--shadow-card-hover);
   }
 
   /* Row Hover */
   .row-hover {
-    @apply transition-colors duration-200 hover:bg-slate-50/80 cursor-pointer;
+    @apply transition-colors duration-200 hover:bg-primary/5 cursor-pointer;
   }
 
   /* Form inputs */
   .field {
-    @apply w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[14px] text-slate-900 outline-none transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/5 placeholder:text-slate-400;
+    @apply w-full px-4 py-2.5 rounded-xl border border-border bg-card text-[14px] text-foreground outline-none transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/5 placeholder:text-muted;
   }
 
   .field-label {
-    @apply block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1.5 ml-0.5;
+    @apply block text-[11px] font-bold uppercase tracking-widest text-muted mb-1.5 ml-0.5;
   }
 }
 
@@ -143,14 +256,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(13, 148, 136, 0.1);
+  background: rgba(16, 185, 129, 0.15);
   border-radius: 99px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(13, 148, 136, 0.3);
+  background: rgba(16, 185, 129, 0.35);
 }
 
 /* Animations Keyframes */
@@ -212,7 +325,7 @@
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.02;
+  opacity: 0.015;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   z-index: 9999;
 }

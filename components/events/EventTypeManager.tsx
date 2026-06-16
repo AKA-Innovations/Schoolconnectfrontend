@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { eventTypeService } from '@/services/event-type/service';
 import type { EventType } from '@/services/event/types';
+import { useEventTypes } from '@/services/event/queries';
+import { useCreateEventType, useDeleteEventType } from '@/services/event/mutations';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
 import {
@@ -13,50 +15,38 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 
 export function EventTypeManager() {
-  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newTypeName, setNewTypeName] = useState('');
-  const [creating, setCreating] = useState(false);
   const [session] = useState(CURRENT_SESSION);
+  const [newTypeName, setNewTypeName] = useState('');
 
-  const fetchTypes = async () => {
-    setLoading(true);
-    try {
-      const types = await eventTypeService.listEventTypes(session);
-      setEventTypes(Array.isArray(types) ? types : []);
-    } catch (err) {
-      toast.error('Failed to load event types');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch event types using react-query
+  const { data: eventTypesData, isLoading: loading, refetch: fetchTypes } = useEventTypes(session);
+  const eventTypes = Array.isArray(eventTypesData) ? eventTypesData : [];
 
-  useEffect(() => {
-    fetchTypes();
-  }, [session]);
+  // Mutations
+  const createMutation = useCreateEventType();
+  const deleteMutation = useDeleteEventType();
+
+  const creating = createMutation.isPending;
 
   const handleCreate = async () => {
     if (!newTypeName.trim()) {
       toast.error('Please enter a type name');
       return;
     }
-    setCreating(true);
     try {
-      await eventTypeService.createEventType({ session, name: newTypeName.trim().toUpperCase() });
+      await createMutation.mutateAsync({ session, name: newTypeName.trim().toUpperCase() });
       toast.success('Event type created successfully');
       setNewTypeName('');
       fetchTypes();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to create event type');
-    } finally {
-      setCreating(false);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this event type?')) return;
     try {
-      await eventTypeService.deleteEventType(id);
+      await deleteMutation.mutateAsync(id);
       toast.success('Event type deleted');
       fetchTypes();
     } catch (err) {
@@ -80,7 +70,7 @@ export function EventTypeManager() {
         <Button
           variant="outline"
           size="icon"
-          onClick={fetchTypes}
+          onClick={() => fetchTypes()}
           disabled={loading}
           className="rounded-xl"
         >

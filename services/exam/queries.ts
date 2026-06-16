@@ -97,6 +97,11 @@ export const useExamSchedules = (query: ExamScheduleQueryDto) => {
   return useQuery({
     queryKey: examKeys.scheduleList(query),
     queryFn: () => examService.getSchedules(query),
+    enabled: !!query.session && (
+      (query.examId !== undefined && query.examId !== 0 && !isNaN(Number(query.examId))) ||
+      (query.classId !== undefined && query.classId !== 0 && !isNaN(Number(query.classId))) ||
+      (query.classSectionId !== undefined && query.classSectionId !== 0 && !isNaN(Number(query.classSectionId)))
+    ),
   });
 };
 

@@ -147,10 +147,10 @@ export function Sidebar({ onClose }: SidebarProps) {
       <button
         type="button"
         onClick={() => setCollapsed((current) => !current)}
-        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 items-center justify-center rounded-full bg-card border border-border text-foreground shadow-sm z-20 hover:bg-accent transition-colors"
+        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 items-center justify-center rounded-full bg-card border border-border text-foreground shadow-sm z-[60] hover:bg-accent transition-colors"
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
     </div>
   );
