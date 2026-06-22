@@ -32,33 +32,43 @@ function ProgressCardItem({ assignment }: { assignment: any }) {
   if (!normalized) return null;
 
   return (
-    <Card className="rounded-2xl border-none shadow-lg shadow-slate-200/30 overflow-hidden">
+    <Card className="rounded-2xl border border-border/40 shadow-sm bg-card overflow-hidden">
       <CardContent className="p-0">
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BookOpen size={18} className="text-primary" />
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <BookOpen size={18} className="text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">{assignment.subjectName}</p>
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                  Class {assignment.className}-{assignment.sectionName}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">{assignment.subjectName}</p>
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-                Class {assignment.className}-{assignment.sectionName}
+            <div className="text-right">
+              <p className="text-lg font-black text-foreground">{normalized.percentage}%</p>
+              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider">
+                Target: 80%
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-black text-slate-900">{normalized.percentage}%</p>
-            <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-              <CheckCircle2 size={10} />
-              <span>{normalized.chaptersCount} Chapters</span>
+
+          <div className="space-y-2">
+            <div className="h-1.5 w-full bg-muted/40 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-1000" 
+                style={{ width: `${normalized.percentage}%` }} 
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-muted-foreground">{normalized.chaptersCount} Chapters Completed</span>
+              <span className="text-primary font-bold">
+                On Track
+              </span>
             </div>
           </div>
-        </div>
-        <div className="h-1.5 w-full bg-slate-100">
-          <div 
-            className="h-full bg-primary transition-all duration-1000" 
-            style={{ width: `${normalized.percentage}%` }} 
-          />
         </div>
       </CardContent>
     </Card>
@@ -70,13 +80,17 @@ export const ProgressDashboardCards = () => {
   const { data: assignments = [], isLoading } = useSubjectDetails(user?.id, CURRENT_SESSION);
 
   if (isLoading) {
-    return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {[1, 2].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-2xl" />)}
-    </div>;
+    return (
+      <div className="flex flex-col gap-4">
+        {[1, 2].map(i => (
+          <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-2xl" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="flex flex-col gap-4 max-h-[380px] overflow-y-auto pr-1.5 scrollbar-thin">
       {assignments.map((as) => (
         <ProgressCardItem key={as.id} assignment={as} />
       ))}

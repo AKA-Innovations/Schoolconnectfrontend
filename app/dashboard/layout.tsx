@@ -4,16 +4,12 @@ import React, { Suspense, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { Topbar } from '../../components/layout/Topbar';
-import { SubNavbar } from '../../components/layout/SubNavbar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-background relative overflow-hidden">
-      {/* Background blobs to match superadmin */}
-      <div className="fixed -top-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-1/4 -left-24 w-72 h-72 bg-accent/10 rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen flex bg-white dark:bg-[#0f172a] relative overflow-hidden">
 
       <div className="hidden lg:flex overflow-visible relative z-[60]">
         <Suspense fallback={<div className="w-72 bg-slate-900" />}>
@@ -52,9 +48,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Topbar onMobileMenuClick={() => setMobileOpen(true)} />
-        <Suspense fallback={<div className="h-12 w-full bg-background border-b" />}>
-          <SubNavbar />
-        </Suspense>
         <main id="main layout" className="flex-1 overflow-y-auto">
           <Suspense fallback={
             <div className="flex items-center justify-center h-full">

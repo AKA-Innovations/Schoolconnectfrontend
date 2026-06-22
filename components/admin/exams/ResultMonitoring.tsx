@@ -14,7 +14,8 @@ import {
   useUpdateTeacherRemarks,
   useUpdatePrincipalRemarks,
 } from '@/services/exam/mutations';
-import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
+import { useSchoolClasses, useSchoolSections, useSubjectDetails } from '@/hooks/useClasses';
+import { CURRENT_SESSION } from '@/lib/constants';
 import { Eye, CheckCircle2, AlertCircle, RefreshCw, Send, Check, Play, Globe, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,9 +26,17 @@ interface Props {
 export function ResultMonitoring({ session }: Props) {
   const user = useAuthStore((s) => s.user);
   const userRole = user?.role; // 'school_admin' or others
+  const isPowerUser = userRole === 'principal' || userRole === 'school_admin' || !!user?.isPrincipal;
 
   const { data: exams = [] } = useExams(session);
   const { data: schoolClasses = [] } = useSchoolClasses();
+
+  // Fetch teacher's assigned classes and subjects (or all if principal/admin)
+  const { data: mySubjectDetailsRaw } = useSubjectDetails(
+    isPowerUser ? undefined : user?.id,
+    CURRENT_SESSION
+  );
+  const mySubjectDetails = (mySubjectDetailsRaw as any[]) || [];
 
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
@@ -36,6 +45,40 @@ export function ResultMonitoring({ session }: Props) {
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
   );
+
+  const filteredClasses = React.useMemo(() => {
+    if (isPowerUser) {
+      return schoolClasses;
+    }
+    const uniqueMap = new Map<number, string>();
+    mySubjectDetails.forEach((sd: any) => {
+      if (sd.classId) {
+        uniqueMap.set(Number(sd.classId), sd.className);
+      }
+    });
+    return Array.from(uniqueMap.entries()).map(([id, className]) => ({
+      id,
+      className,
+    }));
+  }, [isPowerUser, schoolClasses, mySubjectDetails]);
+
+  const filteredSections = React.useMemo(() => {
+    if (isPowerUser) {
+      return classSections;
+    }
+    if (!selectedClassId) return [];
+    
+    const uniqueMap = new Map<number, string>();
+    mySubjectDetails.forEach((sd: any) => {
+      if (Number(sd.classId) === Number(selectedClassId) && sd.classSectionId) {
+        uniqueMap.set(Number(sd.classSectionId), sd.sectionName);
+      }
+    });
+    return Array.from(uniqueMap.entries()).map(([id, sectionName]) => ({
+      id,
+      sectionName,
+    }));
+  }, [isPowerUser, classSections, selectedClassId, mySubjectDetails]);
 
   const { data: results = [], isLoading: loadingResults, refetch: refetchResults } = useClassResults(
     selectedExamId || 0,
@@ -147,11 +190,14 @@ export function ResultMonitoring({ session }: Props) {
 
           <select
             value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => {
+              setSelectedClassId(e.target.value ? Number(e.target.value) : '');
+              setSelectedSectionId('');
+            }}
             className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Select Class</option>
-            {schoolClasses.map((c: any) => (
+            {filteredClasses.map((c: any) => (
               <option key={c.id} value={c.id}>{c.className}</option>
             ))}
           </select>
@@ -163,7 +209,7 @@ export function ResultMonitoring({ session }: Props) {
             className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Select Section</option>
-            {classSections.map((s: any) => (
+            {filteredSections.map((s: any) => (
               <option key={s.id} value={s.id}>{s.sectionName}</option>
             ))}
           </select>

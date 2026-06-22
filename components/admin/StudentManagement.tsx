@@ -39,7 +39,20 @@ export function StudentManagement() {
 
   const router = useRouter();
 
-  const students = data?.items ?? [];
+  const rawStudents = data?.items ?? [];
+  const students = React.useMemo(() => {
+    let list = rawStudents;
+    if (searchName) {
+      const q = searchName.toLowerCase();
+      list = list.filter(s => 
+        `${s.firstName} ${s.lastName}`.toLowerCase().includes(q)
+      );
+    }
+    if (mobileFilter) {
+      list = list.filter(s => s.mobileNumber?.includes(mobileFilter));
+    }
+    return list;
+  }, [rawStudents, searchName, mobileFilter]);
   const pagination = data?.pagination;
   const totalPages = pagination?.totalPages ?? 1;
   const hasFilters = !!(searchName || mobileFilter || selectedSectionId);

@@ -21,6 +21,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 
+function getWeekRange() {
+  const today = new Date();
+  const day = today.getDay();
+  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(today.setDate(diff));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  
+  const format = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  
+  return { start: format(monday), end: format(sunday) };
+}
+
 interface Props {
   role: 'school_admin' | 'principal' | 'teacher' | 'student' | 'subject_coordinator';
 }
@@ -61,6 +79,13 @@ export function EventsManager({ role: userRole }: Props) {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [audienceFilter, setAudienceFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Get default week range
+  const defaultWeek = useMemo(() => getWeekRange(), []);
+
+  // Date filter state
+  const [startDateFilter, setStartDateFilter] = useState<string>(defaultWeek.start);
+  const [endDateFilter, setEndDateFilter] = useState<string>(defaultWeek.end);
 
   const queryParams = useMemo(() => {
     const p: any = { session };
@@ -194,16 +219,26 @@ export function EventsManager({ role: userRole }: Props) {
     return groups;
   }, [filteredClassSections]);
 
-  // Search filter
+  // Search and date filters
   const filteredEvents = useMemo(() => {
     return events.filter(ev => {
       const matchesSearch =
         ev.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (ev.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (ev.location || '').toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
+
+      if (!matchesSearch) return false;
+
+      // Filter by date range (inclusive overlap)
+      const evStart = ev.startDate.slice(0, 10);
+      const evEnd = ev.endDate.slice(0, 10);
+
+      if (startDateFilter && evEnd < startDateFilter) return false;
+      if (endDateFilter && evStart > endDateFilter) return false;
+
+      return true;
     });
-  }, [events, searchTerm]);
+  }, [events, searchTerm, startDateFilter, endDateFilter]);
 
   // View details
   const handleViewDetails = (ev: SchoolEvent) => {
@@ -355,7 +390,7 @@ export function EventsManager({ role: userRole }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -395,6 +430,54 @@ export function EventsManager({ role: userRole }: Props) {
           <option value="2026-27">Session 2026-27</option>
           <option value="2025-26">Session 2025-26</option>
         </select>
+
+        <div className="relative">
+          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type={startDateFilter ? "date" : "text"}
+            placeholder="Start Date"
+            onFocus={(e) => (e.target.type = "date")}
+            onBlur={(e) => {
+              if (!e.target.value) e.target.type = "text";
+            }}
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            className="w-full h-10 pl-9 pr-8 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {startDateFilter && (
+            <button 
+              type="button" 
+              onClick={() => setStartDateFilter('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="relative">
+          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type={endDateFilter ? "date" : "text"}
+            placeholder="End Date"
+            onFocus={(e) => (e.target.type = "date")}
+            onBlur={(e) => {
+              if (!e.target.value) e.target.type = "text";
+            }}
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            className="w-full h-10 pl-9 pr-8 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {endDateFilter && (
+            <button 
+              type="button" 
+              onClick={() => setEndDateFilter('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Event List */}
@@ -426,7 +509,7 @@ export function EventsManager({ role: userRole }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
           {filteredEvents.map((ev) => {
             const isOwner = ev.createdBy === user?.id || userRole === 'school_admin';
             const colors = getEventColors(ev.eventType);
@@ -435,31 +518,30 @@ export function EventsManager({ role: userRole }: Props) {
                 key={ev.id}
                 layoutId={`event-${ev.id}`}
                 onClick={() => handleViewDetails(ev)}
-                className="relative flex flex-col md:flex-row justify-between p-4 sm:p-6 bg-card border border-border/60 rounded-2xl cursor-pointer hover:shadow-md transition group overflow-hidden"
+                className="relative flex flex-col justify-between p-5 bg-card border border-slate-100 hover:border-emerald-500/30 rounded-3xl cursor-pointer hover:shadow-xl hover:-translate-y-1 transition duration-300 group overflow-hidden h-full min-h-[240px]"
               >
                 {/* Colored Sidebar Indicator based on Event Type / Holiday */}
-                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                  ev.isHoliday ? 'bg-rose-500' :
-                  ev.eventType === 'EXAM' ? 'bg-amber-500' :
-                  ev.eventType === 'MEETING' ? 'bg-teal-500' :
-                  ev.eventType === 'SPORTS' ? 'bg-emerald-500' :
-                  ev.eventType === 'CULTURAL' ? 'bg-purple-500' : 'bg-primary'
-                }`} />
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${ev.isHoliday ? 'bg-rose-500' :
+                    ev.eventType === 'EXAM' ? 'bg-amber-500' :
+                      ev.eventType === 'MEETING' ? 'bg-teal-500' :
+                        ev.eventType === 'SPORTS' ? 'bg-emerald-500' :
+                          ev.eventType === 'CULTURAL' ? 'bg-purple-500' : 'bg-primary'
+                  }`} />
 
-                <div className="flex-1 space-y-3 pl-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={`rounded-lg text-[11px] uppercase tracking-wider font-semibold border-0 ${colors.bg} ${colors.text}`}>
+                <div className="space-y-3.5 pl-2.5 flex-1 flex flex-col">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge className={`rounded-lg text-[9px] uppercase tracking-wider font-bold border-0 px-2 py-0.5 ${colors.bg} ${colors.text}`}>
                       {ev.eventType}
                     </Badge>
                     {ev.isHoliday && (
-                      <Badge className="rounded-lg bg-rose-100 text-rose-700 border-0 text-[11px] flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-current" /> Holiday
+                      <Badge className="rounded-lg bg-rose-50/50 text-rose-600 border border-rose-100 text-[9px] font-bold px-2 py-0.5 flex items-center gap-1">
+                        <Star className="h-2.5 w-2.5 fill-current" /> Holiday
                       </Badge>
                     )}
                     {ev.isFullDay && (
-                      <Badge variant="outline" className="rounded-lg text-[10px]">Full Day</Badge>
+                      <Badge variant="outline" className="rounded-lg text-[9px] px-2 py-0.5 text-slate-500 border-slate-200 bg-white">Full Day</Badge>
                     )}
-                    <Badge variant="secondary" className="rounded-lg text-[10px]">
+                    <Badge variant="secondary" className="rounded-lg text-[9px] px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 max-w-full truncate">
                       {ev.targetAudience === 'SPECIFIC_CLASS' ? (
                         ev.targetedClasses && ev.targetedClasses.length > 0 ? (
                           `Classes: ${ev.targetedClasses.map(tc => {
@@ -471,47 +553,50 @@ export function EventsManager({ role: userRole }: Props) {
                     </Badge>
                   </div>
 
-                  <h3 className="text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition">
-                    {ev.title}
-                  </h3>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold tracking-tight text-slate-800 group-hover:text-emerald-600 transition-colors line-clamp-2">
+                      {ev.title}
+                    </h3>
+                    {ev.description && (
+                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed pr-2">{ev.description}</p>
+                    )}
+                  </div>
 
-                  {ev.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 pr-6">{ev.description}</p>
-                  )}
-
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1 flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <CalendarDays className="h-3 w-3" />
-                      {formatDate(ev.startDate)}
-                      {ev.startDate !== ev.endDate && ` — ${formatDate(ev.endDate)}`}
-                    </span>
-                    {!ev.isFullDay && ev.startTime && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {ev.startTime}{ev.endTime ? ` – ${ev.endTime}` : ''}
+                  <div className="space-y-2 text-[11px] text-slate-500 pt-1 mt-auto">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                      <span>
+                        {formatDate(ev.startDate)}
+                        {ev.startDate !== ev.endDate && ` — ${formatDate(ev.endDate)}`}
                       </span>
+                    </div>
+                    {!ev.isFullDay && ev.startTime && (
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{ev.startTime}{ev.endTime ? ` – ${ev.endTime}` : ''}</span>
+                      </div>
                     )}
                     {ev.location && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {ev.location}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                        <span>{ev.location}</span>
+                      </div>
                     )}
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      By: {ev.createdByFullName || 'Staff'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-slate-400" />
+                      <span>By: {ev.createdByFullName || 'Staff'}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Actions */}
                 {isCreatorRole && isOwner && (
-                  <div className="flex items-center gap-2 mt-4 md:mt-0 self-end md:self-center" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, ev)} className="text-muted-foreground hover:text-amber-600 rounded-xl">
-                      <Edit className="h-4 w-4" />
+                  <div className="flex items-center justify-end gap-1.5 pt-3 border-t border-slate-100/50 mt-4 pl-2.5" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, ev)} className="h-7 w-7 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg">
+                      <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={(e) => handleDelete(e, ev.id)} className="text-muted-foreground hover:text-rose-600 rounded-xl">
-                      <Trash2 className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" onClick={(e) => handleDelete(e, ev.id)} className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 )}
@@ -824,11 +909,10 @@ export function EventsManager({ role: userRole }: Props) {
                             return (
                               <label
                                 key={s.id}
-                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs cursor-pointer select-none transition-all ${
-                                  isSectionSelected
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs cursor-pointer select-none transition-all ${isSectionSelected
                                     ? 'bg-primary/10 border-primary text-primary font-medium'
                                     : 'bg-background hover:bg-muted/50 border-border/80 text-muted-foreground'
-                                }`}
+                                  }`}
                               >
                                 <input
                                   type="checkbox"

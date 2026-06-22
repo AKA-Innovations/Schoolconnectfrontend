@@ -14,6 +14,7 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
 
 interface FormValues {
+  title: string;
   assignmentKey: string;
   chapterId: string;
   topicId: string;
@@ -42,6 +43,7 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
 
   const { register, handleSubmit, reset, control, watch, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
+      title: '',
       assignmentKey: '',
       chapterId: '',
       topicId: '',
@@ -82,6 +84,7 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
       subjectId: selectedSubjectDtlsId,
       chapterId: values.chapterId ? Number(values.chapterId) : undefined,
       topicId: values.topicId ? Number(values.topicId) : undefined,
+      title: values.title,
       description: values.description,
       file,
     }, {
@@ -124,6 +127,15 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
               />
             )}
           />
+
+          <FormField label="Document Title" error={errors.title?.message} required>
+            <input
+              type="text"
+              {...register('title', { required: 'Required' })}
+              className="field h-10"
+              placeholder="e.g. Introduction to Algebra Notes"
+            />
+          </FormField>
 
           <div className="grid grid-cols-2 gap-4">
             <Controller

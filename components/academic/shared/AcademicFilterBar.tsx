@@ -22,7 +22,7 @@ export const AcademicFilterBar = React.memo(function AcademicFilterBar({
   children,
 }: Props) {
   return (
-    <div className="bg-white/80 backdrop-blur-2xl border border-slate-100 rounded-[2.5rem] p-2 shadow-xl shadow-slate-200/40 space-y-8">
+    <div className="relative z-30 bg-white/80 backdrop-blur-2xl border border-slate-100 rounded-[2.5rem] p-2 shadow-xl shadow-slate-200/40 space-y-8">
       <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
         {/* Search */}
         <div className="relative w-full lg:max-w-xs group">

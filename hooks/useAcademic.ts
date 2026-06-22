@@ -179,10 +179,10 @@ export function useChapterProgress(chapterId?: number | string, classSectionId?:
 
 // ─── Homework ─────────────────────────────────────────────────────────────────
 
-export function useHomeworks(className?: string) {
+export function useHomeworks(classNameOrParams?: string | any) {
   return useQuery({
-    queryKey: academicKeys.homeworks(className),
-    queryFn: () => academicService.getHomeworks(className),
+    queryKey: academicKeys.homeworks(typeof classNameOrParams === 'string' ? classNameOrParams : classNameOrParams?.className),
+    queryFn: () => academicService.getHomeworks(classNameOrParams),
     placeholderData: (prev) => prev,
   });
 }
@@ -306,10 +306,10 @@ export function useDeleteSubmission(homeworkId: number) {
 
 // ─── Classwork ────────────────────────────────────────────────────────────────
 
-export function useClassworks(classId?: string) {
+export function useClassworks(classIdOrParams?: string | any) {
   return useQuery({
-    queryKey: academicKeys.classworks(classId),
-    queryFn: () => academicService.getClassworks(classId),
+    queryKey: academicKeys.classworks(typeof classIdOrParams === 'string' ? classIdOrParams : classIdOrParams?.classId),
+    queryFn: () => academicService.getClassworks(classIdOrParams),
     placeholderData: (prev) => prev,
   });
 }

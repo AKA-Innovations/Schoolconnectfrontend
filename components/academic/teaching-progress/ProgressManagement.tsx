@@ -14,6 +14,7 @@ import { ProgressAnalytics } from './ProgressAnalytics';
 import type { TeachingProgress, SubjectChapter } from '@/services/academic/types';
 import { ChapterProgressTable } from './ChapterProgressTable';
 import { ProgressFormModal } from './ProgressFormModal';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 
@@ -128,23 +129,29 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
       {mySubjects.length > 0 && (
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignment:</span>
-          <select
-            value={selectedAssignment}
-            onChange={(e) => setSelectedAssignment(e.target.value)}
-            className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all min-w-[280px]"
-          >
-            <option value="">— Select Class-Subject —</option>
-            {mySubjects.map((sd) => (
-              <option key={sd.id} value={String(sd.id)}>
-                {sd.className} {sd.sectionName} — {sd.subjectName}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[280px]">
+            <Select
+              value={selectedAssignment}
+              onValueChange={setSelectedAssignment}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="— Select Class-Subject —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— Select Class-Subject —</SelectItem>
+                {mySubjects.map((sd) => (
+                  <SelectItem key={sd.id} value={String(sd.id)}>
+                    {sd.className} {sd.sectionName} — {sd.subjectName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 
       {subjectSummary && (
-        <Card className="rounded-2xl border-none shadow-lg shadow-slate-200/30 bg-teal-50/30 border border-teal-100 overflow-hidden">
+        <Card className="rounded-2xl border border-teal-100/30 bg-teal-50/10 dark:bg-teal-950/20 dark:border-teal-900/40 overflow-hidden shadow-sm">
           <CardContent className="p-6">
             {(() => {
               const d = (subjectSummary as any).data ?? subjectSummary;
@@ -155,26 +162,26 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
                 <>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Overall Subject Progress</p>
-                      <h3 className="text-xl font-bold text-slate-900">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Overall Subject Progress</p>
+                      <h3 className="text-xl font-bold text-foreground">
                         {mySubjects.find(s => String(s.id) === selectedAssignment)?.subjectName}
                       </h3>
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-teal-700">{percentage}%</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Completion</p>
+                        <p className="text-2xl font-bold text-primary">{percentage}%</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Completion</p>
                       </div>
-                      <div className="h-12 w-[1px] bg-teal-100 hidden md:block" />
+                      <div className="h-12 w-[1px] bg-border/50 hidden md:block" />
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-slate-700">{chaptersCount}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chapters</p>
+                        <p className="text-2xl font-bold text-foreground">{chaptersCount}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Chapters</p>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-6 h-2 w-full bg-teal-100 rounded-full overflow-hidden">
+                  <div className="mt-6 h-2 w-full bg-muted/40 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-teal-500 rounded-full transition-all duration-1000"
+                      className="h-full bg-primary rounded-full transition-all duration-1000"
                       style={{ width: `${percentage}%` }}
                     />
                   </div>

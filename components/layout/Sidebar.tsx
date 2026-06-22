@@ -38,7 +38,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     <div
       className={cn(
         'relative shrink-0 h-full overflow-visible transition-all duration-300',
-        collapsed ? 'w-20' : 'w-72'
+        collapsed ? 'w-16' : 'w-60'
       )}
     >
       <aside
@@ -49,15 +49,15 @@ export function Sidebar({ onClose }: SidebarProps) {
         <div className="absolute top-0 left-0 w-full h-64 bg-primary/10 blur-2xl opacity-40 pointer-events-none" />
 
         {/* BRAND */}
-        <div className={cn('flex items-center relative z-10', collapsed ? 'justify-center px-0 py-8' : 'gap-4 px-8 py-8')}>
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 transition hover:scale-105 shrink-0">
-            <Sparkles size={20} className="text-white" />
+        <div className={cn('flex items-center relative z-10', collapsed ? 'justify-center px-0 py-6' : 'gap-3 px-5 py-5')}>
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 transition hover:scale-105 shrink-0">
+            <Sparkles size={16} className="text-white" />
           </div>
 
           {showLabels && (
             <div className="flex-1">
-              <div className="text-white font-bold text-lg leading-tight">SkoolConnect</div>
-              <div className="text-[10px] text-white/60 uppercase tracking-[0.35em] font-bold mt-0.5">
+              <div className="text-white font-bold text-base leading-tight">SkoolConnect</div>
+              <div className="text-[9px] text-white/55 uppercase tracking-[0.3em] font-bold mt-0.5">
                 {role ? role.replace('_', ' ') : 'School'}
               </div>
             </div>
@@ -66,16 +66,16 @@ export function Sidebar({ onClose }: SidebarProps) {
           {onClose && (
             <button
               onClick={onClose}
-              className="lg:hidden p-2 rounded-xl bg-white/5 text-white/50 hover:text-white transition-colors"
+              className="lg:hidden p-1.5 rounded-xl bg-white/5 text-white/50 hover:text-white transition-colors"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           )}
         </div>
 
         {/* NAV */}
-        <nav className={cn('flex-1 relative z-10 overflow-y-auto', collapsed ? 'px-3' : 'px-4')}>
-          {showLabels && <p className="px-5 text-[10px] uppercase tracking-[0.3em] font-bold text-white/20 mb-4">Core</p>}
+        <nav className={cn('flex-1 relative z-10 overflow-y-auto', collapsed ? 'px-2' : 'px-3')}>
+          {showLabels && <p className="px-4 text-[9px] uppercase tracking-[0.25em] font-bold text-white/20 mb-3">Core</p>}
 
           {links.map((link) => {
             const active = isLinkActive(link, pathname || '', new URLSearchParams(searchParams?.toString()));
@@ -87,8 +87,8 @@ export function Sidebar({ onClose }: SidebarProps) {
                 href={link.href}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center rounded-2xl text-sm transition-all duration-300 group relative',
-                  collapsed ? 'justify-center gap-0 px-0 py-3 mx-auto w-12' : 'gap-4 px-5 py-3',
+                  'flex items-center rounded-xl text-sm transition-all duration-300 group relative',
+                  collapsed ? 'justify-center gap-0 px-0 py-3 mx-auto w-11' : 'gap-3.5 px-4 py-3 mb-1.5',
                   active ? 'bg-white/10 text-white shadow-inner' : 'text-white/50 hover:text-white hover:bg-white/5'
                 )}
                 title={collapsed ? link.name : undefined}
@@ -97,7 +97,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   'w-9 h-9 rounded-xl flex items-center justify-center transition shrink-0',
                   active ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/30 group-hover:text-white group-hover:bg-white/10'
                 )}>
-                  <Icon size={18} />
+                  <Icon size={17} />
                 </div>
 
                 {showLabels && (
@@ -108,8 +108,8 @@ export function Sidebar({ onClose }: SidebarProps) {
 
                 {active && showLabels && (
                   <>
-                    <ChevronRight size={14} className="text-primary opacity-70" />
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full shadow-md shadow-primary/50" />
+                    <ChevronRight size={13} className="text-primary opacity-70" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4.5 bg-primary rounded-r-full shadow-md shadow-primary/50" />
                   </>
                 )}
               </Link>
@@ -118,7 +118,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         </nav>
 
         {/* FOOTER */}
-        <div className={cn('space-y-3 border-t border-white/5 bg-black/30 backdrop-blur z-10', collapsed ? 'p-3' : 'p-5')}>
+        <div className={cn('space-y-2.5 border-t border-white/5 bg-black/30 backdrop-blur z-10', collapsed ? 'p-2.5' : 'p-4')}>
           {/* {showLabels && role === 'school_admin' && (
             <Link href="/dashboard/admin/student/register" onClick={onClose} className="flex items-center justify-center w-full py-3 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold tracking-widest transition hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]">
               Quick Onboard
@@ -134,11 +134,11 @@ export function Sidebar({ onClose }: SidebarProps) {
               if (onClose) onClose();
             }}
             className={cn(
-              'flex items-center justify-center gap-2 text-white/30 hover:text-rose-400 text-[11px] font-bold tracking-widest w-full rounded-xl transition hover:bg-rose-500/5',
-              showLabels ? 'py-2' : 'py-2.5'
+              'flex items-center justify-center gap-2.5 text-white/30 hover:text-rose-400 text-xs font-bold tracking-widest w-full rounded-xl transition hover:bg-rose-500/5',
+              showLabels ? 'py-2.5' : 'py-3'
             )}
           >
-            <LogOut size={14} />
+            <LogOut size={16} />
             {showLabels && <span>Logout</span>}
           </button>
         </div>

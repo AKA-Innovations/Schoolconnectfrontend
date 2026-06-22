@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -81,7 +81,10 @@ function SubjectProgressItem({ subjectId, classSectionId, subjectName }: { subje
 export default function ClassDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
+  
+  const activeTab = searchParams.get('tab') || 'students';
 
   const className = decodeURIComponent(params.className as string);
   const sectionName = decodeURIComponent(params.sectionName as string);
@@ -281,8 +284,14 @@ export default function ClassDetailPage() {
         </Card>
       )}
 
-      {/* Tabs */}
-      <Tabs defaultValue="students">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={(val) => {
+          const params = new URLSearchParams(window.location.search);
+          params.set('tab', val);
+          router.replace(`${window.location.pathname}?${params.toString()}`);
+        }}
+      >
         <TabsList className="rounded-xl flex-wrap">
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>

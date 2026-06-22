@@ -1,96 +1,144 @@
+'use client';
+
 import * as React from "react"
+import { ChevronDown, Check } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 interface SelectProps {
   value?: string
   onValueChange?: (value: string) => void
   children?: React.ReactNode
-  disabled?: boolean
 }
 
-interface SelectTriggerProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'children'> {
-  children?: React.ReactNode
-}
-
-interface SelectContentProps {
-  children?: React.ReactNode
-}
-
-interface SelectItemProps {
-  value: string
-  children?: React.ReactNode
-  disabled?: boolean
-  className?: string
-}
-
-interface SelectValueProps {
-  placeholder?: string
-}
-
-const SelectContext = React.createContext<{
+interface SelectContextType {
   value?: string
   onValueChange?: (value: string) => void
-  options: React.ReactNode[]
-  setOptions: (nodes: React.ReactNode[]) => void
-}>({ options: [], setOptions: () => {} })
+  isOpen: boolean
+  setIsOpen: (isOpen: boolean) => void
+  selectedLabel?: string
+  setSelectedLabel: (label: string) => void
+  triggerRef: React.RefObject<HTMLButtonElement | null>
+}
 
-const Select: React.FC<SelectProps> = ({ value, onValueChange, children }) => {
-  const [options, setOptions] = React.useState<React.ReactNode[]>([])
+const SelectContext = React.createContext<SelectContextType | null>(null)
+
+export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }) => {
+  const [isOpen, setIsOpen] = React.useState(false)
+  const [selectedLabel, setSelectedLabel] = React.useState("")
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+
+  // Close when clicking outside
+  React.useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick)
+    }
+  }, [isOpen])
+
   return (
-    <SelectContext.Provider value={{ value, onValueChange, options, setOptions }}>
-      {children}
+    <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, selectedLabel, setSelectedLabel, triggerRef }}>
+      <div className="relative inline-block w-full">{children}</div>
     </SelectContext.Provider>
   )
 }
 
-const SelectTrigger = React.forwardRef<HTMLSelectElement, SelectTriggerProps>(
-  ({ className, children, ...props }, ref) => {
-    const { value, onValueChange, options } = React.useContext(SelectContext)
-    
-    return (
-      <select
-        ref={ref}
-        value={value}
-        onChange={(e) => onValueChange?.(e.target.value)}
-        className={cn(
-          "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {options}
-      </select>
-    )
-  }
-)
+export const SelectTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, children, ...props }, ref) => {
+  const context = React.useContext(SelectContext)
+  if (!context) throw new Error("SelectTrigger must be used within Select")
+  const { isOpen, setIsOpen, selectedLabel, triggerRef } = context
+
+  // Forward ref helper
+  React.useImperativeHandle(ref, () => triggerRef.current as HTMLButtonElement)
+
+  return (
+    <button
+      ref={triggerRef}
+      type="button"
+      onClick={() => setIsOpen(!isOpen)}
+      className={cn(
+        "flex h-10 w-full items-center justify-between rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer hover:border-slate-300",
+        className
+      )}
+      {...props}
+    >
+      {selectedLabel ? <span className="truncate">{selectedLabel}</span> : children}
+      <ChevronDown className={cn("h-4 w-4 ml-2 text-slate-400 transition-transform duration-200", isOpen && "transform rotate-180")} />
+    </button>
+  )
+})
 SelectTrigger.displayName = "SelectTrigger"
 
-const SelectValue: React.FC<SelectValueProps> = ({ placeholder }) => {
-  return <option value="" disabled>{placeholder}</option>
+export const SelectValue: React.FC<{ placeholder?: string }> = ({ placeholder }) => {
+  const context = React.useContext(SelectContext)
+  if (!context) throw new Error("SelectValue must be used within Select")
+  const { value } = context
+  return !value ? <span className="text-slate-400 font-medium">{placeholder}</span> : null
 }
 
-const SelectContent: React.FC<SelectContentProps> = ({ children }) => {
-  const { setOptions } = React.useContext(SelectContext)
-  const rendered = React.Children.toArray(children)
+export const SelectContent: React.FC<{ children?: React.ReactNode; className?: string }> = ({ children, className }) => {
+  const context = React.useContext(SelectContext)
+  if (!context) throw new Error("SelectContent must be used within Select")
+  const { isOpen } = context
+
+  if (!isOpen) return null
+
+  return (
+    <div
+      className={cn(
+        "absolute z-[100] mt-1.5 max-h-60 w-full min-w-[12rem] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl animate-in fade-in slide-in-from-top-1 duration-200",
+        className
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+export const SelectItem: React.FC<{ value: string; children?: React.ReactNode; className?: string }> = ({ value, children, className }) => {
+  const context = React.useContext(SelectContext)
+  if (!context) throw new Error("SelectItem must be used within Select")
+  const { value: activeValue, onValueChange, setIsOpen, setSelectedLabel } = context
+
+  const isActive = activeValue === value
 
   React.useEffect(() => {
-    setOptions(rendered)
-    return () => setOptions([])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [children])
+    if (isActive && children) {
+      setSelectedLabel(String(children))
+    }
+  }, [isActive, children, setSelectedLabel])
 
-  return null
-}
+  const handleSelect = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onValueChange?.(value)
+    if (children) {
+      setSelectedLabel(String(children))
+    }
+    setIsOpen(false)
+  }
 
-const SelectItem: React.FC<SelectItemProps> = ({ value, children }) => {
-  return <option value={value}>{children}</option>
-}
-
-export {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  return (
+    <button
+      type="button"
+      onClick={handleSelect}
+      className={cn(
+        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer text-left focus:outline-none focus:bg-slate-50",
+        isActive && "bg-emerald-50/40 text-teal-600 font-bold",
+        className
+      )}
+    >
+      <span className="truncate">{children}</span>
+      {isActive && <Check className="h-3.5 w-3.5 text-teal-600 shrink-0" />}
+    </button>
+  )
 }

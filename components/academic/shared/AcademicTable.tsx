@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Inbox } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface ColumnDef<T> {
   key: string;
@@ -31,6 +32,7 @@ interface Props<T> {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   rowKey: (item: T) => string | number;
+  onRowClick?: (item: T) => void;
 }
 
 function AcademicTableInner<T>({
@@ -43,17 +45,18 @@ function AcademicTableInner<T>({
   totalPages = 1,
   onPageChange,
   rowKey,
+  onRowClick,
 }: Props<T>) {
   return (
-    <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-slate-200/40 overflow-hidden bg-white">
+    <Card className="rounded-[2.5rem] border border-border/40 shadow-2xl shadow-slate-200/40 dark:shadow-none overflow-hidden bg-card">
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent border-b border-slate-50 bg-slate-50/50">
+            <TableRow className="hover:bg-transparent border-b border-border/40 bg-slate-50/70 dark:bg-white/5">
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  className={`py-5 text-[11px] font-bold uppercase tracking-widest text-slate-500 ${col.key === columns[0].key ? 'pl-8' : ''} ${col.key === columns[columns.length - 1].key ? 'text-right pr-8' : ''} ${col.className ?? ''}`}
+                  className={`py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground ${col.key === columns[0].key ? 'pl-8' : ''} ${col.key === columns[columns.length - 1].key ? 'text-right pr-8' : ''} ${col.className ?? ''}`}
                 >
                   {col.header}
                 </TableHead>
@@ -82,7 +85,14 @@ function AcademicTableInner<T>({
               data.map((item, idx) => (
                 <TableRow
                   key={rowKey(item)}
-                  className="group transition-colors hover:bg-teal-50/30 border-b border-slate-50"
+                  onClick={() => onRowClick?.(item)}
+                  className={cn(
+                    "group transition-all duration-300 border-b border-border/40 hover:-translate-y-0.5 hover:shadow-sm relative hover:z-10",
+                    onRowClick 
+                      ? "cursor-pointer hover:bg-emerald-50/20 dark:hover:bg-emerald-950/10 hover:shadow-[inset_4px_0_0_0_#10b981,0_4px_10px_-4px_rgba(0,0,0,0.08)]" 
+                      : "hover:bg-emerald-50/10 dark:hover:bg-emerald-950/5 hover:shadow-[0_4px_10px_-4px_rgba(0,0,0,0.05)]",
+                    idx % 2 === 1 ? "bg-slate-50/[0.15] dark:bg-white/[0.01]" : ""
+                  )}
                 >
                   {columns.map((col) => (
                     <TableCell
@@ -100,14 +110,15 @@ function AcademicTableInner<T>({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between p-6 bg-slate-50/50">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="flex items-center justify-between py-3 px-6 bg-slate-50/40 dark:bg-white/[0.02] border-t border-border/40">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Page {page} of {totalPages}
             </span>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <Button
                 variant="outline"
-                className="rounded-xl border-slate-200"
+                size="sm"
+                className="rounded-lg border-slate-200/80 text-xs h-8 px-3 font-bold text-slate-600 hover:bg-slate-50"
                 disabled={page === 1}
                 onClick={() => onPageChange?.(page - 1)}
               >
@@ -115,7 +126,8 @@ function AcademicTableInner<T>({
               </Button>
               <Button
                 variant="outline"
-                className="rounded-xl border-slate-200"
+                size="sm"
+                className="rounded-lg border-slate-200/80 text-xs h-8 px-3 font-bold text-slate-600 hover:bg-slate-50"
                 disabled={page >= totalPages}
                 onClick={() => onPageChange?.(page + 1)}
               >

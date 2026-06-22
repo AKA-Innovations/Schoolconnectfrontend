@@ -13,6 +13,7 @@ import { StudyMaterialTable } from './StudyMaterialTable';
 import { StudyMaterialUploadModal } from './StudyMaterialUploadModal';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
 import type { StudyMaterial } from '@/services/academic/types';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export function StudyMaterialManagement() {
   const [search, setSearch] = useState('');
@@ -28,14 +29,86 @@ export function StudyMaterialManagement() {
   const debouncedSearch = useDebounce(search, 400);
 
   const { data, isLoading, isFetching, refetch } = useStudyMaterials();
-  const { data: sections = [] } = useSchoolSections();
-  const { data: subjects = [] } = useSubjectOptions();
+  const { data: allSections = [] } = useSchoolSections();
+  const { data: allSubjects = [] } = useSubjectOptions();
+  const { data: teacherAssignments = [] } = useSubjectDetails(
+    role === 'teacher' ? user?.id : undefined,
+    'all'
+  );
   const { data: subjectDetails = [] } = useSubjectDetails(undefined, 'all');
+
+  // Define sectionsMap using raw allSections to prevent dependency loop
+  const sectionsMap = useMemo(() => new Map(allSections.map((s) => [s.id, s])), [allSections]);
+
+  const sections = useMemo(() => {
+    if (role === 'principal' || role === 'admin') {
+      return allSections;
+    }
+    if (role === 'coordinator' || role === 'subject_coordinator') {
+      const coordClasses = (user?.coordinatorClasses ?? []).map(c => 
+        String(typeof c === 'object' ? c.className : c)
+      ).filter(Boolean);
+      return allSections.filter(s => coordClasses.includes(s.className));
+    }
+    // Teacher: only show classes/sections that match both className and sectionName of their assignments
+    return allSections.filter(s => 
+      teacherAssignments.some(ta => ta.className === s.className && ta.sectionName === s.sectionName)
+    );
+  }, [allSections, role, user, teacherAssignments]);
+
+  const subjects = useMemo(() => {
+    let filteredSubjects = allSubjects;
+
+    if (role === 'principal' || role === 'admin') {
+      filteredSubjects = allSubjects;
+    } else if (role === 'coordinator' || role === 'subject_coordinator') {
+      const coordClasses = (user?.coordinatorClasses ?? []).map(c => 
+        String(typeof c === 'object' ? c.className : c)
+      ).filter(Boolean);
+      
+      const coordinatorSubjects = subjectDetails
+        .filter(sd => coordClasses.includes(sd.className))
+        .map(sd => sd.subjectName);
+
+      filteredSubjects = allSubjects.filter(sub => coordinatorSubjects.includes(sub.subjectName));
+    } else {
+      // Teacher: only show subjects assigned to the teacher
+      const teacherSubjects = teacherAssignments.map(ta => ta.subjectName);
+      filteredSubjects = allSubjects.filter(sub => teacherSubjects.includes(sub.subjectName));
+    }
+
+    // Filter by selected class/section if set
+    if (classSectionFilter) {
+      const selectedSection = sectionsMap.get(Number(classSectionFilter));
+      if (selectedSection) {
+        if (role === 'teacher') {
+          const classSpecificSubjects = teacherAssignments
+            .filter(ta => ta.className === selectedSection.className && ta.sectionName === selectedSection.sectionName)
+            .map(ta => ta.subjectName);
+          filteredSubjects = filteredSubjects.filter(sub => classSpecificSubjects.includes(sub.subjectName));
+        } else {
+          const classSpecificSubjects = subjectDetails
+            .filter(sd => sd.className === selectedSection.className && sd.sectionName === selectedSection.sectionName)
+            .map(sd => sd.subjectName);
+          filteredSubjects = filteredSubjects.filter(sub => classSpecificSubjects.includes(sub.subjectName));
+        }
+      }
+    }
+
+    // Deduplicate by name to prevent multiple identical listings in dropdown
+    const uniqueSubjects: typeof filteredSubjects = [];
+    const seenNames = new Set<string>();
+    for (const sub of filteredSubjects) {
+      if (!seenNames.has(sub.subjectName)) {
+        seenNames.add(sub.subjectName);
+        uniqueSubjects.push(sub);
+      }
+    }
+    return uniqueSubjects;
+  }, [allSubjects, role, user, teacherAssignments, subjectDetails, classSectionFilter, sectionsMap]);
 
   const deleteMutation = useDeleteStudyMaterial();
 
-  // Create fast-lookup maps for O(1) search performance
-  const sectionsMap = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
   const subjectsMap = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
   const teachersMap = useMemo(() => new Map(subjectDetails.map((sd) => [sd.teacherId, sd.teacherName])), [subjectDetails]);
 
@@ -93,13 +166,7 @@ export function StudyMaterialManagement() {
 
       return true;
     });
-  }, [data, debouncedSearch, classSectionFilter, subjectFilter, ownerFilter, sectionsMap, subjectsMap, teachersMap, user]);
-
-  const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
-  const handleDeleteConfirm = useCallback(() => {
-    if (deleteTarget == null) return;
-    deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) });
-  }, [deleteTarget, deleteMutation]);
+  }, [data, debouncedSearch, classSectionFilter, subjectFilter, ownerFilter, user, sectionsMap, subjectsMap, teachersMap]);
 
   const resetFilters = useCallback(() => {
     setSearch('');
@@ -108,15 +175,29 @@ export function StudyMaterialManagement() {
     setOwnerFilter('all');
   }, []);
 
+  const handleDelete = (id: number) => {
+    setDeleteTarget(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deleteTarget === null) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget);
+      setDeleteTarget(null);
+    } catch (err) {
+      // handled
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <AcademicPageHeader badge="Resources" title="Study" titleAccent="Materials">
+      <AcademicPageHeader badge="Academic Resources" title="Study" titleAccent="Materials">
         <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
         {canUpload && (
           <Button onClick={() => setUploadOpen(true)} className="h-12 px-6 rounded-2xl">
-            <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Upload Material</span>
+            <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Upload File</span>
           </Button>
         )}
       </AcademicPageHeader>
@@ -128,44 +209,59 @@ export function StudyMaterialManagement() {
         onClear={resetFilters} 
         hasActiveFilters={!!(search || classSectionFilter || subjectFilter || ownerFilter !== 'all')}
       >
-        <select
-          value={classSectionFilter}
-          onChange={(e) => setClassSectionFilter(e.target.value)}
-          className="h-10 pl-4 pr-8 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-48 appearance-none cursor-pointer hover:border-slate-300"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
-        >
-          <option value="">All Classes</option>
-          {sections.map((cs) => (
-            <option key={cs.id} value={cs.id}>
-              Class {cs.className}-{cs.sectionName}
-            </option>
-          ))}
-        </select>
+        <div className="w-48">
+          <Select
+            value={classSectionFilter}
+            onValueChange={setClassSectionFilter}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Classes</SelectItem>
+              {sections.map((cs) => (
+                <SelectItem key={cs.id} value={String(cs.id)}>
+                  Class {cs.className}-{cs.sectionName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <select
-          value={subjectFilter}
-          onChange={(e) => setSubjectFilter(e.target.value)}
-          className="h-10 pl-4 pr-8 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-48 appearance-none cursor-pointer hover:border-slate-300"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
-        >
-          <option value="">All Subjects</option>
-          {subjects.map((sub) => (
-            <option key={sub.id} value={sub.id}>
-              {sub.subjectName}
-            </option>
-          ))}
-        </select>
+        <div className="w-48">
+          <Select
+            value={subjectFilter}
+            onValueChange={setSubjectFilter}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Subjects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Subjects</SelectItem>
+              {subjects.map((sub) => (
+                <SelectItem key={sub.id} value={String(sub.id)}>
+                  {sub.subjectName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <select
-          value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value as any)}
-          className="h-10 pl-4 pr-8 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-48 appearance-none cursor-pointer hover:border-slate-300"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
-        >
-          <option value="all">All Teachers</option>
-          <option value="mine">My Materials</option>
-          <option value="others">Other Teachers</option>
-        </select>
+        <div className="w-48">
+          <Select
+            value={ownerFilter}
+            onValueChange={(val) => setOwnerFilter(val as any)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Teachers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Teachers</SelectItem>
+              <SelectItem value="mine">My Materials</SelectItem>
+              <SelectItem value="others">Other Teachers</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </AcademicFilterBar>
 
       <StudyMaterialTable materials={materials} isLoading={isLoading} onDelete={handleDelete} />

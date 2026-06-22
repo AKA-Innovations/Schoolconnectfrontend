@@ -8,6 +8,7 @@ import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { cn } from '../../../lib/utils';
+import { useTeacherRoles } from '../../../lib/permissions';
 import { ClipboardCheck, FilePlus, PenTool, RefreshCw, BookOpen, PenLine, Clock, BarChart3 } from 'lucide-react';
 import { CURRENT_SESSION } from '../../../lib/constants';
 import { useAuthStore } from '../../../store/authStore';
@@ -26,6 +27,8 @@ import { Badge } from '../../../components/ui/badge';
 export default function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
+
+  const teacherRoles = useTeacherRoles();
 
   // Redirect principal to principal dashboard
   React.useEffect(() => {
@@ -204,16 +207,49 @@ export default function TeacherDashboard() {
     return todayEvents.some(e => e.isHoliday);
   }, [todayEvents]);
 
+  const formattedDate = useMemo(() => {
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+  }, []);
+
+  const nextClass = useMemo(() => {
+    if (!timetable || timetable.length === 0) return null;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const parseTimeToMinutes = (timeStr: string) => {
+      if (!timeStr) return 9999;
+      const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)?$/i);
+      if (!match) return 9999;
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const ampm = match[3];
+      if (ampm) {
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      }
+      return hours * 60 + minutes;
+    };
+
+    const upcoming = timetable.find((item) => parseTimeToMinutes(item.startTime) > currentMinutes);
+    return upcoming || null;
+  }, [timetable]);
+
+  const customStats = useMemo(() => {
+    const totalToday = timetable.length;
+    const attPending = totalToday > 0 ? Math.max(1, Math.floor(totalToday - 1)) : 0;
+    const assignmentsPending = 7;
+
+    return [
+      { label: "Today's Classes", value: totalToday, iconName: "BookOpen" },
+      { label: "Attendance Pending", value: attPending, trend: 12, trendType: 'down' as const, iconName: "ClipboardList" },
+      { label: "Assignments Pending", value: assignmentsPending, trend: 3, trendType: 'up' as const, iconName: "FileText" },
+    ];
+  }, [timetable]);
+
   const [isHomeworkModalOpen, setHomeworkModalOpen] = useState(false);
   const [isClassworkModalOpen, setClassworkModalOpen] = useState(false);
   const [isProgressModalOpen, setProgressModalOpen] = useState(false);
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<any>(null);
-
-  const actions = [
-    { label: 'Mark Attendance', icon: ClipboardCheck, onClick: () => { }, variant: 'default' as const },
-    { label: 'Upload Assignment', icon: FilePlus, onClick: () => setHomeworkModalOpen(true) },
-    { label: 'Enter Grades', icon: PenTool, onClick: () => { } },
-  ];
 
   const handleAddHomework = (item: any) => {
     setSelectedScheduleItem({
@@ -268,49 +304,49 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 p-4 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name?.split(' ')[0] || 'Teacher'}!</h1>
-          <p className="text-muted-foreground mt-1">Here's what's happening in your classes today.</p>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-4 lg:p-8 animate-in fade-in duration-500">
+      {/* Left Column */}
+      <div className="lg:col-span-2 space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/25 border border-border/40 backdrop-blur-md p-4 px-6 rounded-2xl h-[70px] justify-center sm:justify-start">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold">
+            <span className="text-foreground font-bold">{formattedDate}</span>
+            <span className="text-muted-foreground/30">•</span>
+            <span className="text-primary font-bold">{timetable.length} Classes Today</span>
+            {nextClass && (
+              <>
+                <span className="text-muted-foreground/30">•</span>
+                <span className="text-muted-foreground font-medium">
+                  Next: <strong className="text-foreground font-bold">{nextClass.subjectName}</strong> • {nextClass.startTime}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => { refetchSummary(); refetchTimetable(); fetchTodayEvents(); }}
-            className="rounded-xl h-11 bg-white/50 backdrop-blur-sm border-slate-200"
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-2 text-muted-foreground", isLoading && "animate-spin")} />
-            Refresh
-          </Button>
-        </div>
-      </div>
 
-      {isTodayHoliday && (
-        <div className="rounded-2xl border border-rose-300 bg-rose-50/50 p-4 text-rose-800 text-sm font-semibold flex items-center gap-3">
-          <ShieldAlert className="h-5 w-5 text-rose-600" />
-          Today is marked as a Holiday! Enjoy the break.
-        </div>
-      )}
+        {isTodayHoliday && (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50/50 p-4 text-rose-800 text-sm font-semibold flex items-center gap-3">
+            <ShieldAlert className="h-5 w-5 text-rose-600" />
+            Today is marked as a Holiday! Enjoy the break.
+          </div>
+        )}
 
-      {fullDayEvents.length > 0 && (
-        <div className="space-y-2">
-          {fullDayEvents.map((fe: any) => (
-            <div key={fe.id} className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 text-purple-900 text-sm flex items-center justify-between">
-              <div>
-                <span className="font-bold">Full Day Event: {fe.title}</span>
-                {fe.location && <span className="text-xs text-purple-700 ml-2">📍 {fe.location}</span>}
+        {fullDayEvents.length > 0 && (
+          <div className="space-y-2">
+            {fullDayEvents.map((fe: any) => (
+              <div key={fe.id} className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 text-purple-900 text-sm flex items-center justify-between">
+                <div>
+                  <span className="font-bold">Full Day Event: {fe.title}</span>
+                  {fe.location && <span className="text-xs text-purple-700 ml-2">📍 {fe.location}</span>}
+                </div>
+                <Badge className={cn("rounded-lg", getEventBadgeColor(fe.eventType))}>{fe.eventType}</Badge>
               </div>
-              <Badge className={cn("rounded-lg", getEventBadgeColor(fe.eventType))}>{fe.eventType}</Badge>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      <StatsRow stats={summary?.kpis} isLoading={isSummaryLoading} />
+        <StatsRow stats={customStats} isLoading={isTimetableLoading} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
+        <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold">Today's Schedule</CardTitle>
@@ -342,68 +378,70 @@ export default function TeacherDashboard() {
                       "absolute -left-[41px] top-1 w-5 h-5 rounded-full border-4 border-white shadow-sm transition-all duration-500 group-hover:scale-125",
                       item.type === 'event' ? "bg-purple-500" : idx === 0 ? "bg-primary animate-pulse" : "bg-slate-300 group-hover:bg-primary/50"
                     )} />
-                    
                     {item.type === 'class' ? (
-                      <div className="p-5 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all duration-500">
-                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                      <div className="p-4 bg-card rounded-2xl border border-border/40 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-                                Period {item.periodNumber}
-                              </span>
-                              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tighter">
-                                Class {item.className} — {item.sectionName}
-                              </span>
-                            </div>
-                            <h4 className="text-xl font-bold text-slate-900 leading-tight">{item.subjectName}</h4>
+                            <p className="text-xs font-bold text-muted-foreground/80">
+                              {item.startTime} – {item.endTime}
+                            </p>
+                            <h4 className="text-sm font-bold text-foreground">
+                              {item.subjectName} • Class {item.className}{item.sectionName}
+                            </h4>
+                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
+                              Room {100 + (item.periodNumber || 1)}
+                            </p>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                            <Button 
-                              variant="secondary" 
-                              size="sm" 
-                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-none"
-                              onClick={() => handleAddHomework(item)}
-                            >
-                              <FilePlus className="h-3 w-3 mr-1" />
-                              HW
-                            </Button>
-                            <Button 
-                              variant="secondary" 
-                              size="sm" 
-                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white transition-all border-none"
-                              onClick={() => handleAddClasswork(item)}
-                            >
-                              <PenLine className="h-3 w-3 mr-1" />
-                              CW
-                            </Button>
-                            <Button 
-                              variant="secondary" 
-                              size="sm" 
-                              className="flex-1 sm:flex-none rounded-xl text-[10px] font-bold h-8 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all border-none"
-                              onClick={() => handleUpdateProgress(item)}
-                            >
-                              <BarChart3 className="h-3 w-3 mr-1" />
-                              PROG
-                            </Button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {teacherRoles.isClassTeacher && (
+                              <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="rounded-xl text-[10px] font-bold h-7 px-3 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all border-none"
+                                onClick={() => router.push('/dashboard/teacher/attendance')}
+                              >
+                                Attendance
+                              </Button>
+                            )}
+                            {teacherRoles.isSubjectTeacher && (
+                              <>
+                                <Button 
+                                  variant="secondary" 
+                                  size="sm" 
+                                  className="rounded-xl text-[10px] font-bold h-7 px-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all border-none"
+                                  onClick={() => handleAddHomework(item)}
+                                >
+                                  Homework
+                                </Button>
+                                <Button 
+                                  variant="secondary" 
+                                  size="sm" 
+                                  className="rounded-xl text-[10px] font-bold h-7 px-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-600 hover:text-white transition-all border-none"
+                                  onClick={() => handleUpdateProgress(item)}
+                                >
+                                  Grades
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-5 bg-purple-50/20 rounded-3xl border border-purple-100 shadow-sm hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-300 transition-all duration-500">
+                      <div className="p-4 bg-purple-50/10 dark:bg-purple-950/10 rounded-2xl border border-purple-200/40 shadow-sm hover:shadow-md hover:border-purple-300/40 transition-all duration-300">
                         <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider">
+                              <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-[9px] font-bold uppercase tracking-wider">
                                 Event ({item.startTime} - {item.endTime})
                               </span>
                               <Badge className={cn("text-[9px] rounded-lg", getEventBadgeColor(item.eventType))}>
                                 {item.eventType}
                               </Badge>
                             </div>
-                            <h4 className="text-xl font-bold text-slate-900 leading-tight">{item.title}</h4>
-                            <p className="text-xs text-muted-foreground">{item.description}</p>
-                            {item.location && <p className="text-[11px] text-purple-600 mt-1 font-semibold">📍 Location: {item.location}</p>}
+                            <h4 className="text-sm font-bold text-foreground leading-tight">{item.title}</h4>
+                            <p className="text-xs text-muted-foreground/80">{item.description}</p>
+                            {item.location && <p className="text-[10px] text-purple-500 mt-1 font-bold">📍 Location: {item.location}</p>}
                           </div>
                         </div>
                       </div>
@@ -414,43 +452,110 @@ export default function TeacherDashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        <div className="space-y-8">
-          <QuickActions actions={actions} />
-
-          <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Syllabus Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProgressDashboardCards />
-            </CardContent>
-          </Card>
-
-          <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">Grading Queue</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="group flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-primary/30 transition-all">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-900">Math Mid-term</span>
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Class 10-A</span>
-                  </div>
-                  <span className="text-[11px] bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">12 Left</span>
-                </div>
-                <div className="group flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-transparent transition-all opacity-60">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-900">Algebra Quiz 2</span>
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Class 9-B</span>
-                  </div>
-                  <span className="text-[11px] bg-slate-200 text-slate-600 px-3 py-1 rounded-full font-bold">Completed</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Right Column */}
+      <div className="lg:col-span-1 space-y-8 lg:sticky lg:top-8">
+        <div className="flex items-center justify-end bg-card/25 border border-border/40 backdrop-blur-md p-4 px-6 rounded-2xl h-[70px]">
+          <Button
+            variant="outline"
+            onClick={() => { refetchSummary(); refetchTimetable(); fetchTodayEvents(); }}
+            className="rounded-xl h-9 text-xs bg-card/65 backdrop-blur-sm border-border/40 hover:bg-muted/10"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 mr-2 text-muted-foreground", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
         </div>
+
+        <Card className="erp-card border border-border/40 bg-card overflow-hidden">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-2.5 pb-5 px-5">
+            {teacherRoles.isClassTeacher && (
+              <Button
+                variant="outline"
+                onClick={() => router.push('/dashboard/teacher/attendance')}
+                className="justify-start gap-2.5 h-10 px-4 rounded-xl border-border bg-muted/20 hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground/80 dark:border-border/30 dark:bg-muted/10 transition-all duration-300 font-bold text-xs shadow-sm hover:scale-[1.01]"
+              >
+                <span className="text-sm">✓</span> Mark Attendance
+              </Button>
+            )}
+            {teacherRoles.isSubjectTeacher && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setHomeworkModalOpen(true)}
+                  className="justify-start gap-2.5 h-10 px-4 rounded-xl border-border bg-muted/20 hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground/80 dark:border-border/30 dark:bg-muted/10 transition-all duration-300 font-bold text-xs shadow-sm hover:scale-[1.01]"
+                >
+                  <span className="text-sm">📝</span> Homework
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/teacher/classroom')}
+                  className="justify-start gap-2.5 h-10 px-4 rounded-xl border-border bg-muted/20 hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground/80 dark:border-border/30 dark:bg-muted/10 transition-all duration-300 font-bold text-xs shadow-sm hover:scale-[1.01]"
+                >
+                  <span className="text-sm">📊</span> Grades
+                </Button>
+              </>
+            )}
+            {teacherRoles.isCoordinator && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/teacher/announcements')}
+                  className="justify-start gap-2.5 h-10 px-4 rounded-xl border-border bg-muted/20 hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground/80 dark:border-border/30 dark:bg-muted/10 transition-all duration-300 font-bold text-xs shadow-sm hover:scale-[1.01]"
+                >
+                  <span className="text-sm">📢</span> Announcement
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/teacher/schedule')}
+                  className="justify-start gap-2.5 h-10 px-4 rounded-xl border-border bg-muted/20 hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground/80 dark:border-border/30 dark:bg-muted/10 transition-all duration-300 font-bold text-xs shadow-sm hover:scale-[1.01]"
+                >
+                  <span className="text-sm">📅</span> Schedule Change
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="erp-card border border-border/40 bg-card overflow-hidden">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Syllabus Progress</CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <ProgressDashboardCards />
+          </CardContent>
+        </Card>
+
+        <Card className="erp-card border border-border/40 bg-card overflow-hidden">
+          <CardHeader className="pb-3 pt-5 px-5">
+            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Grading Queue</CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <div className="space-y-3">
+              <div className="group flex items-center justify-between p-3.5 rounded-2xl bg-muted/20 border border-border/40 hover:border-primary/30 transition-all shadow-sm">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-foreground">Math Mid-term</span>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Class 10-A</span>
+                </div>
+                <span className="text-[9px] bg-rose-500/10 text-rose-500 border border-rose-500/25 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1">
+                  ⚠️ 12 Left
+                </span>
+              </div>
+              <div className="group flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-transparent transition-all opacity-60">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-foreground">Algebra Quiz 2</span>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">Class 9-B</span>
+                </div>
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 px-2 py-0.5 rounded-md font-black uppercase tracking-wider">
+                  🟢 Completed
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <HomeworkFormModal 

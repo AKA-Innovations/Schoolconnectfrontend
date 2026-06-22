@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const EVENT_DOT_COLORS: Record<string, string> = {
   HOLIDAY: 'bg-rose-500',
@@ -73,7 +74,8 @@ export function EventCalendar({ role }: Props) {
   const calendarGrid = useMemo(() => {
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0);
-    const startDow = firstDay.getDay();
+    // Align starting day of week: Monday is 0, Sunday is 6
+    const startDow = (firstDay.getDay() + 6) % 7;
     const totalDays = lastDay.getDate();
 
     const cells: Array<{ date: number | null; dateStr: string; events: SchoolEvent[]; isToday: boolean; isHoliday: boolean }> = [];
@@ -173,34 +175,43 @@ export function EventCalendar({ role }: Props) {
         {loading ? (
           <div className="h-[480px] bg-muted/20 animate-pulse rounded-xl" />
         ) : (
-          <div className="border border-border/40 rounded-xl overflow-hidden shadow-inner bg-background/50">
+          <div className="space-y-4">
             {/* Day headers */}
-            <div className="grid grid-cols-7 border-b border-border/40 bg-muted/30">
+            <div className="grid grid-cols-7 gap-3 text-center">
               {DAY_NAMES.map(d => (
-                <div key={d} className="py-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground border-r border-border/20 last:border-r-0">
+                <div key={d} className="py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   {d}
                 </div>
               ))}
             </div>
 
-            {/* Day cells */}
-            <div className="grid grid-cols-7">
+            {/* Day cells grid with gap-3 */}
+            <div className="grid grid-cols-7 gap-3">
               {calendarGrid.map((cell, idx) => (
                 <div
                   key={idx}
                   onClick={() => cell.date && cell.dateStr && handleDayClick(cell.dateStr)}
-                  className={`min-h-[95px] p-2.5 border-r border-b border-border/20 last:border-r-0 transition-all ${
+                  className={cn(
+                    "min-h-[90px] p-3 rounded-2xl border transition-all duration-300",
                     cell.date
-                      ? `cursor-pointer hover:bg-primary/[0.02] hover:shadow-inner ${cell.isHoliday ? 'bg-rose-50/20' : ''} ${cell.isToday ? 'bg-primary/[0.04] ring-1 ring-primary/20 ring-inset' : ''}`
-                      : 'bg-muted/5 opacity-40 select-none pointer-events-none'
-                  }`}
+                      ? cn(
+                          "cursor-pointer bg-white dark:bg-[#131e31] hover:shadow-md hover:-translate-y-0.5",
+                          cell.isToday 
+                            ? "border-blue-500 shadow-sm shadow-blue-500/5 ring-1 ring-blue-500/20" 
+                            : cell.isHoliday 
+                              ? "border-rose-100 dark:border-rose-950/30 bg-rose-50/10 dark:bg-rose-950/5" 
+                              : "border-slate-100 dark:border-slate-800/80"
+                        )
+                      : "bg-slate-50/25 dark:bg-slate-900/10 border-dashed border-slate-100 dark:border-slate-900/40 opacity-40 select-none pointer-events-none rounded-2xl"
+                  )}
                 >
                   {cell.date && (
-                    <>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <span className={`text-xs font-bold ${
-                          cell.isToday ? 'h-6 w-6 rounded-full bg-primary text-white flex items-center justify-center' : cell.isHoliday ? 'text-rose-600' : 'text-foreground'
-                        }`}>
+                    <div className="flex flex-col h-full justify-between gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className={cn(
+                          "text-xs font-bold",
+                          cell.isToday ? "text-blue-600" : cell.isHoliday ? "text-rose-600" : "text-slate-600 dark:text-slate-300"
+                        )}>
                           {cell.date}
                         </span>
                       </div>
@@ -208,20 +219,23 @@ export function EventCalendar({ role }: Props) {
                         {cell.events.slice(0, 2).map(ev => (
                           <div
                             key={ev.id}
-                            className={`text-[8.5px] font-bold px-2 py-0.5 rounded-md truncate border ${
-                              ev.isHoliday ? 'bg-rose-100/40 text-rose-700 border-rose-200' : 'bg-primary/5 text-primary border-primary/10'
-                            }`}
+                            className={cn(
+                              "text-[8px] font-bold px-1.5 py-0.5 rounded-lg truncate border",
+                              ev.isHoliday 
+                                ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20" 
+                                : "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20"
+                            )}
                           >
                             {ev.title}
                           </div>
                         ))}
                         {cell.events.length > 2 && (
-                          <div className="text-[8px] text-muted-foreground font-black px-1.5 uppercase tracking-wide">
+                          <div className="text-[8px] text-slate-400 font-extrabold px-1 uppercase tracking-wider">
                             +{cell.events.length - 2} more
                           </div>
                         )}
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}

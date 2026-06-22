@@ -201,6 +201,13 @@ export interface UploadHomeworkDocumentPayload {
 
 export type SubmissionStatus = 'pending' | 'submitted' | 'reviewed' | 'late';
 
+export enum HomeworkStatus {
+  PENDING = 'pending',
+  SUBMITTED = 'submitted',
+  LATE = 'late',
+  NOT_SUBMITTED = 'not_submitted',
+}
+
 export interface HomeworkSubmission {
   id: number;
   session: string;
@@ -284,6 +291,7 @@ export interface UploadStudyMaterialPayload {
   subjectId: number;
   chapterId?: number;
   topicId?: number;
+  title: string;
   description: string;
   file: File;
 }

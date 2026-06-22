@@ -26,12 +26,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Megaphone, Plus, Search, Filter, Pin, Trash2, Edit, 
   Eye, FileText, CheckCircle2, Circle, Clock, Users, X, 
-  Upload, Download, UserCheck, EyeOff, BookOpen, AlertCircle, RotateCw
+  Upload, Download, UserCheck, EyeOff, BookOpen, AlertCircle, RotateCw,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+
+function getWeekRange() {
+  const today = new Date();
+  const day = today.getDay();
+  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(today.setDate(diff));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  
+  const format = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  
+  return { start: format(monday), end: format(sunday) };
+}
 
 interface Props {
   role: 'school_admin' | 'principal' | 'teacher' | 'student' | 'subject_coordinator';
@@ -57,6 +76,13 @@ export function AnnouncementsManager({ role: userRole }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [readStatusFilter, setReadStatusFilter] = useState<'ALL' | 'READ' | 'UNREAD'>('ALL');
   const [page, setPage] = useState(1);
+
+  // Get default week range
+  const defaultWeek = useMemo(() => getWeekRange(), []);
+
+  // Date filter state
+  const [startDateFilter, setStartDateFilter] = useState<string>(defaultWeek.start);
+  const [endDateFilter, setEndDateFilter] = useState<string>(defaultWeek.end);
 
   const queryParams = useMemo(() => {
     const p: any = {
@@ -233,7 +259,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
     return groups;
   }, [filteredClassSections]);
 
-  // Search and local filters
+  // Search and date filters
   const filteredAnnouncements = useMemo(() => {
     return announcements.filter(ann => {
       const matchesSearch = 
@@ -241,9 +267,16 @@ export function AnnouncementsManager({ role: userRole }: Props) {
         ann.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (ann.createdByFullName || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchesSearch;
+      if (!matchesSearch) return false;
+
+      // Filter by date range (inclusive)
+      const annDate = (ann.publishAt || ann.createdAt).slice(0, 10);
+      if (startDateFilter && annDate < startDateFilter) return false;
+      if (endDateFilter && annDate > endDateFilter) return false;
+
+      return true;
     });
-  }, [announcements, searchTerm]);
+  }, [announcements, searchTerm, startDateFilter, endDateFilter]);
 
   // Handle viewing detail
   const handleViewDetails = async (ann: Announcement) => {
@@ -463,7 +496,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
       </div>
 
       {/* Filters Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 bg-muted/20 p-4 rounded-2xl border border-border/50">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -513,6 +546,54 @@ export function AnnouncementsManager({ role: userRole }: Props) {
             <option value="2025-26">Session 2025-26</option>
           </select>
         </div>
+
+        <div className="relative">
+          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type={startDateFilter ? "date" : "text"}
+            placeholder="Start Date"
+            onFocus={(e) => (e.target.type = "date")}
+            onBlur={(e) => {
+              if (!e.target.value) e.target.type = "text";
+            }}
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            className="w-full h-10 pl-9 pr-8 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {startDateFilter && (
+            <button 
+              type="button" 
+              onClick={() => setStartDateFilter('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="relative">
+          <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type={endDateFilter ? "date" : "text"}
+            placeholder="End Date"
+            onFocus={(e) => (e.target.type = "date")}
+            onBlur={(e) => {
+              if (!e.target.value) e.target.type = "text";
+            }}
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            className="w-full h-10 pl-9 pr-8 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {endDateFilter && (
+            <button 
+              type="button" 
+              onClick={() => setEndDateFilter('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main List */}
@@ -548,7 +629,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAnnouncements.map((ann) => {
             const isOwner = ann.createdBy === user?.id || userRole === 'school_admin';
             return (
@@ -556,8 +637,8 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                 key={ann.id}
                 layoutId={`ann-${ann.id}`}
                 onClick={() => handleViewDetails(ann)}
-                className={`relative flex flex-col md:flex-row justify-between p-4 sm:p-6 bg-card border rounded-2xl cursor-pointer hover:shadow-md transition group overflow-hidden ${
-                  ann.isPinned ? 'border-primary/40 bg-primary/5' : 'border-border/60'
+                className={`relative flex flex-col justify-between p-6 bg-card border rounded-3xl cursor-pointer hover:shadow-xl hover:-translate-y-1 transition duration-300 group overflow-hidden ${
+                  ann.isPinned ? 'border-primary/40 bg-primary/5/30' : 'border-border/60'
                 }`}
               >
                 {/* Priority Glow Sidebar indicator */}
@@ -567,84 +648,89 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                   ann.priority === 'NORMAL' ? 'bg-blue-500' : 'bg-slate-400'
                 }`} />
 
-                <div className="flex-1 space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="space-y-4 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     {ann.isPinned && (
-                      <Badge className="rounded-lg bg-primary/10 text-primary border-0 text-xs flex items-center gap-1">
-                        <Pin className="h-3 w-3 fill-current" /> Pinned
+                      <Badge className="rounded-lg bg-primary/10 text-primary border-0 text-[10px] py-0.5 px-2 flex items-center gap-1">
+                        <Pin className="h-2.5 w-2.5 fill-current" /> Pinned
                       </Badge>
                     )}
-                    <Badge variant="outline" className={`rounded-lg text-[11px] uppercase tracking-wider font-semibold ${
+                    <Badge variant="outline" className={`rounded-lg text-[9px] py-0.5 px-2 uppercase tracking-wider font-bold ${
                       ann.priority === 'URGENT' ? 'border-rose-200 text-rose-700 bg-rose-50/50' :
                       ann.priority === 'HIGH' ? 'border-amber-200 text-amber-700 bg-amber-50/50' :
-                      'border-border/60'
+                      'border-border/60 text-slate-500'
                     }`}>
-                      {ann.priority} Priority
+                      {ann.priority}
                     </Badge>
-                    <Badge variant="secondary" className="rounded-lg text-[10px]">
-                      Audience: {ann.targetAudience === 'SPECIFIC_CLASS' ? (
+                    <Badge variant="secondary" className="rounded-lg text-[9px] py-0.5 px-2 truncate max-w-[150px]">
+                      {ann.targetAudience === 'SPECIFIC_CLASS' ? (
                         ann.targetedClasses && ann.targetedClasses.length > 0 ? (
-                          `Classes: ${ann.targetedClasses.map((tc: any) => {
+                          `${ann.targetedClasses.map((tc: any) => {
                             const className = tc.className || tc.class?.className || tc.class?.name || `Class ${tc.classId}`;
                             const sectionName = tc.sectionName || tc.section?.sectionName || tc.section?.name;
                             return sectionName ? `${className}-${sectionName}` : className;
                           }).join(', ')}`
                         ) : (
-                          `Class ${ann.targetClassName || ''}-${ann.targetSectionName || ''}`
+                          `${ann.targetClassName || ''}-${ann.targetSectionName || ''}`
                         )
                       ) : ann.targetAudience}
                     </Badge>
                   </div>
 
-                  <h3 className="text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition">
-                    {ann.title}
-                  </h3>
+                  <div>
+                    <h3 className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-primary transition line-clamp-2">
+                      {ann.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-3 mt-2 leading-relaxed">
+                      {ann.content}
+                    </p>
+                  </div>
+                </div>
 
-                  <p className="text-sm text-muted-foreground line-clamp-2 pr-6">
-                    {ann.content}
-                  </p>
-
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 
+                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                  <div className="flex flex-col gap-1.5 text-[10px] text-slate-400 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" /> 
                       Published: {ann.publishAt ? new Date(ann.publishAt).toLocaleDateString() : new Date(ann.createdAt).toLocaleDateString()}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" />
                       By: {ann.createdByFullName || 'Staff'}
                     </span>
                     {ann.AnnouncementAttachment?.length > 0 && (
-                      <span className="flex items-center gap-1 text-primary">
-                        <FileText className="h-3 w-3" />
+                      <span className="flex items-center gap-1.5 text-primary font-bold">
+                        <FileText className="h-3.5 w-3.5" />
                         {ann.AnnouncementAttachment.length} Attachments
                       </span>
                     )}
                   </div>
-                </div>
 
-                {/* Quick actions for creator/admin */}
-                {isCreatorRole && (
-                  <div className="flex items-center gap-2 mt-4 md:mt-0 self-end md:self-center" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" onClick={(e) => handleTogglePin(e, ann)} className="text-muted-foreground hover:text-primary rounded-xl">
-                      <Pin className={`h-4 w-4 ${ann.isPinned ? 'fill-current text-primary' : ''}`} />
-                    </Button>
-                    {isOwner && (
-                      <>
-                        <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, ann)} className="text-muted-foreground hover:text-amber-600 rounded-xl">
-                          <Edit className="h-4 w-4" />
+                  {/* Quick actions for creator/admin */}
+                  {isCreatorRole && (
+                    <div className="flex items-center justify-between gap-2 pt-2" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={(e) => handleTogglePin(e, ann)} className="text-slate-400 hover:text-primary rounded-xl h-8 w-8">
+                          <Pin className={`h-3.5 w-3.5 ${ann.isPinned ? 'fill-current text-primary' : ''}`} />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={(e) => handleDelete(e, ann.id)} className="text-muted-foreground hover:text-rose-600 rounded-xl">
-                          <Trash2 className="h-4 w-4" />
+                        {isOwner && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={(e) => handleEditClick(e, ann)} className="text-slate-400 hover:text-amber-600 rounded-xl h-8 w-8">
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={(e) => handleDelete(e, ann.id)} className="text-slate-400 hover:text-rose-600 rounded-xl h-8 w-8">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      {ann.createdBy === user?.id && (
+                        <Button variant="outline" size="sm" onClick={(e) => handleViewReceipts(e, ann)} className="rounded-xl text-[10px] h-7 px-2.5 font-bold flex items-center gap-1">
+                          <UserCheck className="h-3.5 w-3.5" /> Readers
                         </Button>
-                      </>
-                    )}
-                    {ann.createdBy === user?.id && (
-                      <Button variant="outline" size="sm" onClick={(e) => handleViewReceipts(e, ann)} className="rounded-xl text-xs flex items-center gap-1">
-                        <UserCheck className="h-3.5 w-3.5" /> Readers
-                      </Button>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             );
           })}

@@ -128,9 +128,10 @@ export const academicService = {
 
   // ─── Homework ──────────────────────────────────────────────────────────────
 
-  getHomeworks: async (className?: string): Promise<Homework[]> => {
+  getHomeworks: async (classNameOrParams?: string | any): Promise<Homework[]> => {
+    const params = typeof classNameOrParams === 'string' ? { className: classNameOrParams } : classNameOrParams;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK, {
-      params: className ? { className } : undefined,
+      params,
     });
     const raw = response.data;
     if (Array.isArray(raw)) return raw;
@@ -211,7 +212,9 @@ export const academicService = {
   // ─── Homework Submissions ──────────────────────────────────────────────────
 
   getHomeworkSubmissions: async (homeworkId: number): Promise<HomeworkSubmission[]> => {
-    const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK_SUBMISSION_BY_HW_ID(homeworkId));
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK_SUBMISSION, {
+      params: { homeworkId }
+    });
     return response.data ?? [];
   },
 
@@ -231,9 +234,10 @@ export const academicService = {
 
   // ─── Classwork ─────────────────────────────────────────────────────────────
 
-  getClassworks: async (classId?: string): Promise<Classwork[]> => {
+  getClassworks: async (classIdOrParams?: string | any): Promise<Classwork[]> => {
+    const params = typeof classIdOrParams === 'string' ? { classId: classIdOrParams } : classIdOrParams;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.CLASSWORK, {
-      params: classId ? { classId } : undefined,
+      params,
     });
     const raw = response.data;
     if (Array.isArray(raw)) return raw;
@@ -268,16 +272,70 @@ export const academicService = {
   },
 
   uploadStudyMaterial: async (data: UploadStudyMaterialPayload): Promise<StudyMaterial> => {
-    const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, value instanceof File ? value : String(value));
+    // 1. Client-side security and validation checks
+    if (!data.file) {
+      throw new Error('A file is required for uploading study material.');
+    }
+
+    // Limit file size to 20MB for safety
+    const MAX_SIZE = 20 * 1024 * 1024;
+    if (data.file.size > MAX_SIZE) {
+      throw new Error(`File is too large. Maximum allowed size is 20MB.`);
+    }
+
+    // Restrict potentially dangerous file formats
+    const fileExtension = (data.file.name.split('.').pop() || '').toLowerCase();
+    const BLOCKED_EXTENSIONS = ['exe', 'bat', 'sh', 'js', 'vbs', 'php', 'py', 'cmd', 'scr'];
+    if (BLOCKED_EXTENSIONS.includes(fileExtension)) {
+      throw new Error(`Uploading .${fileExtension} files is prohibited for security reasons.`);
+    }
+
+    try {
+      // Step 1: Create the Study Material record (Metadata) via JSON POST
+      const metadataPayload = {
+        session: data.session,
+        classId: Number(data.classId),
+        classSectionId: Number(data.classSectionId),
+        subjectId: Number(data.subjectId),
+        chapterId: data.chapterId ? Number(data.chapterId) : null,
+        topicId: data.topicId ? Number(data.topicId) : null,
+        title: data.title,
+        description: data.description,
+      };
+
+      const metaResponse = await api.post(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL, metadataPayload);
+      
+      const createdItem = metaResponse.data?.data ?? metaResponse.data;
+      const studyMaterialId = createdItem?.id;
+
+      if (!studyMaterialId) {
+        throw new Error('Backend failed to return a valid study material identifier.');
       }
-    });
-    const response = await api.post(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+
+      // Step 2: Upload the associated file via multipart/form-data POST
+      const documentFormData = new FormData();
+      documentFormData.append('studyMaterialId', String(studyMaterialId));
+      documentFormData.append('documentTitle', data.title);
+      documentFormData.append('documentType', fileExtension);
+      documentFormData.append('description', data.description || '');
+      documentFormData.append('file', data.file);
+
+      const docResponse = await api.post('/academic/study-material/document', documentFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const docData = docResponse.data?.data ?? docResponse.data;
+
+      return {
+        ...createdItem,
+        documentPath: docData?.documentPath || createdItem.documentPath,
+        signedUrl: docData?.signedUrl || createdItem.signedUrl,
+      };
+    } catch (error: any) {
+      const serverMessage = error?.response?.data?.message || error?.message || 'Unknown server error';
+      console.error('[Study Material Upload Error]', error);
+      throw new Error(`Study material upload failed: ${serverMessage}`);
+    }
   },
 
   updateStudyMaterial: async (id: number, data: UpdateStudyMaterialPayload): Promise<StudyMaterial> => {
