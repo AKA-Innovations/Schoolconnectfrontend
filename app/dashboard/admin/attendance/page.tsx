@@ -10,10 +10,11 @@ import { useClassSectionLists } from '@/hooks/useClasses';
 import { useFilterAttendance, useStudentList, useBulkAttendance, useUpdateAttendance } from '@/hooks/useStudents';
 import {
   ShieldCheck, LayoutGrid, Search, Users, Save, ArrowLeft,
-  Filter, CheckCircle, XCircle, Clock, AlertTriangle
+  Filter, CheckCircle, XCircle, Clock, AlertTriangle, ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { CURRENT_SESSION } from '@/lib/constants';
 
 const STATUS_CFG: Record<string, { style: string }> = {
   Present: { style: 'bg-success/10 text-success border-success/20' },
@@ -44,15 +45,13 @@ export default function AdminAttendancePage() {
   const session = selClass?.session || '';
 
   const { data: attendance = [], isLoading: loadingAtt } = useFilterAttendance({
-    className,
-    sectionName,
+    classSectionId: selClass?.masterSectionId,
     session,
     date,
   });
 
   const { data: studentList } = useStudentList({
-    className,
-    sectionName,
+    classSectionId: selClass?.masterSectionId,
     limit: 500,
   });
   const students = (studentList as any)?.items ?? [];
@@ -68,9 +67,15 @@ export default function AdminAttendancePage() {
     if (viewMode === 'detail' && students.length > 0) {
       const newMap: Record<string, { status: AttendanceStatus; remarks: string }> = {};
       students.forEach((s: any) => {
-        const existing = attendance.find((a: any) => a.studentId === s.id);
+        const roll = s.academics?.[0]?.rollNumber;
+        const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
+        const existing = attendance.find((a: any) => 
+          (a.studentId && String(a.studentId) === String(s.id)) ||
+          (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
+          (a.studentName && a.studentName.toLowerCase().trim() === fullName)
+        );
         newMap[s.id] = {
-          status: (existing?.status as AttendanceStatus) ?? 'Present',
+          status: (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus,
           remarks: existing?.remarks ?? '',
         };
       });
@@ -91,8 +96,8 @@ export default function AdminAttendancePage() {
       const newStatus = attendanceMap[s.id]?.status ?? 'Present';
 
       if (existing) {
-        if (existing.status !== newStatus) {
-          toUpdate.push({ recordId: existing.id, status: newStatus });
+        if ((existing.attendanceStatus || existing.status) !== newStatus) {
+          toUpdate.push({ recordId: Number(existing.recordId || existing.id), status: newStatus });
         }
       } else {
         toAdd.push({ studentId: s.id, attendanceStatus: newStatus });
@@ -128,12 +133,52 @@ export default function AdminAttendancePage() {
     }
   };
 
+  const handleSaveSingle = async (studentId: string) => {
+    const s = students.find((st: any) => st.id === studentId);
+    if (!s) return;
+
+    const roll = s.academics?.[0]?.rollNumber;
+    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
+    const existing = attendance.find((a: any) => 
+      (a.studentId && String(a.studentId) === String(s.id)) ||
+      (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
+      (a.studentName && a.studentName.toLowerCase().trim() === fullName)
+    );
+
+    const newStatus = attendanceMap[studentId]?.status ?? 'Present';
+    const currentSession = session || CURRENT_SESSION;
+
+    try {
+      if (existing) {
+        if ((existing.attendanceStatus || existing.status) !== newStatus) {
+          await updateMutation.mutateAsync({ 
+            recordId: Number(existing.recordId || existing.id), 
+            data: { 
+              status: newStatus,
+              attendanceStatus: newStatus
+            } as any 
+          });
+          toast.success(`Attendance updated for ${s.firstName}`);
+        }
+      } else {
+        await bulkMutation.mutateAsync({
+          date,
+          session: currentSession,
+          attendance: [{ studentId, attendanceStatus: newStatus }]
+        });
+        toast.success(`Attendance marked for ${s.firstName}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save attendance');
+    }
+  };
+
   const filteredSections = useMemo(() => {
     if (!search) return allSections;
     const q = search.toLowerCase();
     return allSections.filter(s => 
-      s.className.toLowerCase().includes(q) || 
-      s.sectionName.toLowerCase().includes(q)
+      (s.className ?? '').toLowerCase().includes(q) || 
+      (s.sectionName ?? '').toLowerCase().includes(q)
     );
   }, [allSections, search]);
 
@@ -282,31 +327,65 @@ export default function AdminAttendancePage() {
                         {s.academics?.[0]?.rollNumber || '---'}
                       </td>
                       <td className="p-5">
-                        {att?.status ? (
-                          <Badge className={cn("rounded-xl border-none font-bold py-1 px-3", STATUS_CFG[att.status]?.style)}>
-                             {att.status}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="rounded-xl font-bold py-1 px-3 opacity-30">NOT RECORDED</Badge>
-                        )}
+                        {(() => {
+                          const roll = s.academics?.[0]?.rollNumber;
+                          const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
+                          const existing = attendance.find((a: any) => 
+                            (a.studentId && String(a.studentId) === String(s.id)) ||
+                            (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
+                            (a.studentName && a.studentName.toLowerCase().trim() === fullName)
+                          );
+                          const status = existing?.attendanceStatus || existing?.status;
+                          return status ? (
+                            <Badge className={cn("rounded-xl border-none font-bold py-1 px-3", STATUS_CFG[status]?.style)}>
+                               {status}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="rounded-xl font-bold py-1 px-3 opacity-30">NOT RECORDED</Badge>
+                          );
+                        })()}
                       </td>
                       <td className="p-5">
-                         <div className="flex gap-2">
-                            {statusOptions.map(st => (
-                              <button 
-                                key={st} 
-                                onClick={() => setStudentStatus(s.id, st as AttendanceStatus)}
-                                className={cn(
-                                  "h-10 w-10 flex items-center justify-center rounded-xl text-xs font-black border-2 transition-all",
-                                  att?.status === st 
-                                    ? "border-primary bg-primary text-primary-foreground shadow-lg scale-110" 
-                                    : "border-border hover:border-primary/50 text-muted-foreground"
-                                )}
-                              >
-                                {st.charAt(0)}
-                              </button>
-                            ))}
-                         </div>
+                          <div className="flex items-center gap-3">
+                             <div className="flex gap-2">
+                                {statusOptions.map(st => (
+                                  <button 
+                                    key={st} 
+                                    onClick={() => setStudentStatus(s.id, st as AttendanceStatus)}
+                                    className={cn(
+                                      "h-10 w-10 flex items-center justify-center rounded-xl text-xs font-black border-2 transition-all",
+                                      att?.status === st 
+                                        ? "border-primary bg-primary text-primary-foreground shadow-lg scale-110" 
+                                        : "border-border hover:border-primary/50 text-muted-foreground"
+                                    )}
+                                  >
+                                    {st.charAt(0)}
+                                  </button>
+                                ))}
+                             </div>
+                             {(() => {
+                               const roll = s.academics?.[0]?.rollNumber;
+                               const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
+                               const existing = attendance.find((a: any) => 
+                                 (a.studentId && String(a.studentId) === String(s.id)) ||
+                                 (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
+                                 (a.studentName && a.studentName.toLowerCase().trim() === fullName)
+                               );
+                               const currentStatus = existing?.attendanceStatus || existing?.status;
+                               
+                               return (att?.status !== currentStatus) && (
+                                 <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   onClick={() => handleSaveSingle(s.id)}
+                                   className="h-10 w-10 p-0 text-primary hover:text-primary hover:bg-primary/10 rounded-xl group border-2 border-transparent"
+                                   title="Update student attendance"
+                                 >
+                                   <Save size={18} className="transition-transform group-hover:scale-110" />
+                                 </Button>
+                               );
+                             })()}
+                          </div>
                       </td>
                     </tr>
                  )})}

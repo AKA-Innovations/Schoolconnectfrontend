@@ -13,8 +13,33 @@ interface OverviewTabProps {
   isLoading: boolean;
   actions: { label: string; icon: LucideIcon; onClick: () => void }[];
 }
-
 export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabProps) {
+  const totalStudents = summary?.school?.totalStudents || 0;
+  const totalTeachers = summary?.school?.totalTeachers || 0;
+  const ratio = totalTeachers > 0 ? Math.round(totalStudents / totalTeachers) : 0;
+  
+  const facultyLoadValue = ratio > 0 ? `1:${ratio}` : '—';
+  const facultyLoadStatus = ratio === 0 ? 'N/A' : ratio <= 15 ? 'Excellent' : ratio <= 25 ? 'Optimal' : 'High';
+  const facultyLoadProgress = ratio > 0 ? Math.min(100, Math.max(20, (ratio / 35) * 100)) : 0;
+  const facultyLoadStatusColor = ratio === 0 ? 'text-muted-foreground' : ratio <= 25 ? 'text-success' : 'text-destructive';
+
+  const metrics = [
+    { 
+      label: 'Faculty Load', 
+      value: facultyLoadValue, 
+      status: facultyLoadStatus, 
+      progress: facultyLoadProgress,
+      statusColor: facultyLoadStatusColor 
+    },
+    { 
+      label: 'Daily Attendance', 
+      value: '94%', 
+      status: 'Healthy', 
+      progress: 94,
+      statusColor: 'text-success' 
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <StatsRow stats={summary?.kpis} isLoading={isLoading} />
@@ -84,19 +109,21 @@ export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabPro
               </div>
             </div>
             <div className="space-y-6">
-              {[
-                { label: 'Faculty Load', value: '1:18', status: 'Optimal' },
-                { label: 'Daily Attendance', value: '94%', status: 'Healthy' },
-              ].map((metric) => (
+              {metrics.map((metric) => (
                 <div key={metric.label} className="group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-muted-foreground">{metric.label}</span>
                     <span className="text-sm font-bold text-foreground">{metric.value}</span>
                   </div>
                   <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary w-[70%] rounded-full" />
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all duration-500" 
+                      style={{ width: `${metric.progress}%` }} 
+                    />
                   </div>
-                  <p className="text-[10px] text-success font-bold mt-2 uppercase tracking-wide">{metric.status}</p>
+                  <p className={cn("text-[10px] font-bold mt-2 uppercase tracking-wide", metric.statusColor)}>
+                    {metric.status}
+                  </p>
                 </div>
               ))}
             </div>

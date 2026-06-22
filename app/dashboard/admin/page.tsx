@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -11,7 +11,7 @@ import { AdminOverviewTab } from '@/components/admin/AdminOverviewTab';
 import { Users, GraduationCap, Building2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const { data: summary, isLoading, refetch } = useAdminDashboard();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -35,15 +35,6 @@ export default function AdminDashboard() {
   return (
     <div className="bg-transparent antialiased selection:bg-primary/10 py-8">
       <div className="max-w-7xl mx-auto px-6 space-y-6">
-        <div className="flex justify-end">
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm text-sm font-semibold hover:bg-slate-50"
-          >
-            <RefreshCw className="h-4 w-4 text-slate-600" />
-            Refresh
-          </button>
-        </div>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <AnimatePresence mode="wait">
 
@@ -83,5 +74,13 @@ export default function AdminDashboard() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading dashboard...</div>}>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

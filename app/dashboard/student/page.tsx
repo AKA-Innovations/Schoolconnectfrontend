@@ -13,9 +13,9 @@ export default function StudentDashboard() {
   const { data: summary, isLoading, refetch } = useStudentDashboard();
 
   const actions = [
-    { label: 'View Schedule', icon: Calendar, onClick: () => {}, variant: 'default' as const },
-    { label: 'Submit Assignment', icon: FileText, onClick: () => {} },
-    { label: 'Check Grades', icon: BookOpen, onClick: () => {} },
+    { label: 'View Schedule', icon: Calendar, onClick: () => { }, variant: 'default' as const },
+    { label: 'Submit Assignment', icon: FileText, onClick: () => { } },
+    { label: 'Check Grades', icon: BookOpen, onClick: () => { } },
   ];
 
   const getStatusIcon = (status: string) => {

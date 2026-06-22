@@ -49,7 +49,8 @@ export const studentService = {
   },
 
   list: async (filters: StudentListFilters = {}): Promise<StudentListResponse> => {
-    const res = await api.get(API_ENDPOINTS.STUDENT.LIST, { params: filters });
+    const { schoolId, ...rest } = filters;
+    const res = await api.get(API_ENDPOINTS.STUDENT.LIST, { params: rest });
     
     // Normalize backend 'academicDtls' to frontend 'academics'
     if (res.data?.items) {
@@ -64,6 +65,11 @@ export const studentService = {
 
   getById: async (id: string): Promise<{ message: string; data: StudentDetails }> => {
     const res = await api.get(API_ENDPOINTS.STUDENT.BY_ID(id));
+    return res.data;
+  },
+
+  getBasicDetails: async (): Promise<any> => {
+    const res = await api.get(API_ENDPOINTS.STUDENT.BASIC_DETAILS);
     return res.data;
   },
 
@@ -152,12 +158,15 @@ export const studentService = {
   },
 
   updateAttendance: async (recordId: number, data: Partial<AttendanceRecord>) => {
-    const res = await api.put(API_ENDPOINTS.STUDENT.ATTENDANCE_UPDATE(recordId), data);
+    // Backend expects { status: "string" } for individual updates
+    const status = data.status || data.attendanceStatus || 'Present';
+    const res = await api.put(API_ENDPOINTS.STUDENT.ATTENDANCE_UPDATE(recordId), { status });
     return res.data;
   },
 
   filterAttendance: async (params: AttendanceFilterParams): Promise<AttendanceRecord[]> => {
-    const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params });
+    const { schoolId, ...rest } = params;
+    const res = await api.get(API_ENDPOINTS.STUDENT.ATTENDANCE_FILTER, { params: rest });
     const rawData = res.data?.data ?? res.data;
     
     console.log('Raw Attendance API Response:', res.data);
@@ -188,5 +197,12 @@ export const studentService = {
       console.log(`[Mapping] Record ${mappedRecord.recordId}: Roll ${mappedRecord.studentRollNumber}, Status ${mappedRecord.status}`);
       return mappedRecord;
     });
+  },
+
+  getBirthdays: async (classSectionId: number, date: string): Promise<any[]> => {
+    const res = await api.get(API_ENDPOINTS.STUDENT.BIRTHDAYS, {
+      params: { classSectionId, date }
+    });
+    return res.data?.data ?? res.data ?? [];
   },
 };

@@ -48,17 +48,20 @@ export function ClassStudentsView() {
 
   const today = todayIso();
 
-  // Fetch ALL students for selected class (all sections), up to 200
+  // Find the selected section record to get its ID
+  const selSectionRecord = classSectionsData?.find(
+    (s: any) => s.className === selectedClass && s.sectionName === selectedSection
+  );
+
+  // Fetch students for selected section, up to 200
   const { data: studentData, isLoading: loadingStudents } = useStudentList({
-    className:   selectedClass   || undefined,
-    sectionName: selectedSection || undefined,
+    classSectionId: selSectionRecord?.id,
     limit: 200,
   });
 
-  // Fetch today's attendance for the selected class
+  // Fetch today's attendance for the selected section
   const { data: rawAttendance, isLoading: loadingAttendance } = useFilterAttendance({
-    className:   selectedClass   || undefined,
-    sectionName: selectedSection || undefined,
+    classSectionId: selSectionRecord?.id,
     date: selectedClass ? today : undefined,
   });
 
@@ -69,7 +72,9 @@ export function ClassStudentsView() {
   // Build attendance map: studentId -> status
   const attendanceMap = useMemo(() => {
     const map: Record<string, string> = {};
-    attendanceRecords.forEach((r) => { map[r.studentId] = r.status; });
+    attendanceRecords.forEach((r) => {
+      if (r.studentId) map[r.studentId] = r.status;
+    });
     return map;
   }, [attendanceRecords]);
 

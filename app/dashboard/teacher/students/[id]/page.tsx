@@ -1,210 +1,328 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useStudent } from '@/hooks/useStudents';
-import {
-  ArrowLeft, User, Phone, Mail, Calendar, GraduationCap,
-  MapPin, Heart, Users,
-} from 'lucide-react';
+import { ArrowLeft, Camera, Trash2, User, RefreshCw, Phone, Calendar, BookOpen, Heart, MapPin, ShieldCheck, PowerOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useStudent, useUpdateStudentStatus, useUploadStudentImage, useDeleteStudentImage } from '@/hooks/useStudents';
+import { useAuthStore } from '@/store/authStore';
+import { PersonalTab } from '@/components/admin/student/tabs/PersonalTab';
+import { AcademicTab } from '@/components/admin/student/tabs/AcademicTab';
+import { ParentsTab } from '@/components/admin/student/tabs/ParentsTab';
+import { MedicalTab } from '@/components/admin/student/tabs/MedicalTab';
+import { AddressTab } from '@/components/admin/student/tabs/AddressTab';
+
+const AcademicAnalysis = dynamic(() => import('@/components/admin/student/AcademicAnalysis'), { ssr: false });
+
+function ParentsIcon({ size = 16, className }: { size?: number; className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function ProfileImageSection({ studentId, profileImageUrl, canEdit }: { studentId: string; profileImageUrl?: string; canEdit: boolean }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadMutation = useUploadStudentImage(studentId);
+  const deleteMutation = useDeleteStudentImage(studentId);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file, {
+      onSuccess: () => toast.success('Profile image updated'),
+      onError: () => toast.error('Upload failed.'),
+    });
+    e.target.value = '';
+  };
+
+  const handleDelete = () => {
+    if (!confirm('Delete profile image?')) return;
+    deleteMutation.mutate(undefined, {
+      onSuccess: () => toast.success('Profile image removed'),
+      onError: () => toast.error('Delete failed.'),
+    });
+  };
+
+  const busy = uploadMutation.isPending || deleteMutation.isPending;
+
+  return (
+    <div className="shrink-0  relative group cursor-pointer">
+      <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50">
+        {profileImageUrl ? (
+          <img src={profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+        ) : (
+          <div className="text-primary/60 font-bold text-3xl uppercase tracking-tighter">
+            {/* Placeholder initials */}
+          </div>
+        )}
+        {canEdit && (
+          <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
+              <Camera className="h-3 w-3" />
+              {busy ? 'Uploading…' : 'Upload'}
+            </button>
+            {profileImageUrl && (
+              <button type="button" onClick={handleDelete}
+                className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
+                <Trash2 className="h-3 w-3" />Remove
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+      <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-2 border-card shadow-sm flex items-center justify-center">
+        <ShieldCheck className="h-3 w-3 text-white" />
+      </div>
+    </div>
+  );
+}
 
 export default function TeacherStudentProfilePage() {
   const params = useParams();
   const router = useRouter();
   const studentId = params.id as string;
-  const { data: student, isLoading } = useStudent(studentId);
+  const { role } = useAuthStore();
+  const isAdmin = role === 'school_admin' || role === 'super_admin' || role === 'principal';
+  
+  const { data: student, isLoading, isFetching, refetch } = useStudent(studentId);
+  const statusMutation = useUpdateStudentStatus(studentId);
+  const [activeTab, setActiveTab] = useState('personal');
+
+  const toggleStatus = () => {
+    const next = student?.status === 'Active' ? 'Inactive' : 'Active';
+    statusMutation.mutate(next, {
+      onSuccess: () => toast.success(`Student marked as ${next}`),
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update status'),
+    });
+  };
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-6 animate-pulse">
+      <div className="flex flex-col items-center justify-center h-96 space-y-4 animate-pulse">
+        <div className="h-24 w-24 rounded-full bg-muted" />
         <div className="h-8 bg-muted rounded w-48" />
-        <div className="h-32 bg-muted rounded-xl" />
-        <div className="h-64 bg-muted rounded-xl" />
+        <div className="h-4 bg-muted rounded w-64" />
       </div>
     );
   }
 
   if (!student) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 text-center">
-        <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
-        <h2 className="text-xl font-bold text-muted-foreground">Student not found</h2>
-        <Button variant="outline" className="mt-4 rounded-xl" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+      <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border/50">
+        <User className="h-12 w-12 mx-auto mb-4 opacity-20" />
+        <h3 className="text-xl font-bold">Student Not Found</h3>
+        <p className="text-muted-foreground mt-2">The record may have been relocated or deleted.</p>
+        <Button variant="outline" onClick={() => router.back()} className="mt-6 rounded-xl">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Directory
         </Button>
       </div>
     );
   }
 
-  const academic = student.academics?.[0];
-  const parents = student.parents ?? [];
-  const addresses = student.addresses ?? [];
-  const medicals = student.medicalHistories ?? [];
+  const tabs = [
+    { id: 'personal', label: 'Personal', icon: <User size={13} /> },
+    { id: 'academic', label: 'Academic', icon: <BookOpen size={13} /> },
+    { id: 'analysis', label: 'Analysis', icon: <BookOpen size={13} /> },
+    { id: 'parents', label: 'Parents', icon: <ParentsIcon size={13} /> },
+    { id: 'medical', label: 'Medical', icon: <Heart size={13} /> },
+    { id: 'address', label: 'Address', icon: <MapPin size={13} /> },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => router.back()}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-4 flex-1">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden border border-border/50">
-            {student.profileImageUrl ? (
-              <img src={student.profileImageUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User className="h-8 w-8 text-primary/50" />
-            )}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">{student.firstName} {student.lastName}</h1>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {academic && (
-                <Badge variant="secondary" className="rounded-lg text-xs">
-                  {academic.className} — {academic.sectionName}
-                  {academic.rollNumber && ` · Roll #${academic.rollNumber}`}
-                </Badge>
-              )}
-              <Badge
-                className={`rounded-lg text-xs border-0 ${
-                  student.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}
-              >
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
+      {/* Header / Profile Card */}
+      <Card className="overflow-hidden border-border shadow-sm">
+        <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
+          <ProfileImageSection 
+            studentId={studentId} 
+            profileImageUrl={student.profileImageUrl} 
+            canEdit={isAdmin} // Limit image editing to admins if needed, or allow teachers
+          />
+          <div className="flex-1 text-center md:text-left space-y-1.5">
+            <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1.5">
+              <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border border-border/40">
+                {student.academics?.[0]?.rollNumber || student.id.slice(-6).toUpperCase()}
+              </span>
+              <span className={cn(
+                'px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border',
+                student.status === 'Active'
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                  : 'bg-red-500/10 text-red-600 border-red-500/20'
+              )}>
                 {student.status}
-              </Badge>
+              </span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <Tabs defaultValue="personal">
-        <TabsList className="rounded-xl">
-          <TabsTrigger value="personal"><User className="h-3 w-3 mr-1" />Personal</TabsTrigger>
-          <TabsTrigger value="academic"><GraduationCap className="h-3 w-3 mr-1" />Academic</TabsTrigger>
-          <TabsTrigger value="parents"><Users className="h-3 w-3 mr-1" />Parents</TabsTrigger>
-          <TabsTrigger value="medical"><Heart className="h-3 w-3 mr-1" />Medical</TabsTrigger>
-          <TabsTrigger value="address"><MapPin className="h-3 w-3 mr-1" />Address</TabsTrigger>
-        </TabsList>
-
-        {/* Personal */}
-        <TabsContent value="personal" className="mt-4">
-          <Card className="erp-card">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { label: 'Date of Birth', value: student.dateOfBirth, icon: Calendar },
-                  { label: 'Gender', value: student.gender, icon: User },
-                  { label: 'Phone', value: student.mobileNumber, icon: Phone },
-                  { label: 'Email', value: student.emailId, icon: Mail },
-                  { label: 'Blood Group', value: student.bloodGroup || '—' },
-                  { label: 'Nationality', value: student.nationality || '—' },
-                  { label: 'Religion', value: student.religion || '—' },
-                  { label: 'Caste', value: student.caste || '—' },
-                ].map((f) => (
-                  <div key={f.label} className="flex items-start gap-3">
-                    {f.icon && <f.icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{f.label}</p>
-                      <p className="text-sm font-medium mt-0.5">{f.value}</p>
-                    </div>
-                  </div>
-                ))}
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {student.firstName} {student.lastName}
+            </h1>
+            <div className="flex flex-wrap justify-center md:justify-start gap-x-5 gap-y-1.5 text-muted-foreground/70 mt-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Phone className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {student.mobileNumber}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Academic */}
-        <TabsContent value="academic" className="mt-4">
-          <Card className="erp-card">
-            <CardContent className="p-6">
-              {!academic ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No academic record</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {[
-                    { label: 'Class', value: academic.className },
-                    { label: 'Section', value: academic.sectionName },
-                    { label: 'Roll Number', value: academic.rollNumber || '—' },
-                    { label: 'Admission No.', value: (academic as any).admissionNumber || '—' },
-                    { label: 'Admission Date', value: (academic as any).admissionDate || '—' },
-                    { label: 'Conveyance', value: (academic as any).conveyance || '—' },
-                  ].map((f) => (
-                    <div key={f.label}>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{f.label}</p>
-                      <p className="text-sm font-medium mt-0.5">{f.value}</p>
-                    </div>
-                  ))}
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <User className="h-3.5 w-3.5 opacity-40 text-primary" />
+                {student.gender || '—'}
+              </div>
+              {student.dateOfBirth && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Calendar className="h-3.5 w-3.5 opacity-40 text-primary" />
+                  {new Date(student.dateOfBirth).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Parents */}
-        <TabsContent value="parents" className="mt-4">
-          {parents.length === 0 ? (
-            <Card className="erp-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">No parent records</CardContent></Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {parents.map((p: any) => (
-                <Card key={p.id} className="erp-card">
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold">{p.firstName} {p.lastName}</p>
-                      <Badge variant="secondary" className="rounded-lg text-xs">{p.relation}</Badge>
-                    </div>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      {p.mobileNumber && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" />{p.mobileNumber}</div>}
-                      {p.emailId && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" />{p.emailId}</div>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
-          )}
-        </TabsContent>
+            {student.academics?.[0] && (
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-3">
+                <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  Class {student.academics[0].className} - {student.academics[0].sectionName}
+                </Badge>
+              </div>
+            )}
+          </div>
+          <div className="absolute top-4 right-4 flex gap-2">
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={toggleStatus}
+                disabled={statusMutation.isPending}
+                className={cn(
+                  'rounded-xl h-10 px-4 shadow-sm border font-bold text-[11px] uppercase tracking-widest flex items-center gap-2 transition-all',
+                  student.status === 'Active'
+                    ? 'border-red-200 text-red-600 hover:bg-red-50 bg-background/50'
+                    : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 bg-background/50'
+                )}
+                title={student.status === 'Active' ? 'Deactivate student' : 'Activate student'}
+              >
+                <PowerOff className="h-3.5 w-3.5" />
+                {statusMutation.isPending
+                  ? 'Updating…'
+                  : student.status === 'Active' ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+            <Button variant="secondary" size="icon" onClick={() => refetch()}
+              className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
+              title="Refresh">
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+            </Button>
+            <Button variant="secondary" size="icon" onClick={() => router.back()}
+              className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
+              title="Back to Directory">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
 
-        {/* Medical */}
-        <TabsContent value="medical" className="mt-4">
-          {medicals.length === 0 ? (
-            <Card className="erp-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">No medical records</CardContent></Card>
-          ) : (
-            <div className="space-y-3">
-              {medicals.map((m: any) => (
-                <Card key={m.id} className="erp-card">
-                  <CardContent className="p-5">
-                    <p className="text-sm">{m.history || m.notes || JSON.stringify(m)}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
+            {tabs.map(tab => (
+              <TabsTrigger key={tab.id} value={tab.id}
+                className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase gap-1.5 flex items-center data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+                {tab.icon}{tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <div className="mt-6">
+          <TabsContent value="personal" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Personal Information</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Core identity and contact details.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <PersonalTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Address */}
-        <TabsContent value="address" className="mt-4">
-          {addresses.length === 0 ? (
-            <Card className="erp-card"><CardContent className="p-8 text-center text-sm text-muted-foreground">No address records</CardContent></Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {addresses.map((a: any) => (
-                <Card key={a.id} className="erp-card">
-                  <CardContent className="p-5">
-                    {a.isPermanent && <Badge className="rounded-lg bg-blue-100 text-blue-700 border-0 text-[9px] mb-2">Permanent</Badge>}
-                    <p className="text-sm font-medium">{a.address}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{a.city}, {a.state} — {a.pincode}</p>
-                    <p className="text-xs text-muted-foreground">{a.country}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+          <TabsContent value="academic" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Academic Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Class assignments and academic history.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AcademicTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analysis" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Academic Analysis</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Performance trends and subject analysis.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AcademicAnalysis studentId={studentId} student={student} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="parents" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Parent / Guardian Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Family and emergency contact information.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <ParentsTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="medical" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Medical History</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Health information and medical records.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <MedicalTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="address" className="mt-0">
+            <Card className="overflow-hidden border-border shadow-sm rounded-4xl">
+              <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
+                <div>
+                  <CardTitle className="text-xl font-bold tracking-tight">Address Records</CardTitle>
+                  <CardDescription className="text-xs font-medium opacity-70 mt-1">Residential and contact locations.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <AddressTab studentId={studentId} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

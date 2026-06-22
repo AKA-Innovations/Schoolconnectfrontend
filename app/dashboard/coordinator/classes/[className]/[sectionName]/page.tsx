@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useClassSectionLists, useSubjectDetails, useTimetable, usePeriodSlots,
-  useCreateTimetableEntry, useUpdateTimetableEntry, useDeleteTimetableEntry,
   useCreateSubjectDetail, useDeleteSubjectDetail, useSubjectOptions,
+  useSchoolClasses, useCreateTimetableEntry, useUpdateTimetableEntry,
+  useDeleteTimetableEntry,
 } from '@/hooks/useClasses';
 import { useTeacherList, useAddClassTeacher, useRemoveClassTeacher } from '@/hooks/useTeachers';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
@@ -35,20 +36,57 @@ export default function CoordinatorClassDetailPage() {
 
   const { data: classSections = [] } = useClassSectionLists();
   const { data: subjectDetails = [] } = useSubjectDetails();
-  const { data: timetableEntries = [] } = useTimetable();
+  const { data: schoolClasses = [] } = useSchoolClasses();
+  
+  // Find class section record
+  const classSection = classSections.find((cs) => cs.className === className && cs.sectionName === sectionName);
+
+  // Resolve classId if missing in section object
+  const resolvedClassId = useMemo(() => {
+    if (classSection?.classId) return classSection.classId;
+    if (!className) return undefined;
+    const cls = schoolClasses.find(c => c.className === className);
+    return cls?.id;
+  }, [classSection, className, schoolClasses]);
+
+  const { data: rawTimetableEntries = [] } = useTimetable({
+    session: CURRENT_SESSION,
+    classId: resolvedClassId,
+    classSectionId: classSection?.masterSectionId,
+  });
+
+  const timetableEntries = useMemo(() => {
+    const raw = Array.isArray(rawTimetableEntries) ? rawTimetableEntries : [];
+    return raw.map(e => {
+      let classSubjectId = e.classSubjectId;
+      if (!classSubjectId && e.subjectName) {
+        const match = subjectDetails.find(sd => 
+          String(sd.subjectName).trim().toLowerCase() === String(e.subjectName).trim().toLowerCase() && 
+          String(sd.className) === String(e.className || className) &&
+          String(sd.sectionName) === String(e.sectionName || sectionName)
+        );
+        if (match) classSubjectId = String(match.id);
+      }
+      return { ...e, classSubjectId };
+    });
+  }, [rawTimetableEntries, subjectDetails, className, sectionName]);
+  
   const { data: periodSlots = [] } = usePeriodSlots();
   const { data: subjectOptions = [] } = useSubjectOptions();
   const { data: teachersData } = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
-  const { data: studentsData, isLoading: loadingStudents } = useStudentList({ className, sectionName, limit: 200 });
+  const { data: studentsData, isLoading: loadingStudents } = useStudentList({ 
+    classSectionId: classSection?.masterSectionId, 
+    limit: 200 
+  });
   const students = studentsData?.items ?? [];
 
   const today = new Date().toISOString().split('T')[0];
-  const { data: attendanceData } = useFilterAttendance({ className, sectionName, date: today });
+  const { data: attendanceData } = useFilterAttendance({ 
+    classSectionId: classSection?.masterSectionId, 
+    date: today 
+  });
   const attendanceRecords: any[] = Array.isArray(attendanceData) ? attendanceData : (attendanceData as any)?.data ?? [];
-
-  // Find class section record
-  const classSection = classSections.find((cs) => cs.className === className && cs.sectionName === sectionName);
 
   // Subject details for this section
   const sectionSubjects = useMemo(
@@ -57,9 +95,9 @@ export default function CoordinatorClassDetailPage() {
   );
 
   // Timetable for this section
-  const sectionSdIds = useMemo(() => new Set(sectionSubjects.map((sd) => sd.id)), [sectionSubjects]);
+  const sectionSdIds = useMemo(() => new Set(sectionSubjects.map((sd) => String(sd.id))), [sectionSubjects]);
   const sectionTimetable = useMemo(
-    () => timetableEntries.filter((e) => sectionSdIds.has(e.teacherClassId)),
+    () => timetableEntries.filter((e) => sectionSdIds.has(e.classSubjectId)),
     [timetableEntries, sectionSdIds],
   );
 
@@ -70,11 +108,8 @@ export default function CoordinatorClassDetailPage() {
     [allTeachers, sectionTeacherIds],
   );
 
-  // Available subjects for this class from subject options
-  const classSubjectOptions = useMemo(
-    () => subjectOptions.filter((so) => so.className === className),
-    [subjectOptions, className],
-  );
+  // Available subjects for this class from subject options (session-global)
+  const classSubjectOptions = subjectOptions;
 
   // Attendance map
   const attendanceMap = useMemo(() => {
@@ -155,6 +190,7 @@ export default function CoordinatorClassDetailPage() {
             allTeachers={allTeachers}
             className={className}
             sectionName={sectionName}
+            classSections={classSections}
           />
         </TabsContent>
 
@@ -291,15 +327,17 @@ function SubjectsTab({
   allTeachers,
   className: cls,
   sectionName,
+  classSections,
 }: {
   sectionSubjects: any[];
   classSubjectOptions: any[];
   allTeachers: any[];
   className: string;
   sectionName: string;
+  classSections: any[];
 }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [newSubject, setNewSubject] = useState('');
+  const [newSubjectId, setNewSubjectId] = useState('');
   const [newTeacherId, setNewTeacherId] = useState('');
 
   const createMutation = useCreateSubjectDetail();
@@ -310,19 +348,29 @@ function SubjectsTab({
   const availableSubjects = classSubjectOptions.filter((so) => !mappedSubjects.has(so.subjectName));
 
   const handleAdd = () => {
-    if (!newSubject || !newTeacherId) return;
+    const opt = classSubjectOptions.find(o => o.id === Number(newSubjectId));
+    const cs = classSections.find(c => c.className === cls && c.sectionName === sectionName);
+    if (!opt || !newTeacherId || !cs) return;
     createMutation.mutate(
-      { session: CURRENT_SESSION, teacherId: newTeacherId, className: cls, sectionName, subjectName: newSubject },
+      { 
+        entries: [{
+          session: CURRENT_SESSION, 
+          teacherId: newTeacherId, 
+          classId: cs.classId,
+          classSectionId: cs.masterSectionId,
+          subjectId: opt.id
+        }]
+      },
       {
-        onSuccess: () => { toast.success('Subject teacher assigned'); setShowAdd(false); setNewSubject(''); setNewTeacherId(''); },
+        onSuccess: () => { toast.success('Subject teacher assigned'); setShowAdd(false); setNewSubjectId(''); setNewTeacherId(''); },
         onError: () => toast.error('Failed to assign'),
       },
     );
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     if (!confirm('Remove this subject-teacher mapping?')) return;
-    deleteMutation.mutate(id, {
+    deleteMutation.mutate(id as any, {
       onSuccess: () => toast.success('Mapping removed'),
       onError: () => toast.error('Failed to remove'),
     });
@@ -340,11 +388,11 @@ function SubjectsTab({
       {showAdd && (
         <Card className="erp-card border-primary/20">
           <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
-            <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)}
+            <select value={newSubjectId} onChange={(e) => setNewSubjectId(e.target.value)}
               className="h-9 px-3 bg-background border border-input rounded-lg text-sm flex-1">
               <option value="">Select subject...</option>
               {availableSubjects.map((so) => (
-                <option key={so.id} value={so.subjectName}>{so.subjectName}</option>
+                <option key={so.id} value={String(so.id)}>{so.subjectName}</option>
               ))}
             </select>
             <select value={newTeacherId} onChange={(e) => setNewTeacherId(e.target.value)}
@@ -417,7 +465,7 @@ function ScheduleTab({
   sectionName: string;
 }) {
   const [editingCell, setEditingCell] = useState<{ day: string; slotId: number } | null>(null);
-  const [selectedSdId, setSelectedSdId] = useState<number>(0);
+  const [selectedSdId, setSelectedSdId] = useState<string>('');
 
   const createMutation = useCreateTimetableEntry();
   const updateMutation = useUpdateTimetableEntry();
@@ -444,9 +492,9 @@ function ScheduleTab({
   const handleCellClick = (day: string, slotId: number) => {
     const existing = ttGrid[day]?.[slotId];
     if (existing) {
-      setSelectedSdId(existing.teacherClassId);
+      setSelectedSdId(String(existing.classSubjectId));
     } else {
-      setSelectedSdId(0);
+      setSelectedSdId('');
     }
     setEditingCell({ day, slotId });
   };
@@ -456,7 +504,7 @@ function ScheduleTab({
     const { day, slotId } = editingCell;
     const existing = ttGrid[day]?.[slotId];
 
-    if (selectedSdId === 0 && existing) {
+    if (selectedSdId === '' && existing) {
       // Delete
       deleteMutation.mutate(existing.id, {
         onSuccess: () => { toast.success('Slot cleared'); setEditingCell(null); },
@@ -465,7 +513,7 @@ function ScheduleTab({
     } else if (selectedSdId && existing) {
       // Update
       updateMutation.mutate(
-        { id: existing.id, data: { teacherClassId: selectedSdId } },
+        { id: existing.id, data: { classSubjectId: selectedSdId } },
         {
           onSuccess: () => { toast.success('Slot updated'); setEditingCell(null); },
           onError: () => toast.error('Failed to update slot'),
@@ -474,7 +522,7 @@ function ScheduleTab({
     } else if (selectedSdId && !existing) {
       // Create
       createMutation.mutate(
-        { session: CURRENT_SESSION, teacherClassId: selectedSdId, periodId: slotId, dayOfWeek: day },
+        { session: CURRENT_SESSION, classSubjectId: String(selectedSdId), periodId: slotId, dayOfWeek: day },
         {
           onSuccess: () => { toast.success('Slot assigned'); setEditingCell(null); },
           onError: () => toast.error('Failed to assign slot'),
@@ -523,7 +571,7 @@ function ScheduleTab({
                   </td>
                   {DAYS.map((day) => {
                     const entry = ttGrid[day]?.[slot.id];
-                    const sd = entry ? sdMap.get(entry.teacherClassId) : undefined;
+                    const sd = entry ? sdMap.get(entry.classSubjectId) : undefined;
                     const isEditing = editingCell?.day === day && editingCell?.slotId === slot.id;
 
                     return (
@@ -531,11 +579,14 @@ function ScheduleTab({
                         onClick={() => !isEditing && handleCellClick(day, slot.id)}>
                         {isEditing ? (
                           <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                            <select value={selectedSdId} onChange={(e) => setSelectedSdId(Number(e.target.value))}
-                              className="w-full h-7 px-1 text-[10px] bg-background border border-input rounded text-center">
-                              <option value={0}>— Empty —</option>
-                              {sectionSubjects.map((sd) => (
-                                <option key={sd.id} value={sd.id}>{sd.subjectName}</option>
+                            <select
+                              value={selectedSdId}
+                              onChange={(e) => setSelectedSdId(e.target.value)}
+                              className="h-8 w-full text-xs rounded border border-border/50 bg-background px-1.5"
+                            >
+                              <option value="">- Clear -</option>
+                              {sectionSubjects.map((s) => (
+                                <option key={s.id} value={s.id}>{s.subjectName}</option>
                               ))}
                             </select>
                             <div className="flex gap-1 justify-center">

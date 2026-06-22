@@ -1,5 +1,6 @@
 import api from '../../lib/api';
 import { API_ENDPOINTS } from '../config';
+import { CURRENT_SESSION } from '../../lib/constants';
 import type {
   AdminSummary,
   AdminStudentFilters,
@@ -15,9 +16,9 @@ export const adminService = {
   getSummary: async (schoolId: string): Promise<AdminSummary> => {
     const [schoolRes, teachersRes, studentsRes, classesRes] = await Promise.all([
       api.get(API_ENDPOINTS.SCHOOL.BY_ID(schoolId)),
-      api.get(API_ENDPOINTS.TEACHER.LIST, { params: { schoolId, pageSize: 5 } }),
-      api.get(API_ENDPOINTS.STUDENT.LIST, { params: { schoolId, limit: 5 } }),
-      api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, { params: { schoolId } }),
+      api.get(API_ENDPOINTS.TEACHER.LIST, { params: { pageSize: 5 } }),
+      api.get(API_ENDPOINTS.STUDENT.LIST, { params: { limit: 5 } }),
+      api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, { params: { schoolId, session: CURRENT_SESSION } }),
     ]);
 
     // Defensive data extraction: common in this backend to wrap objects in 'data'
@@ -55,7 +56,7 @@ export const adminService = {
       kpis: [
         { label: 'Total Teachers', value: teacherCount, trendType: 'neutral', iconName: 'Users' },
         { label: 'Total Students', value: studentCount, trendType: 'neutral', iconName: 'GraduationCap' },
-        { label: 'Total Classes', value: classCount, trendType: 'neutral', iconName: 'Building2' },
+        // { label: 'Total Classes', value: classCount, trendType: 'neutral', iconName: 'Building2' },
       ],
       school: {
         id: schoolDataRaw?.id || schoolId,
@@ -77,13 +78,14 @@ export const adminService = {
     limit = 20,
     filters?: AdminTeacherFilters,
   ): Promise<AdminTeacherListResponse> => {
-    const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
-    if (filters) {
-      if (filters.schoolId) params.append('schoolId', filters.schoolId);
-      if (filters.subject) params.append('subject', filters.subject);
-      if (filters.status) params.append('status', filters.status);
-    }
-    const response = await api.get(`${API_ENDPOINTS.ADMIN.TEACHERS}?${params}`);
+    const { schoolId, ...rest } = filters || {};
+    const response = await api.get(API_ENDPOINTS.ADMIN.TEACHERS, {
+      params: {
+        page,
+        pageSize: limit,
+        ...rest,
+      }
+    });
     return response.data;
   },
 
@@ -114,7 +116,6 @@ export const adminService = {
   ): Promise<AdminStudentListResponse> => {
     const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
     if (filters) {
-      if (filters.schoolId) params.append('schoolId', filters.schoolId);
       if (filters.grade) params.append('grade', filters.grade);
       if (filters.class) params.append('class', filters.class);
       if (filters.status) params.append('status', filters.status);
@@ -139,8 +140,7 @@ export const adminService = {
   },
 
   getClasses: async (schoolId?: string) => {
-    const params = schoolId ? `?schoolId=${schoolId}` : '';
-    const response = await api.get(`${API_ENDPOINTS.ADMIN.CLASSES}${params}`);
-    return response.data;
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, { params: { schoolId, session: CURRENT_SESSION } });
+    return response.data?.data || response.data?.items || response.data;
   },
 };

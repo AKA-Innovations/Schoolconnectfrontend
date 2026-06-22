@@ -7,12 +7,12 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
-import { 
-  GraduationCap, 
-  Loader2, 
-  BookOpen, 
-  Users, 
-  BarChart3, 
+import {
+  GraduationCap,
+  Loader2,
+  BookOpen,
+  Users,
+  BarChart3,
   Shield,
   ChevronRight,
   Sparkles,
@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const setAuth = useAuthStore((state) => state.setAuth);
   const router = useRouter();
 
@@ -138,28 +138,28 @@ export default function LoginPage() {
         <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-indigo-50 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2" />
       </div>
 
-      <div className="relative z-10 flex flex-col lg:flex-row flex-1">
-        
+      <div className="relative z-10 flex flex-col lg:flex-row flex-1 w-full">
+
         {/* LEFT SIDE: Branding & Value Prop */}
-        <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-20">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 pt-12 pb-6 lg:py-12 lg:px-20">
           <div className="max-w-xl mx-auto lg:mx-0">
             {/* Logo */}
-            <div className="flex items-center gap-3 mb-10 group">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+            <div className="flex items-center gap-3 mb-6 lg:mb-10 group">
+              <div className="w-12 h-12 bg-[#00A99D] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
                 <GraduationCap className="w-7 h-7 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 leading-none">SkoolConnect</h1>
-                <span className="text-[10px] uppercase tracking-widest font-bold text-blue-600">Enterprise Edition</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-[#00A99D]">Enterprise Edition</span>
               </div>
             </div>
 
             <div className="space-y-6">
-              <h2 className="text-4xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 Managing education <br />
-                <span className="text-blue-600">made simple.</span>
+                <span className="text-[#00A99D]">made simple.</span>
               </h2>
-              <p className="text-lg text-slate-500 leading-relaxed max-w-md">
+              <p className="text-base sm:text-lg text-slate-500 leading-relaxed max-w-md">
                 The all-in-one platform designed to empower educators and inspire students through seamless administration.
               </p>
 
@@ -182,18 +182,18 @@ export default function LoginPage() {
         </div>
 
         {/* RIGHT SIDE: Login Form */}
-        <div className="flex-1 flex items-center justify-center px-4 py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
-          <Card  className="cardprime w-full max-w-105 rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
+        <div className="w-full lg:w-1/2 flex items-center justify-center px-4 pb-12 pt-6 lg:py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
+          <Card className="cardprime w-full max-w-md rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
             <CardHeader className="space-y-1 text-center pb-8">
               <CardTitle className="text-2xl font-bold text-slate-900">Dashboard Login</CardTitle>
               <CardDescription className="text-slate-500">Enter your official credentials below</CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
-                  <Input 
+                  <Input
                     id="username"
                     placeholder="john.doe@school.edu"
                     value={username}
@@ -206,12 +206,12 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                    <button type="button" className="text-xs text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+                    <button type="button" className="text-xs text-[#00A99D] hover:text-[#00A99D] font-semibold transition-colors">
                       Reset Password?
                     </button>
                   </div>
                   <div className="relative">
-                    <Input 
+                    <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
                       value={password}
@@ -236,9 +236,9 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <Button 
+                <Button
                   disabled={isLoading}
-                  className="w-full h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                  className="w-full h-12 text-base font-bold bg-[#00A99D] hover:bg-[#00897B] text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
                 >
                   {isLoading ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
@@ -265,9 +265,9 @@ export default function LoginPage() {
             </div>
           </div>
           <nav className="flex gap-8 text-[13px] font-semibold text-slate-500">
-            <a href="#" className="hover:text-blue-600 transition-colors">Documentation</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Contact</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Documentation</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Privacy</a>
+            <a href="#" className="hover:text-[#00A99D] transition-colors">Contact</a>
           </nav>
         </div>
       </footer>

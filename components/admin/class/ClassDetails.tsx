@@ -6,15 +6,41 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useClass, useClasses, useDeleteClass } from '@/hooks/useClasses';
+import { useTeacher } from '@/hooks/useTeachers';
 import { ArrowLeft, Edit2, Trash2, Users, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+function ClassTeacherDetailsCard({ classTeacherId, initialName }: { classTeacherId: string; initialName?: string | null }) {
+  const { data: teacher } = useTeacher(classTeacherId);
+
+  return (
+    <Card className="rounded-2xl border-border shadow-sm">
+      <CardHeader className="border-b border-border/50 bg-muted/10">
+        <CardTitle className="text-lg font-bold">Class Teacher</CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Users className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Teacher Name</p>
+            <h3 className="text-base font-bold text-slate-800 mt-0.5">
+              {teacher ? `${teacher.firstName} ${teacher.lastName}` : (initialName || 'Loading...')}
+            </h3>
+            <p className="text-xs text-muted-foreground/70 font-mono mt-1">ID: {classTeacherId}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function ClassDetails() {
   const params = useParams();
   const router = useRouter();
   const classDtlsId = parseInt(params?.id as string);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: classData, isLoading: classLoading } = useClass(classDtlsId);
   const { data: classesData, isLoading: sectionsLoading } = useClasses();
@@ -22,17 +48,6 @@ export function ClassDetails() {
     () => (classesData?.items || []).filter((c) => c.className === classData?.className),
     [classesData, classData?.className],
   );
-  const deleteClassMutation = useDeleteClass();
-
-  const handleDelete = () => {
-    deleteClassMutation.mutate(classDtlsId, {
-      onSuccess: () => {
-        toast.success('Class deleted successfully');
-        router.push('/dashboard/admin/class');
-      },
-      onError: () => toast.error('Failed to delete class'),
-    });
-  };
 
   if (classLoading) {
     return (
@@ -86,14 +101,6 @@ export function ClassDetails() {
             <Edit2 className="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button
-            variant="outline"
-            className="rounded-xl text-destructive hover:bg-destructive/10"
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
         </div>
       </div>
 
@@ -138,22 +145,7 @@ export function ClassDetails() {
 
       {/* Class Teacher */}
       {classData.classTeacherId && (
-        <Card className="rounded-2xl border-border shadow-sm">
-          <CardHeader className="border-b border-border/50 bg-muted/10">
-            <CardTitle className="text-lg font-bold">Class Teacher</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Teacher ID</p>
-                <p className="font-bold text-foreground font-mono text-sm">{classData.classTeacherId}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <ClassTeacherDetailsCard classTeacherId={classData.classTeacherId} initialName={(classData as any).classTeacherName || (classData as any).teacherName} />
       )}
 
       {/* All Sections of this class */}
@@ -198,38 +190,6 @@ export function ClassDetails() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-96 rounded-2xl">
-            <CardHeader className="bg-muted/10 border-b border-border/50">
-              <CardTitle className="text-lg font-bold">Delete Class Section</CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground mb-6">
-                Are you sure you want to delete {classData.className} – {classData.sectionName}? This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="rounded-xl"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={deleteClassMutation.isPending}
-                  className="rounded-xl"
-                >
-                  {deleteClassMutation.isPending ? 'Deleting...' : 'Delete'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

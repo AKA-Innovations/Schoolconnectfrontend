@@ -3,42 +3,23 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useClasses } from '@/hooks/useClasses';
+import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
 import { Users, BookOpen, Loader } from 'lucide-react';
 
 export function ClassSectionExplorer() {
-  const [selectedClassName, setSelectedClassName] = useState<string | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
 
-  const { data: classesData, isLoading: classesLoading } = useClasses();
+  const { data: classes = [], isLoading: classesLoading } = useSchoolClasses();
+  const { data: sections = [], isLoading: sectionsLoading } = useSchoolSections(selectedClassId ?? undefined);
 
-  const allRecords = classesData?.items || [];
-  const sections = useMemo(
-    () => allRecords.filter((r) => r.className === selectedClassName),
-    [allRecords, selectedClassName],
-  );
-  const sectionsLoading = classesLoading;
-
-  // Deduplicate class names for the left-sidebar list
-  const uniqueClassNames = useMemo(
-    () => Array.from(new Set(allRecords.map((r) => r.className))).sort(),
-    [allRecords],
-  );
-
-  // Count sections per class name from the flat list
-  const sectionCountByClass = useMemo(() => {
-    const map: Record<string, number> = {};
-    allRecords.forEach((r) => {
-      map[r.className] = (map[r.className] ?? 0) + 1;
-    });
-    return map;
-  }, [allRecords]);
+  const selectedClass = classes.find(c => c.id === selectedClassId);
 
   // Auto-select first class on load
   React.useEffect(() => {
-    if (uniqueClassNames.length > 0 && !selectedClassName) {
-      setSelectedClassName(uniqueClassNames[0]);
+    if (classes.length > 0 && !selectedClassId) {
+      setSelectedClassId(classes[0].id);
     }
-  }, [uniqueClassNames, selectedClassName]);
+  }, [classes, selectedClassId]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
@@ -60,31 +41,22 @@ export function ClassSectionExplorer() {
               <div className="p-6 text-center">
                 <Loader className="h-5 w-5 mx-auto animate-spin text-muted-foreground" />
               </div>
-            ) : uniqueClassNames.length === 0 ? (
+            ) : classes.length === 0 ? (
               <div className="p-6 text-center text-muted-foreground">No classes found</div>
             ) : (
               <div className="space-y-1 p-4">
-                {uniqueClassNames.map((className) => (
+                {classes.map((cls) => (
                   <button
-                    key={className}
-                    onClick={() => setSelectedClassName(className)}
+                    key={cls.id}
+                    onClick={() => setSelectedClassId(cls.id)}
                     className={`w-full text-left px-4 py-3 rounded-lg transition-colors font-medium text-sm ${
-                      selectedClassName === className
+                      selectedClassId === cls.id
                         ? 'bg-primary text-primary-foreground'
                         : 'hover:bg-muted text-foreground'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span>{className}</span>
-                      <Badge
-                        className={`text-xs ${
-                          selectedClassName === className
-                            ? 'bg-white/30 text-white'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {sectionCountByClass[className] ?? 0}
-                      </Badge>
+                      <span>{cls.className}</span>
                     </div>
                   </button>
                 ))}
@@ -96,12 +68,12 @@ export function ClassSectionExplorer() {
         {/* Right Panel - Sections and Details */}
         <div className="lg:col-span-3 space-y-6">
           {/* Class Summary Card */}
-          {selectedClassName && (
+          {selectedClass && (
             <Card className="rounded-2xl border-border shadow-sm bg-gradient-to-r from-primary/5 to-primary/10">
               <CardContent className="p-8">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-3xl font-bold text-foreground">{selectedClassName}</h3>
+                    <h3 className="text-3xl font-bold text-foreground">{selectedClass.className}</h3>
                     <p className="text-sm text-muted-foreground mt-2">
                       {sections.length} section{sections.length !== 1 ? 's' : ''} in this class
                     </p>
@@ -142,30 +114,15 @@ export function ClassSectionExplorer() {
                             </p>
                           </div>
                           <Badge className="bg-blue-500/10 text-blue-600 border-0">
-                            {section.maxLimit != null ? `${section.maxLimit} max` : 'No limit'}
+                            Master
                           </Badge>
                         </div>
 
                         {/* Section Details */}
                         <div className="space-y-3 pt-2 border-t border-border/50">
-                          <div>
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                              Max Limit
-                            </p>
-                            <p className="font-semibold text-foreground mt-1">{section.maxLimit ?? '-'}</p>
-                          </div>
-
-                          {section.classTeacherId && (
-                            <div>
-                              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                                Class Teacher ID
-                              </p>
-                              <p className="font-mono text-xs text-foreground mt-1 flex items-center gap-2">
-                                <Users className="h-4 w-4 text-primary/60" />
-                                {section.classTeacherId}
-                              </p>
-                            </div>
-                          )}
+                          <p className="text-xs text-muted-foreground italic">
+                            This is a master section. Use Classes Overview to configure limits and teachers.
+                          </p>
                         </div>
                       </div>
                     </CardContent>

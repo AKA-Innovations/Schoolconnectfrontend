@@ -42,14 +42,27 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+import { toast } from 'sonner';
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined') {
+      const status = error.response?.status;
+      
+      if (status === 401) {
+        useAuthStore.getState().clearAuth();
+        document.cookie = 'auth-token=; Max-Age=0; path=/';
+        document.cookie = 'user-role=; Max-Age=0; path=/';
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';
+      } else if (status === 403) {
+        toast.error('Access Denied: You do not have permission to access this resource.');
+      } else if (status === 500) {
+        toast.error('Internal Server Error: Please try again later.');
+      } else if (!error.response) {
+        toast.error('Network Connection Error: Please check your network connectivity.');
       }
     }
     return Promise.reject(error);

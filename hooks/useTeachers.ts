@@ -14,8 +14,8 @@ export function useTeacherList(filters: TeacherFilterParams) {
   return useQuery({
     queryKey: teacherKeys.list(filters),
     queryFn: () => teacherService.listTeachers(filters),
-    enabled: !!filters.schoolId,
-    placeholderData: (prev) => prev, // keep previous data visible while new page loads
+    enabled: true, // School ID is not required for this endpoint
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -167,7 +167,7 @@ export function useRemoveClassTeacher() {
 export function useAddCoordinatorClass() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { teacherId: string; classDtlsId: number }) =>
+    mutationFn: (data: { session: string; teacherId: string; className: string }) =>
       teacherService.addCoordinatorClass(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: teacherKeys.all }),
   });

@@ -52,11 +52,17 @@ export interface Teacher {
   joiningDate: string;
   dateOfBirth: string;
   gender: string;
+  bloodGroup?: string;
+  maritalStatus?: string;
+  nationality?: string;
   isPrincipal: boolean;
   isCoordinator: boolean;
   isClassTeacher: boolean;
   isSubjectTeacher: boolean;
   classTeacherAssignment?: ClassTeacherAssignmentDetails | null;
+  classTeacherClass?: ClassTeacherAssignmentDetails | null;
+  /** Convenience alias for schoolRecords[0] */
+  schoolRecord?: SchoolRecord;
   profileImageUrl?: string;
   addresses?: Address[];
   schoolRecords?: SchoolRecord[];
@@ -68,6 +74,9 @@ export interface Teacher {
 
 export interface TeacherClass {
   id?: number;
+  classId?: number;
+  classSectionId?: number;
+  subjectId?: number;
   className: string;
   sectionName: string;
   subjectName: string;
@@ -101,6 +110,21 @@ export interface TeacherRegistrationData {
   classes: TeacherClass[];
   classTeacherClass?: { className: string; sectionName: string };
   coordinatorClasses?: string[];
+  bloodGroup?: string;
+  maritalStatus?: string;
+  nationality?: string;
+  religion?: string;
+  highestQualification?: string;
+  specialization?: string;
+  university?: string;
+  passingYear?: string;
+  designation?: string;
+  totalExperience?: string;
+  previousSchool?: string;
+  fatherName?: string;
+  motherName?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface TeacherUpdateDetails {
@@ -180,6 +204,7 @@ export interface SchoolRecord {
   employeeId: string;
   joiningDate: string;
   employeeEmail: string;
+  isActive?: boolean;
 }
 
 export interface DashboardSummary {

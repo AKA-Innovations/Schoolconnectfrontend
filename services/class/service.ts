@@ -2,12 +2,21 @@ import api from '../../lib/api';
 import { API_ENDPOINTS } from '../config';
 import type {
   ClassDetails,
+  SchoolClass,
+  SchoolSection,
+  CreateSchoolClassPayload,
+  CreateSchoolSectionPayload,
+  UpdateSchoolSectionPayload,
+  ClassTeacherMapping,
+  ClassSubjectMapping,
+  CreateClassTeacherMappingPayload,
+  CreateClassSubjectMappingPayload,
+  CreateSubjectBulkPayload,
   ClassTeacher,
   ClassSectionItem,
   CreateClassPayload,
   CreatePeriodSlotPayload,
   CreateSubjectDetailPayload,
-  CreateSubjectOptionPayload,
   CreateTimetablePayload,
   UpdateClassPayload,
   ClassListResponse,
@@ -17,6 +26,7 @@ import type {
   SubjectDetail,
   SubjectOption,
   TimetableEntry,
+  TimetableFilterParams,
 } from './types';
 
 function buildPage<T>(
@@ -40,17 +50,29 @@ function buildPage<T>(
 }
 
 export const classService = {
+  // ─── Class Details (class-dtls) ───────────────────────────────────────────
+
   getClasses: async (params?: {
     page?: number;
     limit?: number;
     className?: string;
     schoolId?: string;
+    session?: string;
   }): Promise<ClassListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
-      params: { schoolId: params?.schoolId },
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, {
+      params: { schoolId: params?.schoolId, session: params?.session },
     });
     const rawClasses = response.data;
-    let all: ClassDetails[] = Array.isArray(rawClasses) ? rawClasses : Array.isArray(rawClasses?.data) ? rawClasses.data : [];
+    let all: ClassDetails[] = [];
+    if (Array.isArray(rawClasses)) {
+      all = rawClasses;
+    } else if (Array.isArray(rawClasses?.classDtls)) {
+      all = rawClasses.classDtls;
+    } else if (Array.isArray(rawClasses?.data)) {
+      all = rawClasses.data;
+    } else if (Array.isArray(rawClasses?.items)) {
+      all = rawClasses.items;
+    }
 
     if (params?.className) {
       const q = params.className.toLowerCase();
@@ -61,17 +83,30 @@ export const classService = {
   },
 
   getClass: async (classDtlsId: number, schoolId?: string): Promise<ClassDetails> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, {
       params: { schoolId },
     });
     const raw = response.data;
-    const all: ClassDetails[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+    const all: ClassDetails[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.classDtls)
+        ? raw.classDtls
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw?.items)
+            ? raw.items
+            : [];
     const found = all.find((r) => r.id === classDtlsId);
-    if (!found) throw new Error('Class not found');
+    if (!found) throw new Error('Class mapping not found');
     return found;
   },
 
   createClass: async (data: CreateClassPayload): Promise<ClassDetails> => {
+    const response = await api.post(API_ENDPOINTS.CLASS.CLASS_DTLS, data);
+    return response.data;
+  },
+
+  createClassTeacherMapping: async (data: CreateClassTeacherMappingPayload): Promise<ClassTeacherMapping> => {
     const response = await api.post(API_ENDPOINTS.CLASS.CLASS_DTLS, data);
     return response.data;
   },
@@ -85,12 +120,43 @@ export const classService = {
     await api.delete(API_ENDPOINTS.CLASS.CLASS_DTLS_BY_ID(classDtlsId));
   },
 
-  getSectionsByClassName: async (className: string, schoolId?: string): Promise<string[]> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.SECTIONS, {
-      params: { className, schoolId },
+  /** Returns class-dtls records as ClassSectionItem[] (full class+section objects with id) */
+  getClassSectionLists: async (schoolId?: string, session?: string, classId?: number): Promise<ClassSectionItem[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, {
+      params: { schoolId, session, classId },
     });
-    const raw = response.data;
-    return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.classDtls && Array.isArray(raw.classDtls)) return raw.classDtls;
+    if (raw?.sections && Array.isArray(raw.sections)) return raw.sections;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.items && Array.isArray(raw.items)) return raw.items;
+    return [];
+  },
+
+  /** Returns distinct section names for a class from master list */
+  getSectionsByClassName: async (className: string, schoolId?: string): Promise<string[]> => {
+    // 1. Get classId from master classes
+    const classes = await classService.getSchoolClasses(schoolId || '');
+    const cls = classes.find((c) => c.className === className);
+    if (!cls) return [];
+
+    // 2. Get sections for that classId
+    const sections = await classService.getSchoolSections(schoolId || '', cls.id);
+    return sections.map((s) => s.sectionName);
+  },
+
+  /** Returns distinct class names from school/fetch/classes */
+  getClassList: async (schoolId?: string): Promise<string[]> => {
+    const res = await api.get(API_ENDPOINTS.SCHOOL.FETCH_CLASSES, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    if (raw?.classes && Array.isArray(raw.classes)) {
+      return raw.classes.map((c: any) => c.className || c);
+    }
+    if (Array.isArray(raw)) return raw.map((c: any) => c.className || c);
+    return [];
   },
 
   getClassTeachers: async (params?: {
@@ -100,17 +166,19 @@ export const classService = {
     teacherName?: string;
     schoolId?: string;
   }): Promise<ClassTeacherListResponse> => {
-    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, {
+    const response = await api.get(API_ENDPOINTS.CLASS.CLASS_DTLS, {
       params: { schoolId: params?.schoolId },
     });
     const raw = response.data;
     const all: any[] = Array.isArray(raw)
       ? raw
-      : Array.isArray(raw?.items)
-      ? raw.items
-      : Array.isArray(raw?.data)
-      ? raw.data
-      : [];
+      : Array.isArray(raw?.classDtls)
+        ? raw.classDtls
+        : Array.isArray(raw?.items)
+          ? raw.items
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
 
     // Only entries that have a class teacher assigned
     let teacherEntries: ClassTeacher[] = all
@@ -120,7 +188,7 @@ export const classService = {
         sectionName: c.sectionName,
         maxLimit: c.maxLimit ?? null,
         classTeacherId: c.classTeacherId,
-        teacherName: c.classTeacherName ?? null,
+        teacherName: c.classTeacherName ?? c.teacherName ?? null,
         teacherMobile: c.classTeacherMobileNumber ?? null,
       }));
 
@@ -137,8 +205,8 @@ export const classService = {
     return buildPage(teacherEntries, params?.page, params?.limit);
   },
 
-  getClassSummary: async (schoolId?: string): Promise<ClassSummary> => {
-    const classesRes = await classService.getClasses({ schoolId });
+  getClassSummary: async (schoolId?: string, session?: string): Promise<ClassSummary> => {
+    const classesRes = await classService.getClasses({ schoolId, session });
 
     const allClasses = classesRes.items;
     const uniqueClassNames = new Set(allClasses.map((c) => c.className));
@@ -153,77 +221,94 @@ export const classService = {
     };
   },
 
-  // ─── Class API endpoints (new /class/* routes) ─────────────────────────────
+  // ─── Subject Master (subject-dtls) ─────────────────────────────────────────
 
-  getClassList: async (schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASSES, { params: { schoolId } });
+  /** Returns all subjects (session-global, not class-scoped) */
+  getSubjectOptions: async (schoolId?: string, searchText?: string): Promise<SubjectOption[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS, {
+      params: { schoolId, searchText },
+    });
     const raw = res.data;
-    return Array.isArray(raw) ? raw : raw?.classes ?? raw?.data ?? [];
+    if (Array.isArray(raw)) return raw;
+    if (raw?.subjects && Array.isArray(raw.subjects)) return raw.subjects;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
-  getSections: async (className: string, schoolId?: string): Promise<string[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SECTIONS, { params: { className, schoolId } });
-    const raw = res.data;
-    return Array.isArray(raw) ? raw : raw?.sections ?? raw?.data ?? [];
-  },
-
-  getCombinations: async (schoolId?: string): Promise<any[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.COMBINATIONS, { params: { schoolId } });
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-  },
-
-  getClassSectionLists: async (schoolId?: string): Promise<ClassSectionItem[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SECTION_LISTS, { params: { schoolId } });
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-  },
-
-  // ─── Subject Options ──────────────────────────────────────────────────────
-
-  getSubjectOptions: async (): Promise<SubjectOption[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-  },
-
-  createSubjectOption: async (data: CreateSubjectOptionPayload): Promise<SubjectOption> => {
-    const res = await api.post(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS, data);
-    return res.data;
-  },
-
-  updateSubjectOption: async (id: number, data: Partial<CreateSubjectOptionPayload>): Promise<SubjectOption> => {
-    const res = await api.put(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS_BY_ID(id), data);
-    return res.data;
-  },
-
-  deleteSubjectOption: async (id: number): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.SUBJECT_OPTIONS_BY_ID(id));
-  },
-
-  // ─── Teacher-Subject Mapping (subject-dtls) ───────────────────────────────
-
-  getSubjectDetails: async (): Promise<SubjectDetail[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-  },
-
-  createSubjectDetail: async (data: CreateSubjectDetailPayload): Promise<SubjectDetail> => {
+  createSubjectBulk: async (data: CreateSubjectBulkPayload): Promise<any> => {
     const res = await api.post(API_ENDPOINTS.CLASS.SUBJECT_DTLS, data);
     return res.data;
   },
 
-  updateSubjectDetail: async (id: number, data: Partial<CreateSubjectDetailPayload>): Promise<SubjectDetail> => {
+  updateSubjectOption: async (id: number, data: Partial<{ subjectName: string; subjectCode: string }>): Promise<SubjectOption> => {
     const res = await api.put(API_ENDPOINTS.CLASS.SUBJECT_DTLS_BY_ID(id), data);
     return res.data;
   },
 
-  deleteSubjectDetail: async (id: number): Promise<void> => {
+  deleteSubjectOption: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.CLASS.SUBJECT_DTLS_BY_ID(id));
+  },
+
+  // ─── Teacher-Subject Mapping (class-subject-dtls) ─────────────────────────
+
+  getSubjectDetails: async (
+    options?: { schoolId?: string; teacherId?: string; session?: string; classSectionId?: number }
+  ): Promise<SubjectDetail[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, {
+      params: {
+        schoolId: options?.schoolId,
+        teacherId: options?.teacherId,
+        session: options?.session,
+        classSectionId: options?.classSectionId,
+      },
+    });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.classSubjectDtls && Array.isArray(raw.classSubjectDtls)) return raw.classSubjectDtls;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.entries && Array.isArray(raw.entries)) return raw.entries;
+    if (raw?.mappings && Array.isArray(raw.mappings)) return raw.mappings;
+    return [];
+  },
+
+  createClassSubjectMapping: async (data: CreateClassSubjectMappingPayload): Promise<any> => {
+    const res = await api.post(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, data);
+    return res.data;
+  },
+
+  /** Legacy: create a single teacher-subject-class mapping */
+  createSubjectDetail: async (data: any): Promise<SubjectDetail> => {
+    // If it's already in { entries: [...] } format, send as is. Otherwise wrap.
+    const payload = (data && typeof data === 'object' && 'entries' in data) ? data : { entries: [data] };
+    const res = await api.post(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS, payload);
+    return res.data;
+  },
+
+  updateSubjectDetail: async (id: number, data: Partial<CreateSubjectDetailPayload>): Promise<SubjectDetail> => {
+    const res = await api.put(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS_BY_ID(id), data);
+    return res.data;
+  },
+
+  deleteSubjectDetail: async (id: number): Promise<void> => {
+    await api.delete(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS_BY_ID(id));
+  },
+
+  getStudentSubjectDetails: async (): Promise<SubjectDetail[]> => {
+    const res = await api.get('/class/subject-dtls/student');
+    const raw = res.data;
+    return Array.isArray(raw) ? raw : (raw?.subjects || raw?.data || []);
   },
 
   // ─── Period Slots ─────────────────────────────────────────────────────────
 
-  getPeriodSlots: async (): Promise<PeriodSlot[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.PERIOD_SLOTS);
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+  getPeriodSlots: async (schoolId?: string): Promise<PeriodSlot[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.PERIOD_SLOTS, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
   },
 
   createPeriodSlot: async (data: CreatePeriodSlotPayload): Promise<PeriodSlot> => {
@@ -242,30 +327,95 @@ export const classService = {
 
   // ─── Timetable ────────────────────────────────────────────────────────────
 
-  getTimetable: async (params?: { session?: string; teacherClassId?: number; dayOfWeek?: string }): Promise<TimetableEntry[]> => {
-    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE, { params });
-    return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+  getTimetable: async (params?: TimetableFilterParams): Promise<TimetableEntry[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE_FETCH, { params });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.timetable && Array.isArray(raw.timetable)) return raw.timetable;
+    if (raw?.items && Array.isArray(raw.items)) return raw.items;
+    return [];
   },
 
   createTimetableEntry: async (data: CreateTimetablePayload): Promise<TimetableEntry> => {
+    // Backend expects an array even for single entries
+    const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, [data]);
+    return Array.isArray(res.data) ? res.data[0] : res.data;
+  },
+
+  createTimetableBulk: async (data: CreateTimetablePayload[]): Promise<TimetableEntry[]> => {
     const res = await api.post(API_ENDPOINTS.CLASS.TIMETABLE, data);
     return res.data;
   },
 
-  createTimetableBulk: async (data: CreateTimetablePayload[]): Promise<TimetableEntry[]> => {
-    // Backend only accepts single creates, so fire them in parallel
-    const results = await Promise.all(
-      data.map((entry) => api.post(API_ENDPOINTS.CLASS.TIMETABLE, entry).then((r) => r.data))
-    );
-    return results;
-  },
-
-  updateTimetableEntry: async (id: number, data: Partial<CreateTimetablePayload>): Promise<TimetableEntry> => {
-    const res = await api.put(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id), data);
+  updateTimetableEntry: async (id: number | string, data: Partial<CreateTimetablePayload>): Promise<TimetableEntry> => {
+    const res = await api.put(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id as any), data);
     return res.data;
   },
 
-  deleteTimetableEntry: async (id: number): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id));
+  deleteTimetableEntry: async (id: number | string): Promise<void> => {
+    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id as any));
+  },
+
+  fetchTimetable: async (params: any): Promise<TimetableEntry[]> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE_FETCH, { params });
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (raw?.timetable && Array.isArray(raw.timetable)) return raw.timetable;
+    if (raw?.items && Array.isArray(raw.items)) return raw.items;
+    return [];
+  },
+
+  // ─── School Classes & Sections ─────────────────────────────────────────────
+
+  getSchoolClasses: async (schoolId: string): Promise<SchoolClass[]> => {
+    const res = await api.get(API_ENDPOINTS.SCHOOL.FETCH_CLASSES, {
+      params: { schoolId },
+    });
+    const raw = res.data;
+    if (raw?.classes && Array.isArray(raw.classes)) return raw.classes;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (Array.isArray(raw)) return raw;
+    return [];
+  },
+
+  createSchoolClasses: async (data: CreateSchoolClassPayload): Promise<any> => {
+    const res = await api.post(API_ENDPOINTS.SCHOOL.CLASSES, data);
+    return res.data;
+  },
+
+  getSchoolSections: async (schoolId: string, classId?: number): Promise<SchoolSection[]> => {
+    const res = await api.get(API_ENDPOINTS.SCHOOL.FETCH_SECTIONS, {
+      params: { schoolId, classId },
+    });
+    const raw = res.data;
+    if (raw?.sections && Array.isArray(raw.sections)) return raw.sections;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    if (Array.isArray(raw)) return raw;
+    return [];
+  },
+
+  createSchoolSections: async (data: CreateSchoolSectionPayload): Promise<any> => {
+    const res = await api.post(API_ENDPOINTS.SCHOOL.SECTIONS, data);
+    return res.data;
+  },
+
+  updateSchoolSection: async (id: number, data: UpdateSchoolSectionPayload): Promise<any> => {
+    const res = await api.put(API_ENDPOINTS.SCHOOL.SECTION_UPDATE(id), data);
+    return res.data;
+  },
+
+  deleteSchoolSection: async (id: number): Promise<void> => {
+    await api.delete(API_ENDPOINTS.SCHOOL.SECTION_DELETE(id));
+  },
+
+  updateSchoolClass: async (id: number, className: string): Promise<any> => {
+    const res = await api.put(API_ENDPOINTS.SCHOOL.CLASS_UPDATE(id), { className });
+    return res.data;
+  },
+
+  deleteSchoolClass: async (id: number): Promise<void> => {
+    await api.delete(API_ENDPOINTS.SCHOOL.CLASS_DELETE(id));
   },
 };

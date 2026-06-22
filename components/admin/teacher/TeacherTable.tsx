@@ -16,8 +16,8 @@ type Props = {
   page: number;
   totalPages: number;
   onView: (t: Teacher) => void;
-  onEdit: (t: Teacher) => void;
-  onToggleStatus: (id: string, isActive: boolean) => void;
+  onEdit?: (t: Teacher) => void;
+  onToggleStatus?: (id: string, isActive: boolean) => void;
   onPageChange: (p: number) => void;
 };
 
@@ -54,7 +54,11 @@ export function TeacherTable({ teachers, isLoading, page, totalPages, onView, on
                 </TableCell>
               </TableRow>
             ) : teachers.map(teacher => (
-              <TableRow key={teacher.id} className="group transition-colors hover:bg-indigo-50/30 border-b border-slate-50">
+              <TableRow 
+                key={teacher.id} 
+                onClick={() => onView(teacher)}
+                className="group transition-colors hover:bg-indigo-50/30 border-b border-slate-50 cursor-pointer"
+              >
                 <TableCell className="py-5 pl-8">
                   <div className="flex items-center gap-4">
                     <div className="h-11 w-11 rounded-2xl bg-primary hover:bg-primary-hover flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
@@ -89,22 +93,26 @@ export function TeacherTable({ teachers, isLoading, page, totalPages, onView, on
                     {teacher.status || 'Active'}
                   </div>
                 </TableCell>
-                <TableCell className="text-right pr-8">
+                <TableCell className="text-right pr-8" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onView(teacher)}>
                       <Eye size={16} className="text-slate-400" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onEdit(teacher)}>
-                      <Edit size={16} className="text-slate-400" />
-                    </Button>
-                    {teacher.status === 'active' ? (
-                      <Button variant="ghost" size="icon" title="Deactivate" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onToggleStatus(teacher.id, false)}>
-                        <UserX size={16} />
+                    {onEdit && (
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={() => onEdit(teacher)}>
+                        <Edit size={16} className="text-slate-400" />
                       </Button>
-                    ) : (
-                      <Button variant="ghost" size="icon" title="Activate" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-500" onClick={() => onToggleStatus(teacher.id, true)}>
-                        <UserCheck size={16} />
-                      </Button>
+                    )}
+                    {onToggleStatus && (
+                      teacher.status === 'active' ? (
+                        <Button variant="ghost" size="icon" title="Deactivate" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onToggleStatus(teacher.id, false)}>
+                          <UserX size={16} />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" title="Activate" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-500" onClick={() => onToggleStatus(teacher.id, true)}>
+                          <UserCheck size={16} />
+                        </Button>
+                      )
                     )}
                   </div>
                 </TableCell>

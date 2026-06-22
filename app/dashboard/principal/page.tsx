@@ -1,119 +1,231 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useMemo, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useClassSectionLists, useSubjectDetails } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
+import { useStudentList } from '@/hooks/useStudents';
+import { useHomeworks, useClassworks, useTeachingProgressList } from '@/hooks/useAcademic';
+import { useExams, useExamSchedules } from '@/services/exam/queries';
 import { useAuthStore } from '@/store/authStore';
+import { CURRENT_SESSION } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  GraduationCap, Users, BookOpen, ShieldCheck,
-  TrendingUp, AlertCircle,
+  ShieldCheck, Users, GraduationCap, BookOpen,
+  AlertCircle, Activity, LayoutGrid, FileText,
+  RefreshCw,
 } from 'lucide-react';
+
+// Sub-components
+import { OverviewTab } from './OverviewTab';
+import { AcademicTab } from './AcademicTab';
+import { TeachersTab } from './TeachersTab';
+import { StudentsTab } from './StudentsTab';
+import { ExamsTab } from './ExamsTab';
+import { ClassDetailTab } from './ClassDetailTab';
+import TimetablePage from '@/app/dashboard/admin/class/timetable/page';
+
+// ─── Skeleton helpers ─────────────────────────────────────────────────────────
+function KpiSkeleton() {
+  return (
+    <div className="p-5 flex items-center gap-4 animate-pulse">
+      <div className="h-12 w-12 rounded-2xl bg-slate-100" />
+      <div className="space-y-2 flex-1">
+        <div className="h-6 w-16 bg-slate-100 rounded-lg" />
+        <div className="h-3 w-24 bg-slate-50 rounded" />
+      </div>
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="space-y-3 p-6">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-4 animate-pulse">
+          {Array.from({ length: cols }).map((_, j) => (
+            <div key={j} className="h-5 bg-slate-50 rounded flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const DAY_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Last 3 Days', value: '3' },
+  { label: 'Last 7 Days', value: '7' },
+  { label: 'Last 30 Days', value: '30' },
+];
+
+function isWithinDays(dateStr: string, days: string): boolean {
+  if (days === 'all') return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
+  if (days === 'today') {
+    const todayStr = now.toISOString().split('T')[0];
+    return dateStr.startsWith(todayStr);
+  }
+  const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+  return diff <= parseInt(days);
+}
 
 export default function PrincipalDashboard() {
   const schoolId = useAuthStore((s) => s.schoolId);
+  const user = useAuthStore((s) => s.user);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const activeTab = searchParams.get('tab') || 'overview';
+  const sub = searchParams.get('sub') || '';
 
-  const { data: classSections = [],   isLoading: loadingClasses }   = useClassSectionLists();
-  const { data: subjectDetails  = [], isLoading: loadingSubjects }   = useSubjectDetails();
-  const { data: teachersData,         isLoading: loadingTeachers }   = useTeacherList({ schoolId: schoolId ?? '', page: 1, pageSize: 500 });
-  const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
+  // ── Data Queries ──────────────────────────────────────────────────────────
+  const { data: classSections = [], isLoading: loadingClasses, refetch: refetchClasses } = useClassSectionLists();
+  const { data: subjectDetails = [], isLoading: loadingSubjects, refetch: refetchSubjects } = useSubjectDetails();
+  const { data: teachersData, isLoading: loadingTeachers, refetch: refetchTeachers } = useTeacherList({ schoolId: schoolId ?? '', page: 1, pageSize: 500 });
+  const { data: studentsData, isLoading: loadingStudents, refetch: refetchStudents } = useStudentList({ schoolId: schoolId ?? '', page: 1, limit: 500 });
+  const { data: allHomeworks = [], isLoading: loadingHomework, refetch: refetchHW } = useHomeworks();
+  const { data: allClassworks = [], isLoading: loadingClasswork, refetch: refetchCW } = useClassworks();
+  const { data: allProgress = [], isLoading: loadingProgress, refetch: refetchProgress } = useTeachingProgressList();
+  const { data: exams = [], isLoading: loadingExams } = useExams(CURRENT_SESSION);
+  const { data: examSchedules = [], isLoading: loadingSchedules } = useExamSchedules({ session: CURRENT_SESSION });
 
-  const isLoading = loadingClasses || loadingSubjects || loadingTeachers;
+  const allTeachers: any[] = useMemo(() => (teachersData as any)?.items ?? (teachersData as any)?.data ?? [], [teachersData]);
+  const allStudents: any[] = useMemo(() => (studentsData as any)?.items ?? (studentsData as any)?.data ?? [], [studentsData]);
+  const totalStudents: number = (studentsData as any)?.pagination?.totalItemsCount ?? allStudents.length;
+  const totalTeachers: number = (teachersData as any)?.pagination?.totalItemsCount ?? allTeachers.length;
 
-  // Unique class names
+  const isLoading = loadingClasses || loadingSubjects || loadingTeachers || loadingStudents;
+
+  // ── Derived Metrics ───────────────────────────────────────────────────────
   const classNames = useMemo(() => [...new Set(classSections.map((cs) => cs.className))].sort(), [classSections]);
 
-  // Subjects with no mapping (classes/sections that have no subject-teacher assignments)
   const coveredSectionKeys = useMemo(
     () => new Set(subjectDetails.map((sd) => `${sd.className}|${sd.sectionName}`)),
     [subjectDetails],
   );
-  const uncoveredSections = useMemo(
-    () => classSections.filter((cs) => !coveredSectionKeys.has(`${cs.className}|${cs.sectionName}`)),
-    [classSections, coveredSectionKeys],
-  );
 
-  // Teachers with no classes assigned
   const teachersWithClasses = useMemo(() => new Set(subjectDetails.map((sd) => sd.teacherId)), [subjectDetails]);
-  const unassignedTeachers  = useMemo(
+  const unassignedTeachers = useMemo(
     () => allTeachers.filter((t: any) => !teachersWithClasses.has(t.id) && t.isSubjectTeacher),
     [allTeachers, teachersWithClasses],
   );
 
-  // Per-class summary
   const classSummary = useMemo(() => classNames.map((className) => {
-    const sections    = classSections.filter((cs) => cs.className === className);
-    const subjects    = subjectDetails.filter((sd) => sd.className === className);
-    const teacherIds  = new Set(subjects.map((sd) => sd.teacherId));
+    const sections = classSections.filter((cs) => cs.className === className);
+    const subjects = subjectDetails.filter((sd) => sd.className === className);
+    const teacherIds = new Set(subjects.map((sd) => sd.teacherId));
     return {
       className,
-      sectionCount:   sections.length,
-      subjectCount:   new Set(subjects.map((sd) => sd.subjectName)).size,
-      teacherCount:   teacherIds.size,
-      covered:        sections.every((cs) => coveredSectionKeys.has(`${cs.className}|${cs.sectionName}`)),
+      sectionCount: sections.length,
+      subjectCount: new Set(subjects.map((sd) => sd.subjectName)).size,
+      teacherCount: teacherIds.size,
+      covered: sections.every((cs) => coveredSectionKeys.has(`${cs.className}|${cs.sectionName}`)),
     };
   }), [classNames, classSections, subjectDetails, coveredSectionKeys]);
 
+  // ── Tab States ────────────────────────────────────────────────────────────
+  const [teacherSearch, setTeacherSearch] = React.useState('');
+  const [hwDayFilter, setHwDayFilter] = React.useState('7');
+  const [cwDayFilter, setCwDayFilter] = React.useState('7');
+  const [progressView, setProgressView] = React.useState<'grid' | 'list'>('grid');
+  const [hwView, setHwView] = React.useState<'grid' | 'list'>('list');
+  const [cwView, setCwView] = React.useState<'grid' | 'list'>('grid');
+
+  // ── Filtered lists ────────────────────────────────────────────────────────
+  const filteredTeachers = useMemo(() => {
+    if (!teacherSearch) return allTeachers;
+    const q = teacherSearch.toLowerCase();
+    return allTeachers.filter((t: any) =>
+      `${t.firstName} ${t.lastName}`.toLowerCase().includes(q) ||
+      t.employeeId?.toLowerCase().includes(q) ||
+      t.emailId?.toLowerCase().includes(q)
+    );
+  }, [allTeachers, teacherSearch]);
+
+  const filteredHomeworks = useMemo(() =>
+    (allHomeworks as any[]).filter((hw) => isWithinDays(hw.assignedDate || hw.createdAt, hwDayFilter)),
+    [allHomeworks, hwDayFilter],
+  );
+
+  const filteredClassworks = useMemo(() =>
+    (allClassworks as any[]).filter((cw) => isWithinDays(cw.conductedOn || cw.createdAt, cwDayFilter)),
+    [allClassworks, cwDayFilter],
+  );
+
+  const refreshAll = useCallback(() => {
+    refetchClasses();
+    refetchSubjects();
+    refetchTeachers();
+    refetchStudents();
+    refetchHW();
+    refetchCW();
+    refetchProgress();
+  }, [refetchClasses, refetchSubjects, refetchTeachers, refetchStudents, refetchHW, refetchCW, refetchProgress]);
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Principal Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">School-wide academic overview</p>
-        </div>
-      </div>
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Classes',        value: classNames.length,                  icon: GraduationCap, color: 'text-blue-500   bg-blue-500/10' },
-          { label: 'Sections',       value: classSections.length,               icon: GraduationCap, color: 'text-indigo-500 bg-indigo-500/10' },
-          { label: 'Teachers',       value: allTeachers.length,                 icon: Users,         color: 'text-green-500  bg-green-500/10' },
-          { label: 'Subject Map.',   value: subjectDetails.length,              icon: BookOpen,      color: 'text-primary    bg-primary/10' },
-        ].map((kpi) => (
-          <Card key={kpi.label} className="erp-card">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${kpi.color}`}>
-                {isLoading ? (
-                  <div className="h-5 w-5 rounded-full bg-muted animate-pulse" />
-                ) : (
-                  <kpi.icon className="h-5 w-5" />
-                )}
+    <div className="space-y-8 animate-in fade-in duration-500 p-4 lg:p-8">
+      {activeTab === 'overview' && (
+        <>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shadow-lg shadow-primary/10">
+                <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
               <div>
-                {isLoading ? (
-                  <div className="h-7 w-10 bg-muted rounded animate-pulse mb-1" />
-                ) : (
-                  <p className="text-2xl font-bold">{kpi.value}</p>
-                )}
-                <p className="text-xs text-muted-foreground">{kpi.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Alerts */}
-      {(uncoveredSections.length > 0 || unassignedTeachers.length > 0) && !isLoading && (
-        <div className="space-y-2">
-          {uncoveredSections.length > 0 && (
-            <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-sm">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <span className="font-bold">{uncoveredSections.length} section{uncoveredSections.length > 1 ? 's' : ''} have no subject-teacher mappings: </span>
-                {uncoveredSections.slice(0, 5).map((cs) => `${cs.className}-${cs.sectionName}`).join(', ')}
-                {uncoveredSections.length > 5 ? ` +${uncoveredSections.length - 5} more` : ''}
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                  Welcome, {user?.name?.split(' ')[0] || 'Principal'}!
+                </h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  School-wide oversight & monitoring — Session {CURRENT_SESSION}
+                </p>
               </div>
             </div>
-          )}
-          {unassignedTeachers.length > 0 && (
-            <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-700 text-sm">
+            <Button
+              variant="outline"
+              onClick={refreshAll}
+              className="rounded-xl h-11 bg-white/50 backdrop-blur-sm border-slate-200"
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2 text-muted-foreground", isLoading && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* KPI Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              { label: 'Total Students', value: totalStudents, icon: GraduationCap, accent: 'text-blue-600 bg-blue-50' },
+              { label: 'Total Teachers', value: totalTeachers, icon: Users, accent: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Classes', value: classNames.length, icon: BookOpen, accent: 'text-violet-600 bg-violet-50' },
+              { label: 'Sections', value: classSections.length, icon: LayoutGrid, accent: 'text-amber-600 bg-amber-50' },
+              { label: 'Subject Mappings', value: subjectDetails.length, icon: Activity, accent: 'text-primary bg-primary/10' },
+            ].map((kpi) => (
+              <Card key={kpi.label} className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
+                {isLoading ? <KpiSkeleton /> : (
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center shrink-0', kpi.accent)}>
+                      <kpi.icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{kpi.label}</p>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+
+          {/* Alerts */}
+          {!isLoading && unassignedTeachers.length > 0 && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50/50 text-amber-800 text-sm">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
                 <span className="font-bold">{unassignedTeachers.length} subject teacher{unassignedTeachers.length > 1 ? 's' : ''} not assigned to any class: </span>
@@ -122,213 +234,87 @@ export default function PrincipalDashboard() {
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* Tabs: Academic Structure & Teacher Overview */}
-      <Tabs defaultValue="classes">
-        <TabsList className="rounded-xl">
-          <TabsTrigger value="classes">Academic Structure</TabsTrigger>
-          <TabsTrigger value="teachers">Teacher Overview</TabsTrigger>
-        </TabsList>
-
-        {/* Academic Structure */}
-        <TabsContent value="classes" className="mt-4">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />)}
-            </div>
-          ) : classSummary.length === 0 ? (
-            <Card className="erp-card">
-              <CardContent className="p-8 text-center">
-                <GraduationCap className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p className="text-sm font-bold text-muted-foreground">No classes defined yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {classSummary.map((cls) => (
-                <Card key={cls.className} className="erp-card">
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-lg">{cls.className}</h3>
-                      {cls.covered
-                        ? <Badge className="rounded-lg bg-emerald-100 text-emerald-700 border-0 text-[10px]">Fully Mapped</Badge>
-                        : <Badge className="rounded-lg bg-amber-100 text-amber-700 border-0 text-[10px]">Incomplete</Badge>
-                      }
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center mt-3">
-                      {[
-                        { label: 'Sections',  value: cls.sectionCount },
-                        { label: 'Subjects',  value: cls.subjectCount },
-                        { label: 'Teachers',  value: cls.teacherCount },
-                      ].map((stat) => (
-                        <div key={stat.label} className="bg-muted/20 rounded-lg py-2">
-                          <p className="text-base font-bold">{stat.value}</p>
-                          <p className="text-[10px] text-muted-foreground">{stat.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {classSections.filter(cs => cs.className === cls.className).map((cs) => (
-                        <Badge key={cs.id} variant="outline" className="text-[10px] rounded-md">{cs.sectionName}</Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Teacher Overview */}
-        <TabsContent value="teachers" className="mt-4">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />)}
-            </div>
-          ) : (
-            <Card className="erp-card overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border/50 bg-muted/10">
-                        {['Teacher', 'Employee ID', 'Roles', 'Classes Assigned'].map((h) => (
-                          <th key={h} className="text-left py-3 px-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allTeachers.length === 0 ? (
-                        <tr><td colSpan={4} className="py-12 text-center text-sm text-muted-foreground">No teachers found</td></tr>
-                      ) : allTeachers.map((t: any) => {
-                        const tSubjects      = subjectDetails.filter((sd) => sd.teacherId === t.id);
-                        const tClassSections = [...new Set(tSubjects.map((sd) => `${sd.className}-${sd.sectionName}`))];
-                        return (
-                          <tr key={t.id} className="border-b border-border/30 hover:bg-muted/10 transition-colors">
-                            <td className="py-3 px-6">
-                              <div className="font-semibold text-sm">{t.firstName} {t.lastName}</div>
-                              <div className="text-xs text-muted-foreground">{t.emailId}</div>
-                            </td>
-                            <td className="py-3 px-6 text-sm text-muted-foreground">{t.employeeId}</td>
-                            <td className="py-3 px-6">
-                              <div className="flex flex-wrap gap-1">
-                                {t.isPrincipal    && <Badge className="text-[9px] bg-red-100    text-red-700    border-0">Principal</Badge>}
-                                {t.isCoordinator  && <Badge className="text-[9px] bg-purple-100 text-purple-700 border-0">Coordinator</Badge>}
-                                {t.isClassTeacher && <Badge className="text-[9px] bg-blue-100   text-blue-700   border-0">Class Teacher</Badge>}
-                                {t.isSubjectTeacher && <Badge className="text-[9px] bg-green-100 text-green-700  border-0">Subject</Badge>}
-                              </div>
-                            </td>
-                            <td className="py-3 px-6">
-                              <div className="flex flex-wrap gap-1">
-                                {tClassSections.length === 0
-                                  ? <span className="text-xs text-muted-foreground/50">—</span>
-                                  : tClassSections.map((cs) => (
-                                    <Badge key={cs} variant="outline" className="text-[10px] rounded-md">{cs}</Badge>
-                                  ))
-                                }
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-import React from 'react';
-import { usePrincipalDashboard } from '../../../hooks/usePrincipalDashboard';
-import { StatsRow } from '../../../components/dashboard/StatsRow';
-import { QuickActions } from '../../../components/dashboard/QuickActions';
-import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
-import { cn } from '../../../lib/utils';
-import { MessageSquare, UserPlus, FileBarChart, CheckSquare } from 'lucide-react';
-
-export default function PrincipalDashboard() {
-  const { data: summary, isLoading } = usePrincipalDashboard();
-
-  const actions = [
-    { label: 'Post Announcement', icon: MessageSquare, onClick: () => {}, variant: 'default' as const },
-    { label: 'Approve Leave', icon: CheckSquare, onClick: () => {} },
-    { label: 'Academic Reports', icon: FileBarChart, onClick: () => {} },
-  ];
-
-  return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Principal Dashboard</h1>
-        <p className="text-muted-foreground mt-1">School-wide performance monitoring</p>
-      </div>
-
-      <StatsRow stats={summary?.kpis} isLoading={isLoading} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Teacher Attendance & Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {isLoading ? (
-                [1, 2, 3].map(i => <div key={i} className="h-16 bg-muted rounded animate-pulse" />)
-              ) : (
-                summary?.teachers.map((teacher) => (
-                  <div key={teacher.id} className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center text-success font-bold">
-                        {teacher.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{teacher.name}</p>
-                        <p className="text-xs text-muted-foreground">{teacher.subject}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className={cn(
-                        "w-2 h-2 rounded-full",
-                        teacher.attendance === 'Present' ? "bg-success" : "bg-destructive"
-                      )} />
-                      <span className="text-sm font-medium">{teacher.attendance}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-8">
-          <QuickActions actions={actions} />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Today's Schedule</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="border-l-4 border-secondary pl-4 py-1">
-                <p className="text-xs text-muted-foreground">09:00 AM</p>
-                <p className="text-sm font-bold">Assembly &amp; Prayer</p>
-              </div>
-              <div className="border-l-4 border-secondary pl-4 py-1">
-                <p className="text-xs text-muted-foreground">11:00 AM</p>
-                <p className="text-sm font-bold">HOD Weekly Meeting</p>
-              </div>
-              <div className="border-l-4 border-border pl-4 py-1">
-                <p className="text-xs text-muted-foreground">02:30 PM</p>
-                <p className="text-sm font-bold opacity-60">Parent Orientation</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Dynamic Tab Render */}
+      <div className="space-y-6 mt-6">
+        {activeTab === 'overview' && (
+          <OverviewTab
+            isLoading={isLoading}
+            classSummary={classSummary}
+            classSections={classSections}
+            onClassClick={(className) => router.push(`/dashboard/principal?tab=class-detail&class=${className}`)}
+          />
+        )}
+        {activeTab === 'class-detail' && (
+          <ClassDetailTab
+            className={searchParams.get('class') || ''}
+            allTeachers={allTeachers}
+            classSections={classSections}
+            subjectDetails={subjectDetails}
+            onBack={() => router.push('/dashboard/principal?tab=overview')}
+          />
+        )}
+        {activeTab === 'academic' && (
+          <AcademicTab
+            sub={sub}
+            allHomeworks={allHomeworks}
+            allClassworks={allClassworks}
+            allProgress={allProgress}
+            loadingHomework={loadingHomework}
+            loadingClasswork={loadingClasswork}
+            loadingProgress={loadingProgress}
+            filteredHomeworks={filteredHomeworks}
+            filteredClassworks={filteredClassworks}
+            hwDayFilter={hwDayFilter}
+            setHwDayFilter={setHwDayFilter}
+            cwDayFilter={cwDayFilter}
+            setCwDayFilter={setCwDayFilter}
+            hwView={hwView}
+            setHwView={setHwView}
+            cwView={cwView}
+            setCwView={setCwView}
+            progressView={progressView}
+            setProgressView={setProgressView}
+            DAY_OPTIONS={DAY_OPTIONS}
+            TableSkeleton={TableSkeleton}
+          />
+        )}
+        {activeTab === 'teachers' && (
+          <TeachersTab
+            filteredTeachers={filteredTeachers}
+            allTeachers={allTeachers}
+            loadingTeachers={loadingTeachers}
+            teacherSearch={teacherSearch}
+            setTeacherSearch={setTeacherSearch}
+            subjectDetails={subjectDetails}
+            TableSkeleton={TableSkeleton}
+          />
+        )}
+        {activeTab === 'students' && (
+          <StudentsTab
+            allStudents={allStudents}
+            classSections={classSections}
+            totalStudents={totalStudents}
+            loadingStudents={loadingStudents}
+            TableSkeleton={TableSkeleton}
+          />
+        )}
+        {activeTab === 'timetable' && (
+          <TimetablePage />
+        )}
+        {activeTab === 'exams' && (
+          <ExamsTab
+            sub={sub}
+            exams={exams}
+            examSchedules={examSchedules}
+            loadingExams={loadingExams}
+            loadingSchedules={loadingSchedules}
+            CURRENT_SESSION={CURRENT_SESSION}
+            TableSkeleton={TableSkeleton}
+          />
+        )}
       </div>
     </div>
   );

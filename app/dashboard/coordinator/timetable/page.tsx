@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
-  useTimetable, useCreateTimetableBulk, useDeleteTimetableEntry,
+  useTimetable, useCreateTimetableBulk, useDeleteTimetableEntry, useUpdateTimetableEntry,
   usePeriodSlots, useSubjectDetails, useClassSectionLists,
+  useSchoolClasses,
 } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { CURRENT_SESSION } from '@/lib/constants';
-import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload } from '@/types/class.types';
+import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload, ClassSectionItem } from '@/types/class.types';
 import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -20,38 +21,65 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 /** Key for a grid cell: "day|periodId" */
 function cellKey(day: string, periodId: number) { return `${day}|${periodId}`; }
 
-type DraftCell = { teacherClassId: number };
+type DraftCell = { classSubjectId: string };
 
 export default function CoordinatorTimetablePage() {
   const user = useAuthStore((s) => s.user);
   const coordinatorClasses = user?.coordinatorClasses ?? [];
 
-  // ── Data fetching ──
-  const { data: allEntries = [], isLoading: loadingTimetable } = useTimetable({ session: CURRENT_SESSION });
-  const { data: periodSlots = [] }     = usePeriodSlots();
-  const { data: subjectDetails = [] }  = useSubjectDetails();
+  const { data: periodSlots = [] } = usePeriodSlots();
+  const { data: subjectDetails = [] } = useSubjectDetails();
   const { data: rawClassSections = [] } = useClassSectionLists();
+  const { data: schoolClasses = [] } = useSchoolClasses();
 
-  const allClassSections: { id: number; className: string; sectionName: string }[] =
+  const allClassSections: ClassSectionItem[] =
     (rawClassSections as any)?.classSections ?? (Array.isArray(rawClassSections) ? rawClassSections : []);
+
+  const bulkCreateMut = useCreateTimetableBulk();
+  const deleteMut = useDeleteTimetableEntry();
+
+  // ── Local state ──
+  const [selectedClassName, setSelectedClassName] = useState('');
+  const [selectedSectionName, setSelectedSectionName] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, DraftCell>>({});
+
+  // Derive currently selected section object
+  const currentSection = useMemo(
+    () => allClassSections.find(cs => cs.className === selectedClassName && cs.sectionName === selectedSectionName),
+    [allClassSections, selectedClassName, selectedSectionName]
+  );
+
+  // Resolve classId from schoolClasses if missing in section object
+  const resolvedClassId = useMemo(() => {
+    if (currentSection?.classId) return currentSection.classId;
+    if (!currentSection || !selectedClassName) return undefined;
+    const cls = schoolClasses.find(c => c.className === selectedClassName);
+    return cls?.id;
+  }, [currentSection, selectedClassName, schoolClasses]);
+
+  // ── Data fetching ──
+  const { data: allEntries = [], isLoading: loadingTimetable } = useTimetable({
+    session: CURRENT_SESSION,
+    classId: resolvedClassId,
+    classSectionId: currentSection?.masterSectionId,
+  });
+
+  // Normalize coordinator classes to strings for robust filtering
+  const coordClassNames = useMemo(() =>
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
 
   // Filter class sections to only the ones they coordinate
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
-      : allClassSections, // fallback if empty
-    [allClassSections, coordinatorClasses]
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
+      : allClassSections,
+    [allClassSections, coordClassNames]
   );
-  
-  const bulkCreateMut = useCreateTimetableBulk();
-  const deleteMut     = useDeleteTimetableEntry();
 
-  // ── Local state ──
-  const [selectedClassName, setSelectedClassName]   = useState('');
-  const [selectedSectionName, setSelectedSectionName] = useState('');
-  const [editMode, setEditMode] = useState(false);
-  const [drafts, setDrafts]     = useState<Record<string, DraftCell>>({});
-
+  const updateMut = useUpdateTimetableEntry();
   // ── Derived data ──
   const sorted = useMemo(
     () => [...periodSlots].sort((a: PeriodSlot, b: PeriodSlot) => a.periodNumber - b.periodNumber),
@@ -76,10 +104,10 @@ export default function CoordinatorTimetablePage() {
     [subjectDetails, selectedClassName, selectedSectionName],
   );
 
-  // Lookup: teacherClassId → SubjectDetail
+  // Lookup: classSubjectId → SubjectDetail
   const sdMap = useMemo(() => {
-    const m = new Map<number, SubjectDetail>();
-    (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(sd.id, sd));
+    const m = new Map<string, SubjectDetail>();
+    (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(String(sd.id), sd));
     return m;
   }, [subjectDetails]);
 
@@ -88,50 +116,79 @@ export default function CoordinatorTimetablePage() {
     [allEntries],
   );
 
-  // teacherClassIds belonging to selected class+section
+  // ── Data Normalization ──
+  const normalizedEntries = useMemo(() => {
+    return allEntriesArr.map(e => {
+      let classSubjectId = e.classSubjectId;
+      if (!classSubjectId && e.subjectName) {
+        const match = subjectDetails.find(sd => 
+          sd.subjectName === e.subjectName && 
+          (sd.teacherName === e.teacherName || !e.teacherName) &&
+          sd.className === (e.className || selectedClassName) &&
+          sd.sectionName === (e.sectionName || selectedSectionName)
+        );
+        if (match) classSubjectId = String(match.id);
+      }
+
+      let periodId = e.periodId;
+      if (!periodId && e.periodNumber) {
+        const slot = periodSlots.find(s => s.periodNumber === e.periodNumber);
+        periodId = slot?.id ?? 0;
+      }
+
+      return { ...e, classSubjectId, periodId };
+    });
+  }, [allEntriesArr, subjectDetails, periodSlots, selectedClassName, selectedSectionName]);
+
+  // classSubjectIds belonging to selected class+section
   const sectionTcIds = useMemo(
-    () => new Set(mappingsForSection.map((m) => m.id)),
+    () => new Set(mappingsForSection.map((m) => String(m.id))),
     [mappingsForSection],
   );
 
   // Timetable entries for this section
   const sectionEntries: TimetableEntry[] = useMemo(
-    () => allEntriesArr.filter((e) => sectionTcIds.has(e.teacherClassId)),
-    [allEntriesArr, sectionTcIds],
+    () => normalizedEntries.filter((e) => {
+      if (e.classSubjectId) return sectionTcIds.has(String(e.classSubjectId));
+      return e.className === selectedClassName && e.sectionName === selectedSectionName;
+    }),
+    [normalizedEntries, sectionTcIds, selectedClassName, selectedSectionName],
   );
 
   // "day|periodId" → existing TimetableEntry
   const existingGrid = useMemo(() => {
     const m: Record<string, TimetableEntry> = {};
-    sectionEntries.forEach((e) => { m[cellKey(e.dayOfWeek, e.periodId)] = e; });
+    sectionEntries.forEach((e) => { 
+      if (e.periodId) {
+        m[cellKey(e.dayOfWeek, e.periodId as number)] = e; 
+      }
+    });
     return m;
   }, [sectionEntries]);
 
   // ── Conflict checker ──
-  // Checks if the teacher behind teacherClassId is already occupied at day+periodId
+  // Checks if the teacher behind classSubjectId is already occupied at day+periodId
   const teacherConflict = useCallback(
-    (teacherClassId: number, day: string, periodId: number): string | null => {
-      const sd = sdMap.get(teacherClassId);
+    (classSubjectId: string, day: string, periodId: number): string | null => {
+      const sd = sdMap.get(classSubjectId);
       if (!sd) return null;
       const teacherId = sd.teacherId;
 
-      // Check existing timetable entries (across ALL sections)
       for (const entry of allEntriesArr) {
         if (entry.dayOfWeek !== day || entry.periodId !== periodId) continue;
-        if (sectionTcIds.has(entry.teacherClassId)) continue; // same section — OK
-        const entrySd = sdMap.get(entry.teacherClassId);
+        if (sectionTcIds.has(String(entry.classSubjectId))) continue;
+        const entrySd = sdMap.get(String(entry.classSubjectId));
         if (entrySd && entrySd.teacherId === teacherId) {
           return `${entrySd.teacherName || 'Teacher'} already teaches ${entrySd.subjectName} in ${entrySd.className}-${entrySd.sectionName}`;
         }
       }
 
-      // Check within drafts for same teacher at same period+day but different cell
       const thisKey = cellKey(day, periodId);
       for (const [key, draft] of Object.entries(drafts)) {
         if (key === thisKey) continue;
         const [dDay, dPeriod] = key.split('|');
         if (dDay !== day || Number(dPeriod) !== periodId) continue;
-        const dSd = sdMap.get(draft.teacherClassId);
+        const dSd = sdMap.get(draft.classSubjectId);
         if (dSd && dSd.teacherId === teacherId) {
           return `${dSd.teacherName || 'Teacher'} already assigned at this period (draft)`;
         }
@@ -142,14 +199,14 @@ export default function CoordinatorTimetablePage() {
   );
 
   // ── Handlers ──
-  const handleDraftChange = (day: string, periodId: number, teacherClassId: number) => {
+  const handleDraftChange = (day: string, periodId: number, classSubjectId: string) => {
     const key = cellKey(day, periodId);
     setDrafts((prev) => {
-      if (!teacherClassId) {
+      if (!classSubjectId) {
         const { [key]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [key]: { teacherClassId } };
+      return { ...prev, [key]: { classSubjectId } };
     });
   };
 
@@ -157,36 +214,60 @@ export default function CoordinatorTimetablePage() {
     const entries = Object.entries(drafts);
     if (entries.length === 0) { toast.info('No changes to save'); return; }
 
-    // Validate conflicts
+    const toCreate: any[] = [];
+    const toUpdate: { id: number | string; data: any }[] = [];
+
+    // Validate conflicts and identify operations
     for (const [key, draft] of entries) {
       const [day, periodId] = key.split('|');
-      const conflict = teacherConflict(draft.teacherClassId, day, Number(periodId));
+      const conflict = teacherConflict(draft.classSubjectId, day, Number(periodId));
       if (conflict) { toast.error(conflict); return; }
+
+      const existing = existingGrid[key];
+      if (existing) {
+        if (String(existing.classSubjectId) === draft.classSubjectId) continue;
+        toUpdate.push({
+          id: existing.id,
+          data: {
+            session: CURRENT_SESSION,
+            classSubjectId: draft.classSubjectId,
+            periodId: Number(periodId),
+            dayOfWeek: day,
+          }
+        });
+      } else {
+        toCreate.push({
+          session: CURRENT_SESSION,
+          classSubjectId: draft.classSubjectId,
+          periodId: Number(periodId),
+          dayOfWeek: day,
+        });
+      }
     }
 
-    const payload: CreateTimetablePayload[] = entries.map(([key, draft]) => {
-      const [day, periodId] = key.split('|');
-      return {
-        session: CURRENT_SESSION,
-        teacherClassId: draft.teacherClassId,
-        periodId: Number(periodId),
-        dayOfWeek: day,
-      };
-    });
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      toast.info('No changes detected');
+      setEditMode(false);
+      return;
+    }
 
     try {
-      await bulkCreateMut.mutateAsync(payload);
-      toast.success(`${payload.length} timetable entries saved`);
+      const promises = [];
+      if (toCreate.length > 0) promises.push(bulkCreateMut.mutateAsync(toCreate));
+      toUpdate.forEach(upd => promises.push(updateMut.mutateAsync({ id: upd.id, data: upd.data })));
+
+      await Promise.all(promises);
+      toast.success('Timetable updated successfully');
       setDrafts({});
       setEditMode(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save timetable entries');
+      toast.error(err.response?.data?.message || 'Failed to save changes');
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
     try {
-      await deleteMut.mutateAsync(id);
+      await deleteMut.mutateAsync(id as any);
       toast.success('Entry removed');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete');
@@ -203,7 +284,7 @@ export default function CoordinatorTimetablePage() {
     const m: Record<string, string> = {};
     for (const [key, draft] of Object.entries(drafts)) {
       const [day, periodId] = key.split('|');
-      const c = teacherConflict(draft.teacherClassId, day, Number(periodId));
+      const c = teacherConflict(draft.classSubjectId, day, Number(periodId));
       if (c) m[key] = c;
     }
     return m;
@@ -213,9 +294,9 @@ export default function CoordinatorTimetablePage() {
     <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Class Schedule</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Class Schedule</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Weekly timetable for {coordinatorClasses.length > 0 ? coordinatorClasses.join(', ') : 'managed classes'}
+          Weekly timetable for {coordClassNames.length > 0 ? coordClassNames.join(', ') : 'managed classes'}
         </p>
       </div>
 
@@ -355,9 +436,9 @@ export default function CoordinatorTimetablePage() {
                         <div className="text-muted-foreground">{slot.startTime} – {slot.endTime}</div>
                       </td>
                       {DAYS.map((day) => {
-                        const key    = cellKey(day, slot.id);
+                        const key = cellKey(day, slot.id);
                         const existing = existingGrid[key];
-                        const draft    = drafts[key];
+                        const draft = drafts[key];
                         const conflict = conflictMap[key];
 
                         return (
@@ -368,13 +449,13 @@ export default function CoordinatorTimetablePage() {
                             {existing ? (
                               <ExistingCell
                                 entry={existing}
-                                sd={sdMap.get(existing.teacherClassId)}
+                                sd={sdMap.get(String(existing.classSubjectId))}
                                 onDelete={handleDelete}
                                 isDeleting={deleteMut.isPending}
                               />
                             ) : editMode ? (
                               <DraftSelect
-                                value={draft?.teacherClassId ?? 0}
+                                value={draft?.classSubjectId ?? ''}
                                 mappings={mappingsForSection}
                                 onChange={(tcId) => handleDraftChange(day, slot.id, tcId)}
                                 conflict={conflict}
@@ -404,12 +485,12 @@ function ExistingCell({
 }: {
   entry: TimetableEntry;
   sd?: SubjectDetail;
-  onDelete: (id: number) => void;
+  onDelete: (id: number | string) => void;
   isDeleting: boolean;
 }) {
   return (
     <div className="group relative py-1 flex flex-col items-center justify-center min-h-[40px]">
-      <div className="text-xs font-semibold text-primary">{sd?.subjectName || `#${entry.teacherClassId}`}</div>
+      <div className="text-xs font-semibold text-primary">{sd?.subjectName || `#${entry.classSubjectId}`}</div>
       {sd?.teacherName && (
         <div className="text-[10px] text-muted-foreground mt-0.5">{sd.teacherName}</div>
       )}
@@ -428,16 +509,16 @@ function ExistingCell({
 function DraftSelect({
   value, mappings, onChange, conflict,
 }: {
-  value: number;
+  value: string;
   mappings: SubjectDetail[];
-  onChange: (tcId: number) => void;
+  onChange: (tcId: string) => void;
   conflict?: string;
 }) {
   return (
     <div className="relative">
       <select
         value={value || ''}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => onChange(e.target.value)}
         className={cn(
           'w-full h-8 text-[11px] px-1.5 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring',
           conflict ? 'border-amber-400 bg-amber-50' : value ? 'border-primary/40 bg-primary/5' : 'border-input',
@@ -445,12 +526,12 @@ function DraftSelect({
       >
         <option value="">—</option>
         {mappings.map((m) => (
-          <option key={m.id} value={m.id}>
+          <option key={m.id} value={String(m.id)}>
             {m.subjectName} — {m.teacherName || m.teacherId}
           </option>
         ))}
       </select>
-      {value > 0 && !conflict && (
+      {value && !conflict && (
         <Check className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-emerald-500 pointer-events-none" />
       )}
       {conflict && (

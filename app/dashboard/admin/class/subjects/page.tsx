@@ -6,17 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
   useSubjectOptions,
   useCreateSubjectOption,
-  useDeleteSubjectOption,
+  useUpdateSubjectOption,
   useClassList,
 } from '@/hooks/useClasses';
-import { Plus, Trash2, BookOpen, Search, X } from 'lucide-react';
+import { Plus, Edit2, BookOpen, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { CURRENT_SESSION } from '@/lib/constants';
 
 export default function SubjectsPage() {
@@ -24,7 +27,10 @@ export default function SubjectsPage() {
   const { data: uniqueclasses = [] } = useClassList();
 
   const createMutation = useCreateSubjectOption();
-  const deleteMutation = useDeleteSubjectOption();
+  const updateMutation = useUpdateSubjectOption();
+
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '' });
 
   const [search, setSearch] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
@@ -36,24 +42,17 @@ export default function SubjectsPage() {
   const [form, setForm] = useState({
     className: '',
     session: CURRENT_SESSION,
-    subjects: [] as string[],
+    subjects: [] as { subjectName: string; subjectCode: string }[],
   });
 
   const [subjectInput, setSubjectInput] = useState('');
+  const [subjectCodeInput, setSubjectCodeInput] = useState('');
 
   // 🔍 Filter
   const filtered = subjects.filter((s: any) => {
     const q = search.toLowerCase();
-
-    const matchesSearch =
-      s.subjectName?.toLowerCase().includes(q) ||
-      (s.className ?? '').toLowerCase().includes(q);
-
-    const matchesClass = selectedClass
-      ? s.className === selectedClass
-      : true;
-
-    return matchesSearch && matchesClass;
+    return s.subjectName?.toLowerCase().includes(q) ||
+      (s.subjectCode ?? '').toLowerCase().includes(q);
   });
 
   // 📄 Pagination
@@ -71,24 +70,20 @@ export default function SubjectsPage() {
 
   // ➕ Add subject
   const addSubject = () => {
-    const value = subjectInput.trim();
-    if (!value) return;
-
-    if (form.subjects.includes(value)) {
-      toast.error('Subject already added');
-      return;
+    const name = subjectInput.trim();
+    const code = subjectCodeInput.trim();
+    if (!name || !code) { toast.error('Both subject name and code are required'); return; }
+    if (form.subjects.some((s) => s.subjectName === name)) {
+      toast.error('Subject already added'); return;
     }
-
-    setForm({ ...form, subjects: [...form.subjects, value] });
+    setForm({ ...form, subjects: [...form.subjects, { subjectName: name, subjectCode: code }] });
     setSubjectInput('');
+    setSubjectCodeInput('');
   };
 
   // ❌ Remove subject
-  const removeSubject = (sub: string) => {
-    setForm({
-      ...form,
-      subjects: form.subjects.filter((s) => s !== sub),
-    });
+  const removeSubject = (name: string) => {
+    setForm({ ...form, subjects: form.subjects.filter((s) => s.subjectName !== name) });
   };
 
   // 💾 Save
@@ -101,7 +96,6 @@ export default function SubjectsPage() {
     try {
       await createMutation.mutateAsync({
         session: form.session,
-        className: form.className,
         subjects: form.subjects,
       });
 
@@ -113,101 +107,126 @@ export default function SubjectsPage() {
         subjects: [],
       });
       setSubjectInput('');
+      setSubjectCodeInput('');
       setShowAdd(false);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save subjects');
     }
   };
 
-  // 🗑 Delete
-  const handleDelete = async (id: number) => {
+  // ✏️ Edit
+  const handleEditSave = async () => {
+    if (!editingSubject) return;
+    if (!editForm.subjectName.trim() || !editForm.subjectCode.trim()) {
+      toast.error('Both subject name and code are required');
+      return;
+    }
+
     try {
-      await deleteMutation.mutateAsync(id);
-      toast.success('Subject deleted');
+      await updateMutation.mutateAsync({
+        id: editingSubject.id,
+        data: {
+          subjectName: editForm.subjectName.trim(),
+          subjectCode: editForm.subjectCode.trim(),
+        },
+      });
+      toast.success('Subject updated successfully');
+      setEditingSubject(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete subject');
+      toast.error(err.response?.data?.message || 'Failed to update subject');
     }
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
-      
+    <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-300">
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Subject Management</h1>
-          <p className="text-muted-foreground">Manage subjects class-wise</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <BookOpen className="h-6 w-6 text-emerald-600" />
+            Subject Management
+          </h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Manage and categorize school subjects class-wise</p>
         </div>
 
-        <Button onClick={() => setShowAdd(true)} className="rounded-xl">
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={() => setShowAdd(true)} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs">
+          <Plus className="h-4 w-4 mr-1.5" />
           Add Subjects
         </Button>
       </div>
 
       {/* Add Form */}
       {showAdd && (
-        <Card>
+        <Card className="erp-card overflow-hidden border border-slate-100 shadow-xs animate-in slide-in-from-top duration-300">
           <CardContent className="p-6 space-y-4">
-
-            {/* Class */}
-            <div>
-              <Label>Class *</Label>
-              <Select
-                value={form.className}
-                onValueChange={(v) => setForm({ ...form, className: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
+            <h3 className="text-base font-bold text-slate-800">Add New Subjects</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Class */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class *</Label>
+                <select
+                  value={form.className}
+                  onChange={(e) => setForm({ ...form, className: e.target.value })}
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="">Select class</option>
                   {uniqueclasses?.length ? (
                     uniqueclasses.map((cls: string) => (
-                      <SelectItem key={cls} value={cls}>
-                        Class {cls}
-                      </SelectItem>
+                      <option key={cls} value={cls}>Class {cls}</option>
                     ))
                   ) : (
-                    <SelectItem disabled value="loading">
-                      Loading...
-                    </SelectItem>
+                    <option disabled value="loading">Loading...</option>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Subjects */}
-            <div>
-              <Label>Subjects *</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={subjectInput}
-                  onChange={(e) => setSubjectInput(e.target.value)}
-                  placeholder="Enter subject"
-                />
-                <Button onClick={addSubject}>Add</Button>
+                </select>
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-2">
-                {form.subjects.map((sub) => (
-                  <Badge key={sub} className="flex items-center gap-1">
-                    {sub}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => removeSubject(sub)}
+              {/* Subjects */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add Subject Entries *</Label>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Input
+                      value={subjectInput}
+                      onChange={(e) => setSubjectInput(e.target.value)}
+                      placeholder="Subject name (e.g. Mathematics)"
+                      className="rounded-xl border-slate-200 h-10"
+                      onKeyDown={(e) => e.key === 'Enter' && addSubject()}
                     />
-                  </Badge>
-                ))}
+                  </div>
+                  <div className="w-36">
+                    <Input
+                      value={subjectCodeInput}
+                      onChange={(e) => setSubjectCodeInput(e.target.value)}
+                      placeholder="Code (e.g. MATH)"
+                      className="rounded-xl border-slate-200 h-10"
+                      onKeyDown={(e) => e.key === 'Enter' && addSubject()}
+                    />
+                  </div>
+                  <Button onClick={addSubject} type="button" className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white h-10 px-4 font-semibold text-xs">Add</Button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {form.subjects.map((sub) => (
+                    <Badge key={sub.subjectName} variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-700 border-slate-200 text-xs">
+                      {sub.subjectName} <span className="opacity-60 text-[10px] font-bold">({sub.subjectCode})</span>
+                      <X
+                        className="h-3.5 w-3.5 cursor-pointer text-slate-400 hover:text-red-500 transition-colors"
+                        onClick={() => removeSubject(sub.subjectName)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>
-                Save
-              </Button>
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>
+            <div className="flex gap-2 justify-end border-t border-slate-100 pt-4 mt-2">
+              <Button variant="outline" onClick={() => setShowAdd(false)} className="rounded-xl">
                 Cancel
+              </Button>
+              <Button onClick={handleSave} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6">
+                Save Subjects
               </Button>
             </div>
           </CardContent>
@@ -215,119 +234,176 @@ export default function SubjectsPage() {
       )}
 
       {/* Search + Filters */}
-      <div className="flex flex-wrap gap-3">
+      <Card className="erp-card border border-slate-100 bg-slate-50/40 shadow-xs">
+        <CardContent className="p-3 flex flex-col md:flex-row items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search subjects or codes..."
+              className="pl-9 h-9 rounded-xl border-slate-200 bg-white"
+            />
+          </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search subjects..."
-            className="pl-9"
-          />
-        </div>
+          <div className="flex items-center gap-2 w-full md:w-auto ml-auto">
+            {/* Class Filter */}
+            <select
+              value={selectedClass}
+              onChange={e => setSelectedClass(e.target.value)}
+              className="h-9 px-3 w-[180px] rounded-xl text-xs border border-slate-200 bg-white shadow-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="">Filter by class</option>
+              {uniqueclasses?.map((cls: string) => (
+                <option key={cls} value={cls}>Class {cls}</option>
+              ))}
+            </select>
 
-        {/* Class Filter */}
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by class" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Classes</SelectItem>
-            {uniqueclasses?.map((cls: string) => (
-              <SelectItem key={cls} value={cls}>
-                Class {cls}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Reset */}
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setSearch('');
-            setSelectedClass('');
-          }}
-        >
-          Reset
-        </Button>
-      </div>
+            {/* Reset */}
+            {(search || selectedClass) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearch('');
+                  setSelectedClass('');
+                }}
+                className="rounded-xl text-xs hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+              >
+                Reset
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="erp-card overflow-hidden shadow-xs border border-slate-100">
         <CardContent className="p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="p-3 text-left">#</th>
-                <th className="p-3 text-left">Subject</th>
-                <th className="p-3 text-left">Class</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
+          <div className="grid grid-cols-[80px_2fr_1fr_100px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">#</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Subject</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Code</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Actions</span>
+          </div>
 
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={4} className="p-4">Loading...</td>
-                </tr>
-              ) : paginatedData.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-10">
-                    <BookOpen className="mx-auto mb-2 opacity-20" />
-                    No subjects found
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((s: any, idx: number) => (
-                  <tr key={s.id} className="border-b">
-                    <td className="p-3">{idx + 1}</td>
-                    <td className="p-3 font-medium">{s.subjectName}</td>
-                    <td className="p-3">{s.className}</td>
-                    <td className="p-3 text-right">
+          {isLoading ? (
+            <div className="p-8 space-y-3">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : paginatedData.length === 0 ? (
+            <div className="py-20 text-center">
+              <BookOpen className="h-12 w-12 mx-auto mb-3 text-slate-200" />
+              <p className="text-sm font-semibold text-slate-400">No subjects found</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {paginatedData.map((s: any, idx: number) => {
+                const serialNum = (currentPage - 1) * ITEMS_PER_PAGE + idx + 1;
+                return (
+                  <div key={s.id} className="grid grid-cols-[80px_2fr_1fr_100px] items-center px-4 py-3 hover:bg-slate-50/60 transition-colors">
+                    <span className="text-sm text-slate-500 font-medium">#{serialNum}</span>
+                    <span className="text-sm font-semibold text-slate-800">{s.subjectName}</span>
+                    <div>
+                      {s.subjectCode ? (
+                        <Badge variant="outline" className="rounded-lg bg-emerald-50/50 text-emerald-700 border-emerald-100 text-xs font-semibold px-2 py-0.5">
+                          {s.subjectCode}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </div>
+                    <div className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(s.id)}
+                        onClick={() => {
+                          setEditingSubject(s);
+                          setEditForm({ subjectName: s.subjectName, subjectCode: s.subjectCode || '' });
+                        }}
+                        className="h-8 w-8 rounded-lg hover:bg-slate-100"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Edit2 className="h-4 w-4 text-slate-500 hover:text-slate-800" />
                       </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Pagination */}
-          <div className="flex justify-between items-center p-4">
-            <p className="text-sm">
-              Page {currentPage} of {totalPages || 1}
-            </p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/40">
+              <p className="text-xs text-slate-500">
+                Page {currentPage} of {totalPages}
+              </p>
 
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-              >
-                Prev
-              </Button>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="rounded-lg text-xs"
+                >
+                  Prev
+                </Button>
 
-              <Button
-                variant="outline"
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage((p) => p + 1)}
-              >
-                Next
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="rounded-lg text-xs"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
-
+          )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingSubject} onOpenChange={(open) => !open && setEditingSubject(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl border-slate-100 p-6 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-800">Edit Subject Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Name</Label>
+              <Input
+                value={editForm.subjectName}
+                onChange={(e) => setEditForm({ ...editForm, subjectName: e.target.value })}
+                placeholder="E.g. Mathematics"
+                className="rounded-xl border-slate-200"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Code</Label>
+              <Input
+                value={editForm.subjectCode}
+                onChange={(e) => setEditForm({ ...editForm, subjectCode: e.target.value })}
+                placeholder="E.g. MATH"
+                className="rounded-xl border-slate-200"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+            <Button variant="outline" onClick={() => setEditingSubject(null)} className="rounded-xl">
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={(updateMutation as any).isPending || (updateMutation as any).isLoading} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5">
+              {((updateMutation as any).isPending || (updateMutation as any).isLoading) ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

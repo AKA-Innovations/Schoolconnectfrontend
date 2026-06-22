@@ -21,19 +21,25 @@ export default function CoordinatorTeachersPage() {
   const { data: teachersData, isLoading } = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
 
+  // Normalize coordinator classes to strings for filtering
+  const coordClassNames = useMemo(() => 
+    coordinatorClasses.map(c => String(typeof c === 'object' ? c.className : c)).filter(Boolean),
+    [coordinatorClasses]
+  );
+
   const classSections = useMemo(
-    () => coordinatorClasses.length > 0
-      ? allClassSections.filter((cs) => coordinatorClasses.includes(cs.className))
+    () => coordClassNames.length > 0
+      ? allClassSections.filter((cs) => coordClassNames.includes(String(cs.className)))
       : allClassSections,
-    [allClassSections, coordinatorClasses],
+    [allClassSections, coordClassNames],
   );
 
   // Teachers who teach in coordinator's classes
   const scopedSubjects = useMemo(
-    () => coordinatorClasses.length > 0
-      ? subjectDetails.filter((sd) => coordinatorClasses.includes(sd.className))
+    () => coordClassNames.length > 0
+      ? subjectDetails.filter((sd) => coordClassNames.includes(String(sd.className)))
       : subjectDetails,
-    [subjectDetails, coordinatorClasses],
+    [subjectDetails, coordClassNames],
   );
 
   const scopedTeacherIds = useMemo(() => new Set(scopedSubjects.map((sd) => sd.teacherId)), [scopedSubjects]);
@@ -79,8 +85,8 @@ export default function CoordinatorTeachersPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Teachers</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {coordinatorClasses.length > 0
-              ? `Teachers in: ${coordinatorClasses.join(', ')}`
+            {coordClassNames.length > 0
+              ? `Teachers in: ${coordClassNames.join(', ')}`
               : 'All teachers'}
           </p>
         </div>

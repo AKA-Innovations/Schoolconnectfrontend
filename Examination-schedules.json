@@ -1,0 +1,92 @@
+{
+  "v": 12,
+  "id": "cmppwnakr8f1she1m98f4d99n",
+  "name": "Examination-schedules",
+  "folders": [],
+  "requests": [
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"session\": \"2026-27\",\n  \"schedules\": [\n    {\n      \"examId\": 6,\n      \"examSubjectDtlId\":1,\n      \"classId\": 10,\n      \"classSectionId\": 46,\n      \"subjectId\": 51,\n      \"examDate\": \"2026-05-12\",\n      \"startTime\": \"09:00\",\n      \"endTime\": \"12:00\"\n    },\n    {\n      \"examId\": 6,\n      \"examSubjectDtlId\":2,\n      \"classId\": 10,\n      \"classSectionId\": 46,\n      \"subjectId\": 49,\n      \"examDate\": \"2026-05-14\",\n      \"startTime\": \"09:00\",\n      \"endTime\": \"12:00\"\n    }\n  ]\n}",
+        "contentType": "application/json"
+      },
+      "name": "add-schedule",
+      "method": "POST",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/schedule",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppworgq1hsajn1mrtc5igzu"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "get",
+      "method": "GET",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/schedule",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppx2oym1hssjn1m9zxx2gcz"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InJvaGl0LnBhdGVsIiwicm9sZSI6InN0dWRlbnQiLCJzdWIiOiI5ZTUyYjAzZS04Mzc3LTQwZWMtYTkzMC02YmFiMTY2YjUxNGEiLCJzY2hvb2xJZCI6IjUzYTg0MTkzLTMwZTMtNDExZi05NTkyLTExM2MzYmU5NGNkOCIsImlhdCI6MTc3OTk5OTA4MCwiZXhwIjoxNzgwMDg1NDgwfQ.xpBgOKqWCu1RmS2LwDX5VJg12poGYqRGxEwfv0JhDUw",
+        "authType": "bearer",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get-max-schedule for student",
+      "method": "GET",
+      "params": [
+        {
+          "key": "session",
+          "value": "2026-27",
+          "active": true,
+          "description": ""
+        }
+      ],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/schedule/student",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppxfyzv8f2ohe1makdel91w"
+    }
+  ],
+  "auth": {
+    "authType": "bearer",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluc2Nob29sIiwicm9sZSI6InNjaG9vbF9hZG1pbiIsInN1YiI6IjkyODE1YjNhLTE3ZDEtNDAxZS05MGRmLWVjNmIwZGVkMTMyNyIsInNjaG9vbElkIjoiNTNhODQxOTMtMzBlMy00MTFmLTk1OTItMTEzYzNiZTk0Y2Q4IiwiaWF0IjoxNzc5OTkwNzg4LCJleHAiOjE3ODAwNzcxODh9.HGFT3hwaZQyUt7ruAqJAwDKXxxn7z--iCaOapMJlAmM",
+    "authActive": true
+  },
+  "headers": [],
+  "variables": [],
+  "description": null,
+  "preRequestScript": "",
+  "testScript": ""
+}

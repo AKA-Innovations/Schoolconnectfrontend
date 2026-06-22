@@ -39,7 +39,7 @@ const TabsList = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground gap-1 border border-border",
+      "inline-flex h-10 items-center justify-center rounded-xl bg-white dark:bg-[#131e31] p-1 text-muted-foreground gap-1 border border-slate-200/80",
       className
     )}
     {...props}
@@ -59,10 +59,10 @@ const TabsTrigger = React.forwardRef<
       ref={ref}
       onClick={() => onValueChange(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-ring disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all duration-150 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
         isActive
-          ? "bg-card text-primary shadow-sm font-semibold"
-          : "text-muted-foreground hover:text-foreground",
+          ? "bg-slate-100/80 text-primary dark:bg-slate-800/80 font-black shadow-inner"
+          : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200",
         className
       )}
       {...props}

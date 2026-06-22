@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Save, UserPlus, FileText,
-  Briefcase, BookOpen, X, MapPin, 
+  Briefcase, BookOpen, X, MapPin,
   ShieldCheck, Globe, Calendar, Mail, Phone,
   CheckCircle2, Plus, Users, User, PhoneCall, Link2,
-  Compass, Users2,
+  Compass, Users2, GraduationCap,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,44 +51,66 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
   const deleteSubjectMut = useDeleteSubjectDetail();
 
   const [formData, setFormData] = useState<TeacherRegistrationData>(() => ({
-  username: initialData?.user?.username ?? '',   // ✅ FIXED
-  password: '',
-  schoolId: initialData?.schoolId ?? schoolId ?? '',
-  employeeId: initialData?.employeeId ?? '',
+    username: initialData?.user?.username ?? '',   // ✅ FIXED
+    password: '',
+    schoolId: initialData?.schoolId ?? schoolId ?? '',
+    employeeId: initialData?.employeeId ?? '',
 
-  isPrincipal: initialData?.isPrincipal ?? false,
-  isCoordinator: initialData?.isCoordinator ?? false,
-  isClassTeacher: initialData?.isClassTeacher ?? false,
-  isSubjectTeacher: initialData?.isSubjectTeacher ?? false,
+    isPrincipal: initialData?.isPrincipal ?? false,
+    isCoordinator: initialData?.isCoordinator ?? false,
+    isClassTeacher: initialData?.isClassTeacher ?? false,
+    isSubjectTeacher: initialData?.isSubjectTeacher ?? false,
 
-  firstName: initialData?.firstName ?? '',
-  lastName: initialData?.lastName ?? '',
+    firstName: initialData?.firstName ?? '',
+    lastName: initialData?.lastName ?? '',
 
-  dateOfBirth: initialData?.dateOfBirth
-    ? new Date(initialData.dateOfBirth).toISOString().slice(0, 10)
-    : '',
+    dateOfBirth: initialData?.dateOfBirth
+      ? new Date(initialData.dateOfBirth).toISOString().slice(0, 10)
+      : '',
 
-  gender: initialData?.gender ?? '',
-  mobileNumber: initialData?.mobileNumber ?? '',
-  alternateMobileNumber: initialData?.alternateMobileNumber ?? '',
-  emailId: initialData?.emailId ?? '',
+    gender: initialData?.gender ?? '',
+    mobileNumber: initialData?.mobileNumber ?? '',
+    alternateMobileNumber: initialData?.alternateMobileNumber ?? '',
+    emailId: initialData?.emailId ?? '',
 
-  // ✅ FIXED (correct source)
-  joiningDate: initialData?.schoolRecord?.joiningDate
-    ? new Date(initialData.schoolRecord.joiningDate)
+    // ✅ FIXED (correct source)
+    joiningDate: initialData?.schoolRecord?.joiningDate
+      ? new Date(initialData.schoolRecord.joiningDate)
         .toISOString()
         .slice(0, 10)
-    : '',
+      : '',
 
-  // ✅ FIXED (correct source)
-  employeeEmail:
-    initialData?.schoolRecord?.employeeEmail ??
-    initialData?.employeeEmail ??
-    '',
+    // ✅ FIXED (correct source)
+    employeeEmail:
+      initialData?.schoolRecord?.employeeEmail ??
+      initialData?.employeeEmail ??
+      '',
 
-  classes: initialData?.classes ?? [],
-}));
-console.log('INITIAL DATA 👉', initialData);
+    classes: initialData?.classes ?? [],
+    // Personal Data
+    bloodGroup: initialData?.teacherPersonalData?.bloodGroup ?? '',
+    maritalStatus: initialData?.teacherPersonalData?.maritalStatus ?? '',
+    nationality: initialData?.teacherPersonalData?.nationality ?? '',
+    religion: initialData?.teacherPersonalData?.religion ?? '',
+
+    // Academic Data
+    highestQualification: initialData?.teacherAcademicData?.highestQualification ?? '',
+    specialization: initialData?.teacherAcademicData?.specialization ?? '',
+    university: initialData?.teacherAcademicData?.university ?? '',
+    passingYear: initialData?.teacherAcademicData?.passingYear ?? '',
+
+    // Professional Data
+    designation: initialData?.teacherProfessionalData?.designation ?? '',
+    totalExperience: initialData?.teacherProfessionalData?.totalExperience ?? '',
+    previousSchool: initialData?.teacherProfessionalData?.previousSchool ?? '',
+
+    // Family Details
+    fatherName: initialData?.teacherFamilyDetails?.fatherName ?? '',
+    motherName: initialData?.teacherFamilyDetails?.motherName ?? '',
+    emergencyContactName: initialData?.teacherFamilyDetails?.emergencyContactName ?? '',
+    emergencyContactPhone: initialData?.teacherFamilyDetails?.emergencyContactPhone ?? '',
+  }));
+  console.log('INITIAL DATA 👉', initialData);
   // ─── Class Teacher Assignment state ──────────────────────────────────────
   const [classTeacherClassId, setClassTeacherClassId] = useState<number | null>(
     initialData?.classTeacherAssignment?.classDtlsId ?? null
@@ -110,6 +132,9 @@ console.log('INITIAL DATA 👉', initialData);
     className: '',
     sectionName: '',
     subjectName: '',
+    classId: undefined,
+    classSectionId: undefined,
+    subjectId: undefined,
   });
   const { data: subjectOptions = [] } = useSubjectOptions();
 
@@ -135,12 +160,21 @@ console.log('INITIAL DATA 👉', initialData);
   };
 
   const addClass = () => {
-    if (newClass.className && newClass.sectionName && newClass.subjectName) {
+    if (newClass.classId && newClass.classSectionId && newClass.subjectId) {
       setFormData(prev => ({
         ...prev,
         classes: [...prev.classes, { ...newClass }]
       }));
-      setNewClass({ className: '', sectionName: '', subjectName: '' });
+      setNewClass({
+        className: '',
+        sectionName: '',
+        subjectName: '',
+        classId: undefined,
+        classSectionId: undefined,
+        subjectId: undefined,
+      });
+    } else {
+      toast.error('Please select Class, Section and Subject');
     }
   };
 
@@ -162,7 +196,7 @@ console.log('INITIAL DATA 👉', initialData);
     setLoading(true);
     try {
       if (isEditMode) {
-        // 1. Update basic details
+        // 1. Update details
         await teacherService.updateTeacherDetails(initialData.id, {
           isPrincipal: formData.isPrincipal,
           isCoordinator: formData.isCoordinator,
@@ -175,13 +209,36 @@ console.log('INITIAL DATA 👉', initialData);
           mobileNumber: formData.mobileNumber,
           alternateMobileNumber: formData.alternateMobileNumber,
           emailId: formData.emailId,
+          teacherPersonalData: {
+            bloodGroup: (formData as any).bloodGroup,
+            maritalStatus: (formData as any).maritalStatus,
+            nationality: (formData as any).nationality,
+            religion: (formData as any).religion,
+          },
+          teacherAcademicData: {
+            highestQualification: (formData as any).highestQualification,
+            specialization: (formData as any).specialization,
+            university: (formData as any).university,
+            passingYear: (formData as any).passingYear,
+          },
+          teacherProfessionalData: {
+            designation: (formData as any).designation,
+            totalExperience: (formData as any).totalExperience,
+            previousSchool: (formData as any).previousSchool,
+          },
+          teacherFamilyDetails: {
+            fatherName: (formData as any).fatherName,
+            motherName: (formData as any).motherName,
+            emergencyContactName: (formData as any).emergencyContactName,
+            emergencyContactPhone: (formData as any).emergencyContactPhone,
+          },
         });
 
         // 2. Handle class teacher assignment changes
         if (formData.isClassTeacher && classTeacherClassId) {
           const prevClassId = initialData?.classTeacherAssignment?.classDtlsId;
           if (prevClassId && prevClassId !== classTeacherClassId) {
-            const prevClass = classSections.find((c: any) => c.id === prevClassId);
+            const prevClass = classSections.find((c: any) => c.masterSectionId === prevClassId);
             if (prevClass) {
               await teacherService.removeClassTeacher({
                 classTeacherId: initialData.id,
@@ -192,7 +249,7 @@ console.log('INITIAL DATA 👉', initialData);
             }
           }
           if (prevClassId !== classTeacherClassId) {
-            const cs = classSections.find((c: any) => c.id === classTeacherClassId);
+            const cs = classSections.find((c: any) => c.masterSectionId === classTeacherClassId);
             if (cs) {
               await teacherService.addClassTeacher({
                 classTeacherId: initialData.id,
@@ -203,7 +260,7 @@ console.log('INITIAL DATA 👉', initialData);
             }
           }
         } else if (!formData.isClassTeacher && initialData?.classTeacherAssignment?.classDtlsId) {
-          const prevClass = classSections.find((c: any) => c.id === initialData.classTeacherAssignment.classDtlsId);
+          const prevClass = classSections.find((c: any) => c.masterSectionId === initialData.classTeacherAssignment.classDtlsId);
           if (!prevClass) return;
           await teacherService.removeClassTeacher({
             classTeacherId: initialData.id,
@@ -224,7 +281,11 @@ console.log('INITIAL DATA 👉', initialData);
           const toRemove = prevClassNames.filter((className) => !coordinatorClasses.includes(className));
           await Promise.all([
             ...toAdd.map((className) =>
-              teacherService.addCoordinatorClass({ session: CURRENT_SESSION, teacherId: initialData.id, className }),
+              teacherService.addCoordinatorClass({
+                session: CURRENT_SESSION,
+                teacherId: initialData.id,
+                className
+              }),
             ),
             ...toRemove.flatMap((className) => {
               const mappings = (initialData?.coordinatorMappings ?? []).filter((m: any) => {
@@ -254,13 +315,21 @@ console.log('INITIAL DATA 👉', initialData);
             ex.className === d.className && ex.sectionName === d.sectionName && ex.subjectName === d.subjectName
           )));
 
-          await Promise.all(toAdd.map((d) => createSubjectMut.mutateAsync({
-            session: CURRENT_SESSION,
-            teacherId: initialData.id,
-            className: d.className,
-            sectionName: d.sectionName,
-            subjectName: d.subjectName,
-          })));
+          await Promise.all(toAdd.map((d) => {
+            if (!d.classId || !d.classSectionId || !d.subjectId) {
+              console.error('Missing IDs for mapping', d);
+              return Promise.resolve();
+            }
+            return createSubjectMut.mutateAsync({
+              entries: [{
+                session: CURRENT_SESSION,
+                teacherId: initialData.id,
+                classId: d.classId,
+                classSectionId: d.classSectionId,
+                subjectId: d.subjectId,
+              }]
+            });
+          }));
 
           await Promise.all(toRemove.map((ex) => ex.id ? deleteSubjectMut.mutateAsync(ex.id) : Promise.resolve()));
         } catch (err) {
@@ -276,9 +345,21 @@ console.log('INITIAL DATA 👉', initialData);
           : null;
 
         // Build payload without `classes` (API rejects it) and include the new fields
-        const { classes: _classes, ...rest } = formData;
+        const {
+          classes: _classes,
+          bloodGroup, maritalStatus, nationality, religion,
+          highestQualification, specialization, university, passingYear,
+          designation, totalExperience, previousSchool,
+          fatherName, motherName, emergencyContactName, emergencyContactPhone,
+          ...flatFields
+        } = formData;
+
         const payload = {
-          ...rest,
+          ...flatFields,
+          teacherPersonalData: { bloodGroup, maritalStatus, nationality, religion },
+          teacherAcademicData: { highestQualification, specialization, university, passingYear },
+          teacherProfessionalData: { designation, totalExperience, previousSchool },
+          teacherFamilyDetails: { fatherName, motherName, emergencyContactName, emergencyContactPhone },
           classTeacherClass: cs ? { className: cs.className, sectionName: cs.sectionName } : undefined,
           coordinatorClasses: formData.isCoordinator
             ? coordinatorClasses.map((className) => ({ className, session: CURRENT_SESSION }))
@@ -319,7 +400,7 @@ console.log('INITIAL DATA 👉', initialData);
             {initialData ? 'Update Profile' : 'Onboard Faculty'}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-             {initialData ? 'Update the existing teacher information.' : 'Add a new member to the institutional directory.'}
+            {initialData ? 'Update the existing teacher information.' : 'Add a new member to the institutional directory.'}
           </p>
         </div>
       </div>
@@ -343,24 +424,24 @@ console.log('INITIAL DATA 👉', initialData);
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FG label="First Name" required>
                 <div className="relative">
-                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="firstName" required value={formData.firstName} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="First Name" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="firstName" required value={formData.firstName} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="First Name" />
                 </div>
               </FG>
               <FG label="Last Name" required>
                 <div className="relative">
-                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="lastName" required value={formData.lastName} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Last Name" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="lastName" required value={formData.lastName} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Last Name" />
                 </div>
               </FG>
               <FG label="Birth Date" required>
                 <div className="relative">
-                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="dateOfBirth" type="date" required value={formData.dateOfBirth} onChange={handleInputChange} className="pl-9 rounded-xl" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="dateOfBirth" type="date" required value={formData.dateOfBirth} onChange={handleInputChange} className="pl-9 rounded-xl" />
                 </div>
               </FG>
               <FG label="Gender" required>
-                <select name="gender" required value={formData.gender} onChange={handleInputChange} 
+                <select name="gender" required value={formData.gender} onChange={handleInputChange}
                   className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                   <option value="">Select</option>
                   <option value="Male">Male</option>
@@ -370,20 +451,20 @@ console.log('INITIAL DATA 👉', initialData);
               </FG>
               <FG label="Mobile Number" required>
                 <div className="relative">
-                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="mobileNumber" type="tel" required value={formData.mobileNumber} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Mobile Number" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="mobileNumber" type="tel" required value={formData.mobileNumber} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Mobile Number" />
                 </div>
               </FG>
               <FG label="Alternate Mobile">
                 <div className="relative">
-                   <PhoneCall className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="alternateMobileNumber" type="tel" value={formData.alternateMobileNumber ?? ''} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Alternate Mobile" />
+                  <PhoneCall className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="alternateMobileNumber" type="tel" value={formData.alternateMobileNumber ?? ''} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Alternate Mobile" />
                 </div>
               </FG>
               <FG label="Personal Email" required className="md:col-span-2">
                 <div className="relative">
-                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
-                   <Input name="emailId" type="email" required value={formData.emailId} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Email Address" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" />
+                  <Input name="emailId" type="email" required value={formData.emailId} onChange={handleInputChange} className="pl-9 rounded-xl" placeholder="Email Address" />
                 </div>
               </FG>
             </div>
@@ -405,33 +486,32 @@ console.log('INITIAL DATA 👉', initialData);
           </CardHeader>
           <CardContent className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <FG label="School ID" required>
-                <Input name="schoolId" required value={formData.schoolId} disabled={isEditMode} onChange={handleInputChange} className="rounded-xl" placeholder="School UUID" />
-              </FG>
               <FG label="Employee ID" required>
                 <Input name="employeeId" required value={formData.employeeId} onChange={handleInputChange} className="rounded-xl" placeholder="Employee Code" />
               </FG>
-              <FG label="Joining Date" required>
-                <Input name="joiningDate" type="date" required value={formData.joiningDate} onChange={handleInputChange} className="rounded-xl" />
-              </FG>
+              {!isEditMode && (
+                <FG label="Joining Date" required>
+                  <Input name="joiningDate" type="date" required={!isEditMode} value={formData.joiningDate} onChange={handleInputChange} className="rounded-xl" />
+                </FG>
+              )}
               <FG label="Professional Email" required>
                 <Input name="employeeEmail" type="email" required value={formData.employeeEmail} onChange={handleInputChange} className="rounded-xl" placeholder="Professional Email" />
               </FG>
             </div>
 
-            <div className="border-t border-border/50 pt-6">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 block mb-4">System Credentials</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FG label="Username" required>
+            {!isEditMode && (
+              <div className="border-t border-border/50 pt-6">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 block mb-4">System Credentials</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FG label="Username" required>
                     <Input name="username" required value={formData.username} onChange={handleInputChange} className="rounded-xl" placeholder="System Username" />
-                 </FG>
-                 {!initialData && (
-                    <FG label="Password" required>
-                       <Input name="password" type="password" required value={formData.password} onChange={handleInputChange} className="rounded-xl" placeholder="Access Password" />
-                    </FG>
-                 )}
+                  </FG>
+                  <FG label="Password" required>
+                    <Input name="password" type="password" required value={formData.password} onChange={handleInputChange} className="rounded-xl" placeholder="Access Password" />
+                  </FG>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="border-t border-border/50 pt-6 mt-6">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 block mb-4">Institutional Roles</Label>
@@ -486,7 +566,7 @@ console.log('INITIAL DATA 👉', initialData);
                     >
                       <option value="">Select Class-Section</option>
                       {classSections.map((cs: any) => (
-                        <option key={cs.id} value={cs.id}>
+                        <option key={cs.masterSectionId} value={cs.masterSectionId}>
                           {cs.className} — {cs.sectionName}
                         </option>
                       ))}
@@ -551,6 +631,126 @@ console.log('INITIAL DATA 👉', initialData);
           )}
         </AnimatePresence>
 
+        {/* Personal Details */}
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <User className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold tracking-tight">Personal Data</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Demographics and personal profile records.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FG label="Blood Group">
+              <Input name="bloodGroup" value={(formData as any).bloodGroup} onChange={handleInputChange} className="rounded-xl" placeholder="e.g. A+" />
+            </FG>
+            <FG label="Marital Status">
+              <select name="maritalStatus" value={(formData as any).maritalStatus} onChange={handleInputChange}
+                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">Select</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </FG>
+            <FG label="Nationality">
+              <Input name="nationality" value={(formData as any).nationality} onChange={handleInputChange} className="rounded-xl" placeholder="Nationality" />
+            </FG>
+            <FG label="Religion">
+              <Input name="religion" value={(formData as any).religion} onChange={handleInputChange} className="rounded-xl" placeholder="Religion" />
+            </FG>
+          </CardContent>
+        </Card>
+
+        {/* Academic Details */}
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <GraduationCap className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold tracking-tight">Academic Data</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Education history and certifications.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FG label="Highest Qualification">
+              <Input name="highestQualification" value={(formData as any).highestQualification} onChange={handleInputChange} className="rounded-xl" placeholder="e.g. Master of Science" />
+            </FG>
+            <FG label="Specialization">
+              <Input name="specialization" value={(formData as any).specialization} onChange={handleInputChange} className="rounded-xl" placeholder="e.g. Mathematics" />
+            </FG>
+            <FG label="University/College">
+              <Input name="university" value={(formData as any).university} onChange={handleInputChange} className="rounded-xl" placeholder="University Name" />
+            </FG>
+            <FG label="Passing Year">
+              <Input name="passingYear" value={(formData as any).passingYear} onChange={handleInputChange} className="rounded-xl" placeholder="YYYY" />
+            </FG>
+          </CardContent>
+        </Card>
+
+        {/* Professional Details */}
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Briefcase className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold tracking-tight">Professional Data</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Work history and past experience.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <FG label="Designation">
+              <Input name="designation" value={(formData as any).designation} onChange={handleInputChange} className="rounded-xl" placeholder="e.g. Senior Lecturer" />
+            </FG>
+            <FG label="Experience (Years)">
+              <Input name="totalExperience" value={(formData as any).totalExperience} onChange={handleInputChange} className="rounded-xl" placeholder="e.g. 5" />
+            </FG>
+            <FG label="Previous School/Employer">
+              <Input name="previousSchool" value={(formData as any).previousSchool} onChange={handleInputChange} className="rounded-xl" placeholder="Previous Institution" />
+            </FG>
+          </CardContent>
+        </Card>
+
+        {/* Family Details */}
+        <Card className="erp-card overflow-hidden">
+          <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Users className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold tracking-tight">Family & Emergency Contact Data</CardTitle>
+                <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Contact details of immediate family members.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FG label="Father's Name">
+              <Input name="fatherName" value={(formData as any).fatherName} onChange={handleInputChange} className="rounded-xl" placeholder="Father's Name" />
+            </FG>
+            <FG label="Mother's Name">
+              <Input name="motherName" value={(formData as any).motherName} onChange={handleInputChange} className="rounded-xl" placeholder="Mother's Name" />
+            </FG>
+            <FG label="Emergency Contact Name">
+              <Input name="emergencyContactName" value={(formData as any).emergencyContactName} onChange={handleInputChange} className="rounded-xl" placeholder="Contact Person Name" />
+            </FG>
+            <FG label="Emergency Contact Phone">
+              <Input name="emergencyContactPhone" value={(formData as any).emergencyContactPhone} onChange={handleInputChange} className="rounded-xl" placeholder="Contact Phone Number" />
+            </FG>
+          </CardContent>
+        </Card>
+
         {/* Academic Assignments */}
         <Card className="erp-card overflow-hidden">
           <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8 flex flex-row items-center justify-between">
@@ -572,30 +772,55 @@ console.log('INITIAL DATA 👉', initialData);
               <div className="flex-1 min-w-30">
                 <FG label="Grade">
                   <select
-                    value={newClass.className}
-                    onChange={(e) => setNewClass((p) => ({ ...p, className: e.target.value, sectionName: '', subjectName: '' }))}
+                    value={newClass.classId ?? ''}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const cs = classSections.find(c => c.classId === id);
+                      setNewClass((p) => ({
+                        ...p,
+                        classId: id,
+                        className: cs?.className ?? '',
+                        sectionName: '',
+                        classSectionId: undefined,
+                        subjectName: '',
+                        subjectId: undefined
+                      }));
+                    }}
                     className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Select class</option>
-                    {classNames.map((cn) => (
-                      <option key={cn} value={cn}>{cn}</option>
-                    ))}
+                    {uniqueClassNames.map((name) => {
+                      const cs = classSections.find(c => c.className === name);
+                      return (
+                        <option key={cs?.classId ?? name} value={cs?.classId}>
+                          {name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </FG>
               </div>
               <div className="flex-1 min-w-20">
                 <FG label="Section">
                   <select
-                    value={newClass.sectionName}
-                    onChange={(e) => setNewClass((p) => ({ ...p, sectionName: e.target.value }))}
+                    value={newClass.classSectionId ?? ''}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const cs = classSections.find(c => c.masterSectionId === id);
+                      setNewClass((p) => ({
+                        ...p,
+                        classSectionId: cs?.masterSectionId || cs?.id,
+                        sectionName: cs?.sectionName ?? ''
+                      }));
+                    }}
                     className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={!newClass.className}
+                    disabled={!newClass.classId}
                   >
-                    <option value="">{newClass.className ? 'Select section' : 'Select class first'}</option>
+                    <option value="">{newClass.classId ? 'Select section' : 'Select class first'}</option>
                     {classSections
-                      .filter((cs: any) => cs.className === newClass.className)
+                      .filter((cs: any) => cs.classId === newClass.classId)
                       .map((cs: any) => (
-                        <option key={cs.id} value={cs.sectionName}>{cs.sectionName}</option>
+                        <option key={cs.masterSectionId} value={cs.masterSectionId}>{cs.sectionName}</option>
                       ))}
                   </select>
                 </FG>
@@ -603,16 +828,22 @@ console.log('INITIAL DATA 👉', initialData);
               <div className="flex-2 min-w-37.5">
                 <FG label="Subject">
                   <select
-                    value={newClass.subjectName}
-                    onChange={(e) => setNewClass((p) => ({ ...p, subjectName: e.target.value }))}
+                    value={newClass.subjectId ?? ''}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const s = subjectOptions.find(so => so.id === id);
+                      setNewClass((p) => ({
+                        ...p,
+                        subjectId: id,
+                        subjectName: s?.subjectName ?? ''
+                      }));
+                    }}
                     className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Select subject</option>
-                    {subjectOptions
-                      .filter((s: any) => String(s.className) === String(newClass.className))
-                      .map((s: any) => (
-                        <option key={s.id ?? s.subjectName} value={s.subjectName}>{s.subjectName}</option>
-                      ))}
+                    {subjectOptions.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.subjectName}</option>
+                    ))}
                   </select>
                 </FG>
               </div>
@@ -655,8 +886,8 @@ console.log('INITIAL DATA 👉', initialData);
             Cancel
           </Button>
           <Button type="submit" disabled={loading} className="px-10 h-12 rounded-xl text-xs font-bold uppercase tracking-widest shadow-sm">
-             <Save className="h-4 w-4 mr-2" />
-             {loading ? 'Processing...' : (initialData ? 'Update Faculty' : 'Complete Registration')}
+            <Save className="h-4 w-4 mr-2" />
+            {loading ? 'Processing...' : (initialData ? 'Update Faculty' : 'Complete Registration')}
           </Button>
         </div>
       </form>

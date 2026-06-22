@@ -13,6 +13,7 @@ import { SchoolDetailsForm } from '@/components/admin/school/SchoolDetailsForm';
 import { ContactForm } from '@/components/admin/school/ContactForm';
 import { OwnerForm } from '@/components/admin/school/OwnerForm';
 import { AdministratorForm } from '@/components/admin/school/AdministratorForm';
+import { StructureManagement } from '@/components/admin/school/StructureManagement';
 
 export function SchoolManagement() {
   const { schoolId, user } = useAuthStore();
@@ -87,6 +88,7 @@ export function SchoolManagement() {
             { id: 'contact', label: 'Contact'         },
             { id: 'owner',   label: 'Owner'           },
             { id: 'admin',   label: 'Administrator'   },
+            { id: 'structure', label: 'Structure'     },
           ].map(tab => (
             <TabsTrigger key={tab.id} value={tab.id}
               className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
@@ -99,8 +101,10 @@ export function SchoolManagement() {
           <TabsContent value="contact" className="mt-0"><ContactForm        school={school} /></TabsContent>
           <TabsContent value="owner"   className="mt-0"><OwnerForm          school={school} /></TabsContent>
           <TabsContent value="admin"   className="mt-0"><AdministratorForm  adminId={user?.id} schoolId={schoolId} /></TabsContent>
+          <TabsContent value="structure" className="mt-0"><StructureManagement /></TabsContent>
         </div>
       </Tabs>
     </div>
   );
 }
+

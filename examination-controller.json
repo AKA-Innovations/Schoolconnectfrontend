@@ -1,0 +1,221 @@
+{
+  "v": 12,
+  "id": "cmppseqje8d65he1mu5g0ad7t",
+  "name": "examination-controller",
+  "folders": [],
+  "requests": [
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n    \"session\": \"2026-27\",\n    \"examName\": \"Unit Test 2\",\n    \"examType\": \"UNIT_TEST\",\n    \"startDate\": \"2026-07-15\",\n    \"endDate\": \"2026-07-22\"\n  }",
+        "contentType": "application/json"
+      },
+      "name": "Add-exam",
+      "method": "POST",
+      "params": [],
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "",
+          "active": false,
+          "description": ""
+        }
+      ],
+      "endpoint": "http://localhost:3000/examination/exam",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppseym38d66he1mseez9g0i"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get-exams",
+      "method": "GET",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/exams",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppuz51k1gp5jn1mthltu1zx"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"isPublished\":true\n}",
+        "contentType": "application/json"
+      },
+      "name": "update-exama",
+      "method": "PUT",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/exam/6",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppv149s1gp7jn1mbbp202p9"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"session\": \"2026-27\",\n  \"examId\": 6,\n  \"subjects\": [\n    {\n      \"classId\": 10,\n      \"subjectId\": 51,\n      \"examType\": \"THEORY\",\n      \"totalMarks\": 20,\n      \"passingMarks\": 6,\n      \"weightage\": 20,\n      \"gradingType\": \"MARKS\",\n      \"includeInFinalResult\": true,\n      \"displayOrder\": 1\n    },\n    {\n      \"classId\": 10,\n      \"subjectId\": 49,\n      \"examType\": \"THEORY\",\n      \"totalMarks\": 20,\n      \"passingMarks\": 6,\n      \"weightage\": 20,\n      \"gradingType\": \"MARKS\",\n      \"includeInFinalResult\": true,\n      \"displayOrder\": 2\n    },\n    {\n      \"classId\": 10,\n      \"subjectId\": 55,\n      \"examType\": \"THEORY\",\n      \"totalMarks\": 20,\n      \"passingMarks\": 6,\n      \"weightage\": 20,\n      \"gradingType\": \"MARKS\",\n      \"includeInFinalResult\": true,\n      \"displayOrder\": 2\n    }\n  ]\n}",
+        "contentType": "application/json"
+      },
+      "name": "Add-exam-subject",
+      "method": "POST",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/exam-subject",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppvc3sp8ddrhe1myk244wxl"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"displayOrder\":1\n}",
+        "contentType": "application/json"
+      },
+      "name": "Edit-exam-subject",
+      "method": "PUT",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/exam-subject/3",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppvrcsu1gpyjn1mrgex3bhh"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "Get-subject-exams",
+      "method": "GET",
+      "params": [
+        {
+          "key": "session",
+          "value": "2026-27",
+          "active": true,
+          "description": ""
+        },
+        {
+          "key": "examId",
+          "value": "6",
+          "active": true,
+          "description": ""
+        }
+      ],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/exam-subjects",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppvtash8dgwhe1mc806yziv"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": "{\n  \"session\": \"2026-27\",\n  \"grades\": [\n    {\n      \"gradeName\": \"A+\",\n      \"minPercentage\": 91,\n      \"maxPercentage\": 100,\n      \"gradePoint\": 10,\n      \"remarks\": \"Outstanding Performance\"\n    },\n    {\n      \"gradeName\": \"A\",\n      \"minPercentage\": 81,\n      \"maxPercentage\": 90,\n      \"gradePoint\": 9,\n      \"remarks\": \"Excellent Performance\"\n    },\n    {\n      \"gradeName\": \"B+\",\n      \"minPercentage\": 71,\n      \"maxPercentage\": 80,\n      \"gradePoint\": 8,\n      \"remarks\": \"Very Good Performance\"\n    },\n    {\n      \"gradeName\": \"B\",\n      \"minPercentage\": 61,\n      \"maxPercentage\": 70,\n      \"gradePoint\": 7,\n      \"remarks\": \"Good Performance\"\n    },\n    {\n      \"gradeName\": \"C\",\n      \"minPercentage\": 51,\n      \"maxPercentage\": 60,\n      \"gradePoint\": 6,\n      \"remarks\": \"Average Performance\"\n    },\n    {\n      \"gradeName\": \"D\",\n      \"minPercentage\": 41,\n      \"maxPercentage\": 50,\n      \"gradePoint\": 5,\n      \"remarks\": \"Needs Improvement\"\n    },\n    {\n      \"gradeName\": \"E\",\n      \"minPercentage\": 33,\n      \"maxPercentage\": 40,\n      \"gradePoint\": 4,\n      \"remarks\": \"Pass\"\n    },\n    {\n      \"gradeName\": \"F\",\n      \"minPercentage\": 0,\n      \"maxPercentage\": 32,\n      \"gradePoint\": 0,\n      \"remarks\": \"Fail\"\n    }\n  ]\n}",
+        "contentType": "application/json"
+      },
+      "name": "add grade details",
+      "method": "POST",
+      "params": [],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/grade-config",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppw2hth8dgyhe1m8imfykgu"
+    },
+    {
+      "v": "17",
+      "auth": {
+        "authType": "inherit",
+        "authActive": true
+      },
+      "body": {
+        "body": null,
+        "contentType": null
+      },
+      "name": "get grades",
+      "method": "GET",
+      "params": [
+        {
+          "key": "session",
+          "value": "2026-27",
+          "active": true,
+          "description": ""
+        }
+      ],
+      "headers": [],
+      "endpoint": "http://localhost:3000/examination/grade-config",
+      "responses": {},
+      "testScript": "",
+      "description": null,
+      "preRequestScript": "",
+      "requestVariables": [],
+      "id": "cmppw59tu1gr4jn1my1rq5iv6"
+    }
+  ],
+  "auth": {
+    "authType": "bearer",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluc2Nob29sIiwicm9sZSI6InNjaG9vbF9hZG1pbiIsInN1YiI6IjkyODE1YjNhLTE3ZDEtNDAxZS05MGRmLWVjNmIwZGVkMTMyNyIsInNjaG9vbElkIjoiNTNhODQxOTMtMzBlMy00MTFmLTk1OTItMTEzYzNiZTk0Y2Q4IiwiaWF0IjoxNzc5OTkwNzg4LCJleHAiOjE3ODAwNzcxODh9.HGFT3hwaZQyUt7ruAqJAwDKXxxn7z--iCaOapMJlAmM",
+    "authActive": true
+  },
+  "headers": [],
+  "variables": [],
+  "description": null,
+  "preRequestScript": "",
+  "testScript": ""
+}

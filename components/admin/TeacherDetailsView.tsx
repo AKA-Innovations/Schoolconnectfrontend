@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -122,12 +122,11 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
         <div className="overflow-x-auto pb-2">
           <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
             {[
-              { id: 'personal',     label: 'Identity'      },
+              { id: 'personal',     label: 'Identity & Details' },
               { id: 'employment',   label: 'Employment'    },
               { id: 'pedagogical',  label: 'Pedagogical'   },
               { id: 'classes',      label: 'Classes'       },
               { id: 'addresses',    label: 'Addresses'     },
-              { id: 'extended',     label: 'Extended Data' },
             ].map(tab => (
               <TabsTrigger key={tab.id} value={tab.id}
                 className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
@@ -142,7 +141,6 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
           <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} /></TabsContent>
           <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} /></TabsContent>
           <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} /></TabsContent>
-          <TabsContent value="extended"    className="mt-0"><ExtendedDataSection teacher={teacher} teacherId={teacherId} /></TabsContent>
         </div>
       </Tabs>
     </div>
@@ -222,11 +220,50 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
     isCoordinator: teacher.isCoordinator ?? false,
     isClassTeacher: teacher.isClassTeacher ?? false,
     isSubjectTeacher: teacher.isSubjectTeacher ?? false,
+
+    // Personal Data
+    bloodGroup: teacher.teacherPersonalData?.bloodGroup ?? '',
+    maritalStatus: teacher.teacherPersonalData?.maritalStatus ?? '',
+    nationality: teacher.teacherPersonalData?.nationality ?? '',
+    religion: teacher.teacherPersonalData?.religion ?? '',
+
+    // Academic Data
+    highestQualification: teacher.teacherAcademicData?.highestQualification ?? '',
+    specialization: teacher.teacherAcademicData?.specialization ?? '',
+    university: teacher.teacherAcademicData?.university ?? '',
+    passingYear: teacher.teacherAcademicData?.passingYear ?? '',
+
+    // Professional Data
+    designation: teacher.teacherProfessionalData?.designation ?? '',
+    totalExperience: teacher.teacherProfessionalData?.totalExperience ?? '',
+    previousSchool: teacher.teacherProfessionalData?.previousSchool ?? '',
+
+    // Family Details
+    fatherName: teacher.teacherFamilyDetails?.fatherName ?? '',
+    motherName: teacher.teacherFamilyDetails?.motherName ?? '',
+    emergencyContactName: teacher.teacherFamilyDetails?.emergencyContactName ?? '',
+    emergencyContactPhone: teacher.teacherFamilyDetails?.emergencyContactPhone ?? '',
   });
 
   const handleSave = () => {
+    const {
+      firstName, lastName, dateOfBirth, gender, mobileNumber, alternateMobileNumber, emailId,
+      isPrincipal, isCoordinator, isClassTeacher, isSubjectTeacher,
+      bloodGroup, maritalStatus, nationality, religion,
+      highestQualification, specialization, university, passingYear,
+      designation, totalExperience, previousSchool,
+      fatherName, motherName, emergencyContactName, emergencyContactPhone
+    } = form;
+
     updateMutation.mutate(
-      { ...form, alternateMobileNumber: form.alternateMobileNumber || undefined },
+      {
+        firstName, lastName, dateOfBirth, gender, mobileNumber, alternateMobileNumber: alternateMobileNumber || undefined, emailId,
+        isPrincipal, isCoordinator, isClassTeacher, isSubjectTeacher,
+        teacherPersonalData: { bloodGroup, maritalStatus, nationality, religion },
+        teacherAcademicData: { highestQualification, specialization, university, passingYear },
+        teacherProfessionalData: { designation, totalExperience, previousSchool },
+        teacherFamilyDetails: { fatherName, motherName, emergencyContactName, emergencyContactPhone }
+      },
       { onError: (err: any) => alert(err.response?.data?.message || 'Update failed.') }
     );
   };
@@ -235,8 +272,8 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
     <Card className="erp-card overflow-hidden">
       <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
         <div>
-          <CardTitle className="text-xl font-bold tracking-tight">Personal Identity</CardTitle>
-          <CardDescription className="text-xs font-medium opacity-70 mt-1">Core identity fields and role assignments.</CardDescription>
+          <CardTitle className="text-xl font-bold tracking-tight">Identity & Details</CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-1">Core identity fields, role assignments, and extended profile datasets.</CardDescription>
         </div>
         <Button onClick={handleSave} disabled={updateMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
           <Save className="mr-2 h-4 w-4" />{updateMutation.isPending ? 'Saving…' : 'Save Changes'}
@@ -279,6 +316,58 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
                 {(form as any)[r.key] && <CheckCircle2 className="h-4 w-4 shrink-0" />}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Personal Details */}
+        <div className="border-t border-border/50 pt-8 space-y-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Personal Data</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FieldGroup label="Blood Group"><Input value={form.bloodGroup} onChange={e => setForm(p => ({ ...p, bloodGroup: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Marital Status">
+              <select value={form.maritalStatus} onChange={e => setForm(p => ({ ...p, maritalStatus: e.target.value }))}
+                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">Select</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </FieldGroup>
+            <FieldGroup label="Nationality"><Input value={form.nationality} onChange={e => setForm(p => ({ ...p, nationality: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Religion"><Input value={form.religion} onChange={e => setForm(p => ({ ...p, religion: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          </div>
+        </div>
+
+        {/* Academic Details */}
+        <div className="border-t border-border/50 pt-8 space-y-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Academic Data</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <FieldGroup label="Highest Qualification"><Input value={form.highestQualification} onChange={e => setForm(p => ({ ...p, highestQualification: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Specialization"><Input value={form.specialization} onChange={e => setForm(p => ({ ...p, specialization: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="University/College"><Input value={form.university} onChange={e => setForm(p => ({ ...p, university: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Passing Year"><Input value={form.passingYear} onChange={e => setForm(p => ({ ...p, passingYear: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          </div>
+        </div>
+
+        {/* Professional Details */}
+        <div className="border-t border-border/50 pt-8 space-y-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Professional Data</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <FieldGroup label="Designation"><Input value={form.designation} onChange={e => setForm(p => ({ ...p, designation: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Experience (Years)"><Input value={form.totalExperience} onChange={e => setForm(p => ({ ...p, totalExperience: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Previous School/Employer"><Input value={form.previousSchool} onChange={e => setForm(p => ({ ...p, previousSchool: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          </div>
+        </div>
+
+        {/* Family Details */}
+        <div className="border-t border-border/50 pt-8 space-y-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Family & Emergency Details</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FieldGroup label="Father's Name"><Input value={form.fatherName} onChange={e => setForm(p => ({ ...p, fatherName: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Mother's Name"><Input value={form.motherName} onChange={e => setForm(p => ({ ...p, motherName: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Emergency Contact Name"><Input value={form.emergencyContactName} onChange={e => setForm(p => ({ ...p, emergencyContactName: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Emergency Contact Phone"><Input value={form.emergencyContactPhone} onChange={e => setForm(p => ({ ...p, emergencyContactPhone: e.target.value }))} className="rounded-xl" /></FieldGroup>
           </div>
         </div>
       </CardContent>
@@ -588,71 +677,7 @@ function ClassForm({ data, onChange, onSave, onCancel, saving, mode }: {
   );
 }
 
-// ─── Extended Data (PUT /teacher/:id/details — JSON blob fields) ─────────────
 
-function ExtendedDataSection({ teacher, teacherId }: { teacher: Teacher; teacherId: string }) {
-  const updateMutation = useUpdateTeacher(teacherId);
-  const [fields, setFields] = useState({
-    teacherPersonalData: JSON.stringify(teacher.teacherPersonalData ?? {}, null, 2),
-    teacherAcademicData: JSON.stringify(teacher.teacherAcademicData ?? {}, null, 2),
-    teacherProfessionalData: JSON.stringify(teacher.teacherProfessionalData ?? {}, null, 2),
-    teacherFamilyDetails: JSON.stringify(teacher.teacherFamilyDetails ?? {}, null, 2),
-  });
-
-  const tryParse = (val: string) => { try { return JSON.parse(val); } catch { return undefined; } };
-
-  const handleSave = async () => {
-    const payload: Record<string, any> = {};
-    const entries: [string, string][] = [
-      ['teacherPersonalData', fields.teacherPersonalData],
-      ['teacherAcademicData', fields.teacherAcademicData],
-      ['teacherProfessionalData', fields.teacherProfessionalData],
-      ['teacherFamilyDetails', fields.teacherFamilyDetails],
-    ];
-    for (const [key, raw] of entries) {
-      const parsed = tryParse(raw);
-      if (parsed === undefined) { alert(`Invalid JSON in ${key}`); return; }
-      payload[key] = parsed;
-    }
-    updateMutation.mutate(payload, {
-      onError: (err: any) => alert(err.response?.data?.message || 'Save failed.'),
-    });
-  };
-
-  const sections = [
-    { key: 'teacherPersonalData',     label: 'Personal Data'      },
-    { key: 'teacherAcademicData',     label: 'Academic Data'      },
-    { key: 'teacherProfessionalData', label: 'Professional Data'  },
-    { key: 'teacherFamilyDetails',    label: 'Family Details'     },
-  ];
-
-  return (
-    <Card className="erp-card overflow-hidden">
-      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
-        <div>
-          <CardTitle className="text-xl font-bold tracking-tight">Extended Data</CardTitle>
-          <CardDescription className="text-xs font-medium opacity-70 mt-1">Additional JSON records for personal, academic, professional, and family data.</CardDescription>
-        </div>
-        <Button onClick={handleSave} disabled={updateMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
-          <Save className="mr-2 h-4 w-4" />{updateMutation.isPending ? 'Saving…' : 'Save All'}
-        </Button>
-      </CardHeader>
-      <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {sections.map(s => (
-          <div key={s.key} className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">{s.label}</Label>
-            <textarea
-              className="w-full min-h-[200px] p-4 bg-muted/10 border border-border/50 rounded-xl font-mono text-[11px] resize-y outline-none focus:ring-2 focus:ring-primary/20 leading-relaxed"
-              value={(fields as any)[s.key]}
-              onChange={e => setFields(prev => ({ ...prev, [s.key]: e.target.value }))}
-              spellCheck={false}
-            />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
 
 // ─── Pedagogical Mapping Section (GET/POST/DELETE /class/subject-dtls) ───────
 
@@ -664,42 +689,66 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
   const deleteMutation = useDeleteSubjectDetail();
 
   const [showAdd, setShowAdd] = useState(false);
-  const [newMapping, setNewMapping] = useState({ className: '', sectionName: '', subjectName: '' });
+  const [newMapping, setNewMapping] = useState({
+    classId: 0,
+    classSectionId: 0,
+    subjectId: 0,
+    className: '',
+    sectionName: '',
+    subjectName: ''
+  });
 
   const mappings: SubjectDetail[] = (allDetails ?? []).filter((d: SubjectDetail) => d.teacherId === teacherId);
 
   const classNames: string[] = Array.from(new Set(
-    (classSectionsData?.classSections ?? classSectionsData ?? []).map((s: any) => String(s.className))
+    (classSectionsData ?? []).map((s: any) => String(s.className))
   )).sort() as string[];
 
   const sectionsForClass: string[] = Array.from(new Set(
-    (classSectionsData?.classSections ?? classSectionsData ?? [])
+    (classSectionsData ?? [])
       .filter((s: any) => String(s.className) === newMapping.className)
       .map((s: any) => String(s.sectionName))
   )).sort() as string[];
 
   const subjectNamesForClass: string[] = Array.from(new Set(
     (subjectOptsData ?? [])
-      .filter((s: any) => String(s.className) === newMapping.className)
       .map((s: any) => String(s.subjectName))
   )).sort() as string[];
 
   const handleAdd = () => {
-    if (!newMapping.className || !newMapping.sectionName || !newMapping.subjectName) {
+    if (!newMapping.classId || !newMapping.classSectionId || !newMapping.subjectId) {
       alert('Please select class, section, and subject.'); return;
     }
     createMutation.mutate(
-      { session: CURRENT_SESSION, teacherId, ...newMapping },
       {
-        onSuccess: () => { setShowAdd(false); setNewMapping({ className: '', sectionName: '', subjectName: '' }); },
+        entries: [{
+          session: CURRENT_SESSION,
+          teacherId,
+          classId: newMapping.classId,
+          classSectionId: newMapping.classSectionId,
+          subjectId: newMapping.subjectId
+        }]
+      },
+      {
+        onSuccess: () => {
+          setShowAdd(false);
+          setNewMapping({
+            classId: 0,
+            classSectionId: 0,
+            subjectId: 0,
+            className: '',
+            sectionName: '',
+            subjectName: ''
+          });
+        },
         onError: (err: any) => alert(err.response?.data?.message || 'Failed to create mapping.'),
       }
     );
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     if (!confirm('Remove this pedagogical mapping?')) return;
-    deleteMutation.mutate(id, {
+    deleteMutation.mutate(id as any, {
       onError: (err: any) => alert(err.response?.data?.message || 'Failed to delete mapping.'),
     });
   };
@@ -726,33 +775,58 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Class *</Label>
                 <select
-                  value={newMapping.className}
-                  onChange={e => setNewMapping({ className: e.target.value, sectionName: '', subjectName: '' })}
+                  value={newMapping.classId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const cs = (classSectionsData ?? []).find((s: any) => s.classId === id);
+                    setNewMapping({
+                      classId: id,
+                      className: cs?.className ?? '',
+                      sectionName: '',
+                      classSectionId: 0,
+                      subjectId: 0,
+                      subjectName: ''
+                    });
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                   <option value="">Select class</option>
-                  {classNames.map(c => <option key={c} value={c}>{c}</option>)}
+                  {classNames.map(name => {
+                    const cs = (classSectionsData ?? []).find((s: any) => s.className === name);
+                    return <option key={cs?.classId ?? name} value={cs?.classId}>{name}</option>;
+                  })}
                 </select>
               </div>
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Section *</Label>
                 <select
-                  value={newMapping.sectionName}
-                  onChange={e => setNewMapping(p => ({ ...p, sectionName: e.target.value, subjectName: '' }))}
+                  value={newMapping.classSectionId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const cs = (classSectionsData ?? []).find((s: any) => s.id === id);
+                    setNewMapping(p => ({ ...p, classSectionId: id, sectionName: cs?.sectionName ?? '', subjectName: '', subjectId: 0 }));
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={!newMapping.className}>
+                  disabled={!newMapping.classId}>
                   <option value="">Select section</option>
-                  {sectionsForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                  {(classSectionsData ?? [])
+                    .filter((s: any) => s.classId === newMapping.classId)
+                    .map((s: any) => <option key={s.id} value={s.id}>{s.sectionName}</option>)
+                  }
                 </select>
               </div>
               <div>
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
                 <select
-                  value={newMapping.subjectName}
-                  onChange={e => setNewMapping(p => ({ ...p, subjectName: e.target.value }))}
+                  value={newMapping.subjectId || ''}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const s = (subjectOptsData ?? []).find((so: any) => so.id === id);
+                    setNewMapping(p => ({ ...p, subjectId: id, subjectName: s?.subjectName ?? '' }));
+                  }}
                   className="mt-1 w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={!newMapping.className}>
+                  disabled={!newMapping.classId}>
                   <option value="">Select subject</option>
-                  {subjectNamesForClass.map(s => <option key={s} value={s}>{s}</option>)}
+                  {(subjectOptsData ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.subjectName}</option>)}
                 </select>
               </div>
             </div>
