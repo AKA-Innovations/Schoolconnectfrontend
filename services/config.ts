@@ -176,4 +176,22 @@ export const API_ENDPOINTS = {
     BASE: '/event-type',
     BY_ID: (id: number) => `/event-type/${id}`,
   },
+  TEACHER_LEAVE: {
+    BASE: '/teacher-leave',
+    BY_ID: (id: number) => `/teacher-leave/${id}`,
+    APPROVE: (id: number) => `/teacher-leave/${id}/approve`,
+    REJECT: (id: number) => `/teacher-leave/${id}/reject`,
+    CANCEL: (id: number) => `/teacher-leave/${id}/cancel`,
+    BALANCE: '/teacher-leave/balance',
+    BALANCE_INITIALIZE: '/teacher-leave/balance/initialize',
+  },
+  SUBSTITUTE_PERIOD: {
+    BASE: '/substitute-period',
+    AVAILABLE_TEACHERS: '/substitute-period/available-teachers',
+    ASSIGN: (id: number) => `/substitute-period/${id}/assign`,
+  },
+  TEACHER_ATTENDANCE: {
+    BASE: '/teacher-attendance',
+    MARK: '/teacher-attendance/mark',
+  },
 } as const;

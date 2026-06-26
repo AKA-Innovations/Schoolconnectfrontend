@@ -4,7 +4,7 @@ import {
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
   Sparkles, Building2, UserCog, Grid3X3, Users2, Menu,
-  Clock, Compass, Shield, LucideIcon, Megaphone
+  Clock, Compass, Shield, LucideIcon, Megaphone, CalendarClock
 } from 'lucide-react';
 import { Role } from '../types/roles';
 
@@ -68,6 +68,16 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       name: 'Attendance', 
       href: '/dashboard/admin/attendance', 
       icon: ClipboardCheck,
+    },
+    {
+      name: 'Leave & Subs',
+      href: '/dashboard/admin/teacher-leave?tab=requests',
+      icon: CalendarClock,
+      subLinks: [
+        { name: 'Leave Requests', href: '/dashboard/admin/teacher-leave?tab=requests' },
+        { name: 'Substitutions', href: '/dashboard/admin/teacher-leave?tab=substitutes' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/teacher-leave?tab=attendance' },
+      ]
     },
     { 
       name: 'Academic Module', 
@@ -167,6 +177,16 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
     {
+      name: 'Leave & Subs',
+      href: '/dashboard/admin/teacher-leave?tab=requests',
+      icon: CalendarClock,
+      subLinks: [
+        { name: 'Leave Requests', href: '/dashboard/admin/teacher-leave?tab=requests' },
+        { name: 'Substitutions', href: '/dashboard/admin/teacher-leave?tab=substitutes' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/teacher-leave?tab=attendance' },
+      ]
+    },
+    {
       name: 'Announcements',
       href: '/dashboard/principal/announcements?tab=notices',
       icon: Megaphone,
@@ -236,6 +256,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Progress', href: '/dashboard/teacher/academic?tab=progress' },
         { name: 'Materials', href: '/dashboard/teacher/academic?tab=materials' },
       ]
+    },
+    {
+      name: 'Leave',
+      href: '/dashboard/teacher/leave',
+      icon: CalendarClock,
     },
     { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog },
     {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -15,6 +15,7 @@ import { HomeworkDetailView } from './HomeworkDetailView';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import type { Homework } from '@/services/academic/types';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const getDateRange = (preset: string) => {
   const start = new Date();
@@ -53,6 +54,10 @@ const getHomeworkStatus = (hw: Homework): 'active' | 'overdue' => {
 };
 
 export function HomeworkManagement() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const homeworkIdParam = searchParams?.get('homeworkId');
+
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'overdue'>('all');
@@ -216,8 +221,22 @@ export function HomeworkManagement() {
     return Math.max(1, Math.ceil(filteredAndSortedHomeworks.length / limit));
   }, [filteredAndSortedHomeworks]);
 
+  useEffect(() => {
+    if (homeworkIdParam && data && data.length > 0) {
+      const match = data.find(h => String(h.id) === homeworkIdParam);
+      if (match) {
+        setViewItem(match);
+      }
+    }
+  }, [homeworkIdParam, data]);
+
   const handleEdit = useCallback((hw: Homework) => { setEditItem(hw); setFormOpen(true); }, []);
-  const handleView = useCallback((hw: Homework) => setViewItem(hw), []);
+  const handleView = useCallback((hw: Homework) => {
+    setViewItem(hw);
+    const params = new URLSearchParams(window.location.search);
+    params.set('homeworkId', String(hw.id));
+    router.replace(`${window.location.pathname}?${params.toString()}`);
+  }, [router]);
   const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget == null) return;
@@ -236,8 +255,15 @@ export function HomeworkManagement() {
     setPage(1);
   }, []);
 
+  const handleBack = useCallback(() => {
+    setViewItem(null);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('homeworkId');
+    router.replace(`${window.location.pathname}?${params.toString()}`);
+  }, [router]);
+
   if (viewItem) {
-    return <HomeworkDetailView homework={viewItem} onBack={() => setViewItem(null)} />;
+    return <HomeworkDetailView homework={viewItem} onBack={handleBack} />;
   }
 
   return (

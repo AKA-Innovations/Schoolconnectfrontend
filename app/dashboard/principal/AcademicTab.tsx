@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FileText, PenLine, BarChart3, List, LayoutGrid, CalendarDays, BookOpen, Search, ChevronLeft, ChevronRight, FolderOpen, Clock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useStudyMaterials, useSubjectProgress } from '@/hooks/useAcademic';
+import { useStudyMaterials, useSubjectProgress, useHomeworks, useClassworks } from '@/hooks/useAcademic';
 import { useClassSectionLists, useSubjectOptions, useSubjectDetails } from '@/hooks/useClasses';
 import { StudyMaterialTable } from '@/components/academic/study-material/StudyMaterialTable';
 import { CURRENT_SESSION } from '@/lib/constants';
@@ -124,19 +124,101 @@ export function AcademicTab({
   const [selectedProgressSection, setSelectedProgressSection] = useState('');
   const { data: subjectDetails = [], isLoading: loadingSubjectDetails } = useSubjectDetails(undefined, CURRENT_SESSION);
 
+  // State & Hooks for Homework
+  const [selectedHwClass, setSelectedHwClass] = useState('');
+  const [selectedHwSection, setSelectedHwSection] = useState('');
+  const { data: rawHomeworks = [], isLoading: loadingHwData } = useHomeworks(selectedHwClass || undefined);
+
+  // State & Hooks for Classwork
+  const [selectedCwClass, setSelectedCwClass] = useState('');
+  const [selectedCwSection, setSelectedCwSection] = useState('');
+  const { data: rawClassworks = [], isLoading: loadingCwData } = useClassworks(selectedCwClass || undefined);
+
+  const isWithinDaysLocal = useCallback((dateStr: string, days: string): boolean => {
+    if (days === 'all') return true;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return true;
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    if (days === 'today') {
+      const todayStr = now.toISOString().split('T')[0];
+      return dateStr.startsWith(todayStr);
+    }
+    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+    return diff <= parseInt(days);
+  }, []);
+
+  const filteredHomeworksLocal = useMemo(() => {
+    if (!selectedHwClass || !selectedHwSection) return [];
+    return rawHomeworks.filter(
+      (hw: any) =>
+        hw.className === selectedHwClass &&
+        hw.sectionName === selectedHwSection &&
+        isWithinDaysLocal(hw.assignedDate || hw.createdAt || '', hwDayFilter)
+    );
+  }, [rawHomeworks, selectedHwClass, selectedHwSection, hwDayFilter, isWithinDaysLocal]);
+
+  const filteredClassworksLocal = useMemo(() => {
+    if (!selectedCwClass || !selectedCwSection) return [];
+    return rawClassworks.filter((cw: any) => {
+      const matchClass = cw.classId === selectedCwClass || cw.className === selectedCwClass;
+      const matchSection = cw.sectionId === selectedCwSection || cw.sectionName === selectedCwSection;
+      return matchClass && matchSection && isWithinDaysLocal(cw.conductedOn || cw.createdAt || '', cwDayFilter);
+    });
+  }, [rawClassworks, selectedCwClass, selectedCwSection, cwDayFilter, isWithinDaysLocal]);
+
   // Auto-select first class & section if not set
   useEffect(() => {
-    if (activeSub === 'progress' && classSections.length > 0) {
-      if (!selectedProgressClass) {
-        const firstClass = classSections[0]?.className;
+    if (classSections.length > 0) {
+      const firstClass = classSections[0]?.className;
+      const firstSection = classSections.filter(cs => cs.className === firstClass)[0]?.sectionName;
+
+      if (activeSub === 'progress' && !selectedProgressClass) {
         setSelectedProgressClass(firstClass);
-        const sectionsForClass = classSections.filter(cs => cs.className === firstClass);
-        if (sectionsForClass.length > 0) {
-          setSelectedProgressSection(sectionsForClass[0]?.sectionName);
-        }
+        if (firstSection) setSelectedProgressSection(firstSection);
+      }
+      if (activeSub === 'homework' && !selectedHwClass) {
+        setSelectedHwClass(firstClass);
+        if (firstSection) setSelectedHwSection(firstSection);
+      }
+      if (activeSub === 'classwork' && !selectedCwClass) {
+        setSelectedCwClass(firstClass);
+        if (firstSection) setSelectedCwSection(firstSection);
       }
     }
-  }, [activeSub, classSections, selectedProgressClass]);
+  }, [activeSub, classSections, selectedProgressClass, selectedHwClass, selectedCwClass]);
+
+  // Homework Filter Options
+  const hwClassesList = useMemo(() => {
+    return [...new Set(classSections.map((cs) => cs.className))].sort();
+  }, [classSections]);
+
+  const hwSectionsList = useMemo(() => {
+    if (!selectedHwClass) return [];
+    return [
+      ...new Set(
+        classSections
+          .filter((cs) => cs.className === selectedHwClass)
+          .map((cs) => cs.sectionName)
+      ),
+    ].sort();
+  }, [classSections, selectedHwClass]);
+
+  // Classwork Filter Options
+  const cwClassesList = useMemo(() => {
+    return [...new Set(classSections.map((cs) => cs.className))].sort();
+  }, [classSections]);
+
+  const cwSectionsList = useMemo(() => {
+    if (!selectedCwClass) return [];
+    return [
+      ...new Set(
+        classSections
+          .filter((cs) => cs.className === selectedCwClass)
+          .map((cs) => cs.sectionName)
+      ),
+    ].sort();
+  }, [classSections, selectedCwClass]);
 
   // Unique classes list for Syllabus Progress dropdown
   const progressClassesList = useMemo(() => {
@@ -227,50 +309,96 @@ export function AcademicTab({
       {/* ── Homework Section ─────────────────────────────────────────── */}
       {activeSub === 'homework' && (
         <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <FileText className="h-5 w-5 text-indigo-500" /> Homework — All Classes
-              </CardTitle>
-              <CardDescription className="text-xs mt-1">Read-only overview of homework assigned across the school</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {DAY_OPTIONS.map((opt) => (
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-indigo-500" /> Homework
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">Read-only overview of homework assigned across the school</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {DAY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setHwDayFilter(opt.value)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all',
+                      hwDayFilter === opt.value
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <div className="h-5 w-px bg-slate-200 mx-1" />
                 <button
-                  key={opt.value}
-                  onClick={() => setHwDayFilter(opt.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all',
-                    hwDayFilter === opt.value
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  )}
+                  onClick={() => setHwView('list')}
+                  className={cn('p-1.5 rounded-lg', hwView === 'list' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
                 >
-                  {opt.label}
+                  <List className="h-4 w-4" />
                 </button>
-              ))}
-              <div className="h-5 w-px bg-slate-200 mx-1" />
-              <button
-                onClick={() => setHwView('list')}
-                className={cn('p-1.5 rounded-lg', hwView === 'list' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setHwView('grid')}
-                className={cn('p-1.5 rounded-lg', hwView === 'grid' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
+                <button
+                  onClick={() => setHwView('grid')}
+                  className={cn('p-1.5 rounded-lg', hwView === 'grid' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-slate-100/50 pt-4">
+              {/* Class Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedHwClass}
+                  onChange={(e) => {
+                    setSelectedHwClass(e.target.value);
+                    setSelectedHwSection('');
+                  }}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Select Class</option>
+                  {hwClassesList.map((cls) => (
+                    <option key={cls} value={cls}>
+                      Class {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Section Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedHwSection}
+                  onChange={(e) => setSelectedHwSection(e.target.value)}
+                  disabled={!selectedHwClass}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                >
+                  <option value="">Select Section</option>
+                  {hwSectionsList.map((sec) => (
+                    <option key={sec} value={sec}>
+                      Section {sec}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {loadingHomework ? (
+            {loadingHwData ? (
               <TableSkeleton />
-            ) : filteredHomeworks.length === 0 ? (
+            ) : !selectedHwClass || !selectedHwSection ? (
               <div className="text-center py-10 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">No homework found for the selected period</p>
+                <p className="text-xs font-bold">Please select a class and section to view homework</p>
+              </div>
+            ) : filteredHomeworksLocal.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-bold">No homework found for Class {selectedHwClass} - {selectedHwSection} in the selected period</p>
               </div>
             ) : hwView === 'list' ? (
               <div className="overflow-x-auto">
@@ -288,7 +416,7 @@ export function AcademicTab({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filteredHomeworks.map((hw: any) => (
+                    {filteredHomeworksLocal.map((hw: any) => (
                       <tr key={hw.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3 px-4 text-sm font-bold text-foreground">{hw.title || '—'}</td>
                         <td className="py-3 px-4">
@@ -312,7 +440,7 @@ export function AcademicTab({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredHomeworks.map((hw: any) => (
+                {filteredHomeworksLocal.map((hw: any) => (
                   <div
                     key={hw.id}
                     className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-50 transition-all group"
@@ -332,9 +460,11 @@ export function AcademicTab({
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground mt-3 font-bold">
-              {filteredHomeworks.length} homework item{filteredHomeworks.length !== 1 ? 's' : ''} shown
-            </p>
+            {selectedHwClass && selectedHwSection && (
+              <p className="text-[10px] text-muted-foreground mt-3 font-bold">
+                {filteredHomeworksLocal.length} homework item{filteredHomeworksLocal.length !== 1 ? 's' : ''} shown
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -342,50 +472,96 @@ export function AcademicTab({
       {/* ── Classwork Section ────────────────────────────────────────── */}
       {activeSub === 'classwork' && (
         <Card className="erp-card border-none bg-white/40 backdrop-blur-md shadow-xl shadow-slate-200/50">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <PenLine className="h-5 w-5 text-teal-500" /> Classwork — All Classes
-              </CardTitle>
-              <CardDescription className="text-xs mt-1">Daily classwork logs across all sections</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {DAY_OPTIONS.map((opt) => (
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <PenLine className="h-5 w-5 text-teal-500" /> Classwork
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">Daily classwork logs across all sections</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {DAY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCwDayFilter(opt.value)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all',
+                      cwDayFilter === opt.value
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <div className="h-5 w-px bg-slate-200 mx-1" />
                 <button
-                  key={opt.value}
-                  onClick={() => setCwDayFilter(opt.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all',
-                    cwDayFilter === opt.value
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  )}
+                  onClick={() => setCwView('list')}
+                  className={cn('p-1.5 rounded-lg', cwView === 'list' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
                 >
-                  {opt.label}
+                  <List className="h-4 w-4" />
                 </button>
-              ))}
-              <div className="h-5 w-px bg-slate-200 mx-1" />
-              <button
-                onClick={() => setCwView('list')}
-                className={cn('p-1.5 rounded-lg', cwView === 'list' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setCwView('grid')}
-                className={cn('p-1.5 rounded-lg', cwView === 'grid' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
+                <button
+                  onClick={() => setCwView('grid')}
+                  className={cn('p-1.5 rounded-lg', cwView === 'grid' ? 'bg-primary/10 text-primary' : 'text-slate-400')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-slate-100/50 pt-4">
+              {/* Class Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedCwClass}
+                  onChange={(e) => {
+                    setSelectedCwClass(e.target.value);
+                    setSelectedCwSection('');
+                  }}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Select Class</option>
+                  {cwClassesList.map((cls) => (
+                    <option key={cls} value={cls}>
+                      Class {cls}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Section Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedCwSection}
+                  onChange={(e) => setSelectedCwSection(e.target.value)}
+                  disabled={!selectedCwClass}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                >
+                  <option value="">Select Section</option>
+                  {cwSectionsList.map((sec) => (
+                    <option key={sec} value={sec}>
+                      Section {sec}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {loadingClasswork ? (
+            {loadingCwData ? (
               <TableSkeleton />
-            ) : filteredClassworks.length === 0 ? (
+            ) : !selectedCwClass || !selectedCwSection ? (
               <div className="text-center py-10 text-muted-foreground">
                 <PenLine className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">No classwork found for the selected period</p>
+                <p className="text-xs font-bold">Please select a class and section to view classwork</p>
+              </div>
+            ) : filteredClassworksLocal.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <PenLine className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-bold">No classwork found for Class {selectedCwClass} - {selectedCwSection} in the selected period</p>
               </div>
             ) : cwView === 'list' ? (
               <div className="overflow-x-auto">
@@ -403,7 +579,7 @@ export function AcademicTab({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filteredClassworks.map((cw: any) => (
+                    {filteredClassworksLocal.map((cw: any) => (
                       <tr key={cw.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3 px-4 text-sm font-semibold text-foreground max-w-[300px] truncate">
                           {cw.description || '—'}
@@ -420,7 +596,7 @@ export function AcademicTab({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredClassworks.map((cw: any) => (
+                {filteredClassworksLocal.map((cw: any) => (
                   <div
                     key={cw.id}
                     className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-teal-200 hover:shadow-lg hover:shadow-teal-50 transition-all"
@@ -435,9 +611,11 @@ export function AcademicTab({
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground mt-3 font-bold">
-              {filteredClassworks.length} classwork item{filteredClassworks.length !== 1 ? 's' : ''} shown
-            </p>
+            {selectedCwClass && selectedCwSection && (
+              <p className="text-[10px] text-muted-foreground mt-3 font-bold">
+                {filteredClassworksLocal.length} classwork item{filteredClassworksLocal.length !== 1 ? 's' : ''} shown
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

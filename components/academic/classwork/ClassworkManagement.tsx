@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -15,6 +15,7 @@ import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAuthStore } from '@/store/authStore';
 import type { Classwork } from '@/services/academic/types';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const getDateRange = (preset: string) => {
   const start = new Date();
@@ -46,6 +47,10 @@ const getDateRange = (preset: string) => {
 };
 
 export function ClassworkManagement() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const classworkIdParam = searchParams?.get('classworkId');
+
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [dateRangePreset, setDateRangePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
@@ -210,8 +215,22 @@ export function ClassworkManagement() {
     return Math.max(1, Math.ceil(classworks.length / limit));
   }, [classworks]);
 
+  useEffect(() => {
+    if (classworkIdParam && data && data.length > 0) {
+      const match = data.find(c => String(c.id) === classworkIdParam);
+      if (match) {
+        setViewItem(match);
+      }
+    }
+  }, [classworkIdParam, data]);
+
   const handleEdit = useCallback((cw: Classwork) => { setEditItem(cw); setFormOpen(true); }, []);
-  const handleView = useCallback((cw: Classwork) => setViewItem(cw), []);
+  const handleView = useCallback((cw: Classwork) => {
+    setViewItem(cw);
+    const params = new URLSearchParams(window.location.search);
+    params.set('classworkId', String(cw.id));
+    router.replace(`${window.location.pathname}?${params.toString()}`);
+  }, [router]);
   const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget == null) return;
@@ -229,9 +248,16 @@ export function ClassworkManagement() {
     setPage(1);
   }, []);
 
+  const handleBack = useCallback(() => {
+    setViewItem(null);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('classworkId');
+    router.replace(`${window.location.pathname}?${params.toString()}`);
+  }, [router]);
+
   if (viewItem) {
     const enrichedViewItem = classworks.find(cw => cw.id === viewItem.id) || viewItem;
-    return <ClassworkDetailView classwork={enrichedViewItem} onBack={() => setViewItem(null)} />;
+    return <ClassworkDetailView classwork={enrichedViewItem} onBack={handleBack} />;
   }
 
   return (

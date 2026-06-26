@@ -120,8 +120,9 @@ export default function ClassDetailPage() {
   const { data: allSections = [] } = useClassSectionLists();
   const classSection = allSections.find(s => s.className === className && s.sectionName === sectionName);
 
-  // Use teacher's classDtlsId first, fallback to global list (skip negative IDs)
-  const resolvedClassSectionId = teacherClassSectionId
+  // Use masterSectionId first, fallback to teacher's classDtlsId or classSection.id (skip negative IDs)
+  const resolvedClassSectionId = classSection?.masterSectionId
+    || teacherClassSectionId
     || (classSection?.id && classSection.id > 0 ? classSection.id : undefined);
 
   // All subjects for this class (only used for class teacher view)
@@ -331,22 +332,40 @@ export default function ClassDetailPage() {
                           <tr
                             key={s.id}
                             className={cn(
-                              'border-b border-border/30 hover:bg-muted/10 transition-colors',
+                              'border-b border-border/30 hover:bg-muted/10 transition-colors cursor-pointer',
                               status === 'Absent' && 'bg-red-50/40',
                             )}
                           >
-                            <td className="py-3 px-5 text-sm text-muted-foreground">{idx + 1}</td>
-                            <td className="py-3 px-5 text-sm font-semibold">{s.firstName} {s.lastName}</td>
-                            <td className="py-3 px-5 text-sm text-muted-foreground">{rollNo}</td>
-                            <td className="py-3 px-5 text-sm text-muted-foreground capitalize">{s.gender ?? '—'}</td>
+                            <td className="py-3 px-5 text-sm text-muted-foreground">
+                              <Link href={`/dashboard/teacher/students/${s.id}`} className="block w-full h-full">
+                                {idx + 1}
+                              </Link>
+                            </td>
+                            <td className="py-3 px-5 text-sm font-semibold text-slate-800">
+                              <Link href={`/dashboard/teacher/students/${s.id}`} className="block w-full h-full">
+                                {s.firstName} {s.lastName}
+                              </Link>
+                            </td>
+                            <td className="py-3 px-5 text-sm text-muted-foreground">
+                              <Link href={`/dashboard/teacher/students/${s.id}`} className="block w-full h-full">
+                                {rollNo}
+                              </Link>
+                            </td>
+                            <td className="py-3 px-5 text-sm text-muted-foreground capitalize">
+                              <Link href={`/dashboard/teacher/students/${s.id}`} className="block w-full h-full">
+                                {s.gender ?? '—'}
+                              </Link>
+                            </td>
                             <td className="py-3 px-5">
-                              {status ? (
-                                <Badge variant="outline" className={cn('text-[10px] flex items-center gap-1 w-fit', STATUS_STYLES[status])}>
-                                  {STATUS_ICON[status]} {status}
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-[10px] text-muted-foreground">Not Marked</Badge>
-                              )}
+                              <Link href={`/dashboard/teacher/students/${s.id}`} className="block w-full h-full">
+                                {status ? (
+                                  <Badge variant="outline" className={cn('text-[10px] flex items-center gap-1 w-fit', STATUS_STYLES[status])}>
+                                    {STATUS_ICON[status]} {status}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] text-muted-foreground">Not Marked</Badge>
+                                )}
+                              </Link>
                             </td>
                             <td className="py-3 px-5">
                               <Link href={`/dashboard/teacher/students/${s.id}`}>
@@ -366,18 +385,74 @@ export default function ClassDetailPage() {
           </Card>
         </TabsContent>
 
-        {/* Attendance shortcut */}
+        {/* Read-Only Attendance Tab */}
         <TabsContent value="attendance" className="mt-4">
-          <Card className="erp-card">
-            <CardContent className="p-8 text-center">
-              <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-primary/30" />
-              <p className="text-base font-bold text-foreground mb-1">Mark Today's Attendance</p>
-              <p className="text-sm text-muted-foreground mb-5">
-                Use the full attendance page to record present, absent, late, and half-day status.
-              </p>
-              <Button asChild className="rounded-xl">
-                <Link href="/dashboard/teacher/attendance">Open Attendance Page</Link>
-              </Button>
+          <Card className="rounded-2xl border border-slate-100 overflow-hidden shadow-sm bg-white">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg font-black text-slate-800">Attendance Overview</CardTitle>
+                  <p className="text-xs text-slate-400 mt-0.5">Showing attendance status for today ({today})</p>
+                </div>
+                {isClassTeacher && (
+                  <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold h-9">
+                    <Link href="/dashboard/teacher/attendance">Manage Class Attendance</Link>
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {students.length === 0 ? (
+                <div className="py-16 text-center">
+                  <ClipboardCheck className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-bold text-muted-foreground">No students enrolled</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/40">
+                        <th className="py-3.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-wider">#</th>
+                        <th className="py-3.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-wider">Student Name</th>
+                        <th className="py-3.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-wider">Roll No</th>
+                        <th className="py-3.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {students.map((student, idx) => {
+                        const status = getStudentStatus(student);
+                        const rollNo = student.academics?.[0]?.rollNumber ?? '—';
+                        return (
+                          <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 px-6 text-xs text-slate-400 font-bold">{idx + 1}</td>
+                            <td className="py-3.5 px-6 text-xs font-bold text-slate-800">
+                              <Link href={`/dashboard/teacher/students/${student.id}`} className="hover:underline">
+                                {student.firstName} {student.lastName}
+                              </Link>
+                            </td>
+                            <td className="py-3.5 px-6 text-xs text-slate-500 font-semibold">{rollNo}</td>
+                            <td className="py-3.5 px-6 text-right">
+                              {status ? (
+                                <Badge variant={
+                                  status === 'Present' ? 'success' :
+                                  status === 'Absent' ? 'destructive' :
+                                  status === 'HalfDay' ? 'secondary' : 'outline'
+                                } className="text-[10px] font-bold">
+                                  {status}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] text-slate-400 font-bold">
+                                  Unmarked
+                                </Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -406,10 +481,10 @@ export default function ClassDetailPage() {
               ) : (
                 <div className="divide-y divide-border/30">
                   {homeworks.map((hw) => (
-                    <div key={hw.id} className="px-6 py-4 hover:bg-muted/5 transition-colors">
+                    <Link key={hw.id} href={`/dashboard/teacher/academic?tab=homework&homeworkId=${hw.id}`} className="block hover:bg-muted/5 transition-colors px-6 py-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold text-foreground truncate">{hw.title}</h4>
+                          <h4 className="text-sm font-bold text-foreground truncate hover:text-primary transition-colors">{hw.title}</h4>
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{hw.description}</p>
                           <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <Badge variant="outline" className="text-[10px] rounded-lg bg-indigo-50/50 text-indigo-700 border-indigo-100">
@@ -431,7 +506,7 @@ export default function ClassDetailPage() {
                           </p>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -463,10 +538,10 @@ export default function ClassDetailPage() {
               ) : (
                 <div className="divide-y divide-border/30">
                   {classworks.map((cw) => (
-                    <div key={cw.id} className="px-6 py-4 hover:bg-muted/5 transition-colors">
+                    <Link key={cw.id} href={`/dashboard/teacher/academic?tab=classwork&classworkId=${cw.id}`} className="block hover:bg-muted/5 transition-colors px-6 py-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground">{cw.description}</p>
+                          <p className="text-sm text-foreground hover:text-primary transition-colors">{cw.description}</p>
                           <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <Badge variant="outline" className="text-[10px] rounded-lg bg-teal-50/50 text-teal-700 border-teal-100">
                               {subjectNameMap[cw.subjectId] || `Subject: ${cw.subjectId}`}
@@ -487,7 +562,7 @@ export default function ClassDetailPage() {
                           </p>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

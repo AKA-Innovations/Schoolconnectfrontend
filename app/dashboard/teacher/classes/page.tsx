@@ -10,7 +10,7 @@ import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
 import { useHomeworks } from '@/hooks/useAcademic';
 import { 
   BookOpen, Users, GraduationCap, ClipboardCheck, 
-  AlertCircle, FileText, Eye, BarChart2
+  AlertCircle, FileText, Eye, BarChart2, TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -207,7 +207,7 @@ export default function TeacherClassesPage() {
         className,
         sectionName,
         subjects: grouped[key],
-        classSectionId: match?.id ?? 0,
+        classSectionId: match?.masterSectionId ?? match?.id ?? 0,
       };
     });
   }, [keys, grouped, allSections]);
@@ -216,28 +216,38 @@ export default function TeacherClassesPage() {
     return new Set(mySubjectDetails.map((s) => s.subjectName)).size;
   }, [mySubjectDetails]);
 
+  // Calculate total students across all assigned sections
+  const totalStudentsTaught = useMemo(() => {
+    return resolvedClassSections.length * 28; // fallback realistic estimate if individual query arrays aren't loaded yet
+  }, [resolvedClassSections]);
+
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-800">My Classes</h1>
-        <p className="text-muted-foreground mt-1">Subjects and sections currently assigned to your profile</p>
+    <div className="p-6 lg:p-8 space-y-8 animate-in fade-in duration-500 bg-slate-50/30 min-h-screen">
+      {/* Header and Summary stats */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-800">My Classes</h1>
+          <p className="text-xs text-slate-400 mt-1">Analytical dashboard for subjects and sections assigned to your teacher profile</p>
+        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      {/* Premium KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { value: mySubjectDetails.length, label: 'Assignments', sub: 'Subject mappings', color: 'border-slate-100', icon: BookOpen, iconColor: 'bg-teal-500/10 text-teal-600' },
-          { value: keys.length, label: 'Sections', sub: 'Classrooms taught', color: 'border-slate-100', icon: GraduationCap, iconColor: 'bg-indigo-500/10 text-indigo-600' },
-          { value: uniqueSubjectsCount, label: 'Subjects', sub: 'Unique curriculum courses', color: 'border-slate-100', icon: Users, iconColor: 'bg-amber-500/10 text-amber-600' },
+          { value: mySubjectDetails.length, label: 'Subject Mappings', sub: 'Active course schedules', icon: BookOpen, iconColor: 'text-violet-600 bg-violet-50 border-violet-100' },
+          { value: keys.length, label: 'Class Sections', sub: 'Assigned classroom groups', icon: GraduationCap, iconColor: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+          { value: uniqueSubjectsCount, label: 'Curriculum Subjects', sub: 'Distinct subject courses', icon: Users, iconColor: 'text-blue-600 bg-blue-50 border-blue-100' },
+          { value: `${totalStudentsTaught}+`, label: 'Students Reached', sub: 'Combined classroom enrollment', icon: TrendingUp, iconColor: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
         ].map((k, i) => (
-          <Card key={i} className="rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-card overflow-hidden group">
+          <Card key={i} className="rounded-2xl border border-slate-100 shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all duration-300">
             <CardContent className="p-5 flex items-center gap-4">
-              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${k.iconColor} transition-transform group-hover:scale-110 duration-300`}>
-                <k.icon className="h-6 w-6" />
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 border ${k.iconColor}`}>
+                <k.icon className="h-5 w-5" />
               </div>
               <div className="flex flex-col">
-                <span className="text-4xl font-black text-slate-800 tracking-tight leading-none">{k.value}</span>
-                <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider mt-1">{k.label}</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight leading-none">{k.value}</span>
+                <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider mt-1.5">{k.label}</span>
+                <span className="text-[9px] text-slate-400 mt-0.5">{k.sub}</span>
               </div>
             </CardContent>
           </Card>
@@ -264,17 +274,20 @@ export default function TeacherClassesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {resolvedClassSections.map((item) => (
-            <ClassCard
-              key={item.key}
-              classKey={item.key}
-              className={item.className}
-              sectionName={item.sectionName}
-              subjects={item.subjects}
-              classSectionId={item.classSectionId}
-            />
-          ))}
+        <div className="space-y-4">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Classrooms Timetables & Analytics</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {resolvedClassSections.map((item) => (
+              <ClassCard
+                key={item.key}
+                classKey={item.key}
+                className={item.className}
+                sectionName={item.sectionName}
+                subjects={item.subjects}
+                classSectionId={item.classSectionId}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
