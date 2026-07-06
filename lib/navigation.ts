@@ -243,7 +243,7 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       subLinks: [
         { name: 'Marks Entry',   href: '/dashboard/teacher/exams/result-entry' },
         { name: 'My Schedules',  href: '/dashboard/teacher/exams/schedules' },
-        { name: 'Class Results', href: '/dashboard/teacher/exams/results' },
+        { name: 'Class Results', href: '/dashboard/teacher/exams/results', requiresTeacherRole: 'isClassTeacher' },
       ]
     },
     { 
@@ -310,6 +310,19 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
   ],
   student: [
+    {
+      name: 'Dashboard',
+      href: '/dashboard/student',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Academics',
+      href: '/dashboard/student/homework',
+      icon: BookOpen,
+      subLinks: [
+        { name: 'Homework', href: '/dashboard/student/homework' },
+      ]
+    },
     { 
       name: 'Exams', 
       href: '/dashboard/student/exams/schedule', 
@@ -378,8 +391,19 @@ export const getSidebarLinks = (role: Role | null, teacherRoles: any): SidebarLi
   }
   
   const base = baseSidebarLinks[role] || [];
-  return base.filter((link) => {
-    if (!link.requiresTeacherRole) return true;
-    return teacherRoles[link.requiresTeacherRole];
-  });
+  return base
+    .filter((link) => {
+      if (!link.requiresTeacherRole) return true;
+      return teacherRoles[link.requiresTeacherRole];
+    })
+    .map((link) => {
+      if (!link.subLinks) return link;
+      return {
+        ...link,
+        subLinks: link.subLinks.filter(sub => {
+          if (!sub.requiresTeacherRole) return true;
+          return teacherRoles[sub.requiresTeacherRole];
+        })
+      };
+    });
 };

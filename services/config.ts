@@ -182,6 +182,7 @@ export const API_ENDPOINTS = {
     APPROVE: (id: number) => `/teacher-leave/${id}/approve`,
     REJECT: (id: number) => `/teacher-leave/${id}/reject`,
     CANCEL: (id: number) => `/teacher-leave/${id}/cancel`,
+    REVOKE: (id: number) => `/teacher-leave/${id}/revoke`,
     BALANCE: '/teacher-leave/balance',
     BALANCE_INITIALIZE: '/teacher-leave/balance/initialize',
   },
@@ -193,5 +194,6 @@ export const API_ENDPOINTS = {
   TEACHER_ATTENDANCE: {
     BASE: '/teacher-attendance',
     MARK: '/teacher-attendance/mark',
+    DAY: '/teacher-attendance/day',
   },
 } as const;

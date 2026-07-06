@@ -10,11 +10,11 @@ export const teacherKeys = {
 };
 
 // ─── List ─────────────────────────────────────────────────────────────────────
-export function useTeacherList(filters: TeacherFilterParams) {
+export function useTeacherList(filters: TeacherFilterParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: teacherKeys.list(filters),
     queryFn: () => teacherService.listTeachers(filters),
-    enabled: true, // School ID is not required for this endpoint
+    enabled: options?.enabled ?? true, // School ID is not required for this endpoint
     placeholderData: (prev) => prev,
   });
 }

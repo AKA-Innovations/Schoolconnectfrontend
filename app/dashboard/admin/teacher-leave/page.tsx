@@ -11,7 +11,8 @@ import { SubstitutePeriodManager } from '@/components/teacher-leave/SubstitutePe
 import { TeacherAttendanceManager } from '@/components/teacher-leave/TeacherAttendanceManager';
 import { InitializeBalancesDialog } from '@/components/teacher-leave/InitializeBalancesDialog';
 import type { TeacherLeave } from '@/types/leave.types';
-import { FileText, ArrowRightLeft, ClipboardCheck, Settings, CalendarDays } from 'lucide-react';
+import { useSubstitutePeriods } from '@/hooks/useTeacherLeave';
+import { FileText, ArrowRightLeft, ClipboardCheck, Settings, CalendarDays, AlertCircle } from 'lucide-react';
 
 function AdminTeacherLeaveContent() {
   const searchParams = useSearchParams();
@@ -22,6 +23,13 @@ function AdminTeacherLeaveContent() {
   const [approvalMode, setApprovalMode] = useState<'approve' | 'reject'>('approve');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [initDialogOpen, setInitDialogOpen] = useState(false);
+
+  const todayStr = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+  const { data: periods = [] } = useSubstitutePeriods(todayStr);
+  const unassignedCount = React.useMemo(() => periods.filter(p => p.status === 'UNASSIGNED').length, [periods]);
 
   React.useEffect(() => {
     const tab = searchParams.get('tab');
@@ -74,6 +82,23 @@ function AdminTeacherLeaveContent() {
               <TabsContent key="requests" value="requests" className="outline-none">
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   <div className="space-y-4">
+                    {unassignedCount > 0 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 py-3 rounded-xl bg-rose-50 border border-rose-100 shadow-sm animate-pulse">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle size={15} className="text-rose-500 shrink-0" />
+                          <span className="text-xs font-bold text-rose-700">
+                            Attention: There are {unassignedCount} unassigned substitute period slots today! Please allocate substitute teachers.
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] h-7 px-3.5 rounded-lg w-fit shrink-0 transition-all shadow-sm"
+                          onClick={() => handleTabChange('substitutes')}
+                        >
+                          Assign Substitute
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100">
                       <CalendarDays size={14} className="text-blue-500" />
                       <span className="text-xs font-semibold text-blue-700">

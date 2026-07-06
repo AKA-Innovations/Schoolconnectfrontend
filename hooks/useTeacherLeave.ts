@@ -65,7 +65,15 @@ export function useTeacherAttendance(teacherId?: string, year?: number, month?: 
   return useQuery({
     queryKey: leaveKeys.attendance(teacherId, year, month),
     queryFn: () => teacherLeaveService.getAttendance({ teacherId, year, month }),
-    enabled: !!teacherId,
+    enabled: !!year && !!month,
+  });
+}
+
+export function useTeacherAttendanceForDay(date: string) {
+  return useQuery({
+    queryKey: ['teacher-attendance', 'day', date],
+    queryFn: () => teacherLeaveService.getAttendanceForDay(date),
+    enabled: !!date,
   });
 }
 
@@ -117,6 +125,18 @@ export function useCancelLeave() {
   });
 }
 
+export function useRevokeLeave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => teacherLeaveService.revokeLeave(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['teacher-leave'] });
+      qc.invalidateQueries({ queryKey: ['substitute-period'] });
+      qc.invalidateQueries({ queryKey: ['teacher-attendance'] });
+    },
+  });
+}
+
 export function useInitializeBalances() {
   const qc = useQueryClient();
   return useMutation({
@@ -144,6 +164,9 @@ export function useMarkAttendance() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (dto: MarkAttendanceDto) => teacherLeaveService.markAttendance(dto),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['teacher-attendance'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['teacher-attendance'] });
+      qc.invalidateQueries({ queryKey: ['substitute-period'] });
+    },
   });
 }

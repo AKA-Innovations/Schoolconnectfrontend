@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { useTeacherList } from '../../hooks/useTeachers';
-import { useMarkAttendance, useTeacherAttendance } from '../../hooks/useTeacherLeave';
+import { useMarkAttendance, useTeacherAttendanceForDay } from '../../hooks/useTeacherLeave';
 import { AttendanceStatus } from '../../types/leave.types';
 import { Button } from '../ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { CalendarDays, CheckCircle, Loader2, Users, ClipboardList } from 'lucide-react';
+import { CalendarDays, CheckCircle, Loader2, Users, ClipboardList, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -17,39 +17,93 @@ export function TeacherAttendanceManager() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState('ALL');
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 10;
 
   const { data: teacherData, isLoading: loadingTeachers } = useTeacherList({ page: 1, pageSize: 200 });
   const teachers = teacherData?.data || [];
 
-  // Fetch all attendance for the chosen month/year to see existing marked states
-  const parsedDate = React.useMemo(() => new Date(selectedDate), [selectedDate]);
-  const year = parsedDate.getFullYear();
-  const month = parsedDate.getMonth() + 1;
-
-  // We can query all attendance records for this month/year.
-  // Then we map them: teacherId -> status for the selectedDate.
-  const { data: allAttendance = [], isLoading: loadingAttendance } = useTeacherAttendance(
-    undefined, // fetch all teachers
-    year,
-    month
-  );
+  // Fetch all attendance for the chosen date to see existing marked states
+  const { data: dayAttendance = [], isLoading: loadingAttendance } = useTeacherAttendanceForDay(selectedDate);
 
   const markAttendanceMut = useMarkAttendance();
 
   // Create a mapping of teacherId -> Attendance Record for the selectedDate
   const currentDayAttendanceMap = React.useMemo(() => {
     const map = new Map<string, { status: AttendanceStatus; recordId: number }>();
-    const selectedDateStr = new Date(selectedDate).toDateString();
     
-    allAttendance.forEach((record) => {
-      if (new Date(record.date).toDateString() === selectedDateStr) {
-        map.set(record.teacherId, { status: record.status, recordId: record.id });
-      }
+    dayAttendance.forEach((record) => {
+      map.set(record.teacherId, { status: record.status, recordId: record.id });
     });
     return map;
-  }, [allAttendance, selectedDate]);
+  }, [dayAttendance]);
 
   const [savingTeacherId, setSavingTeacherId] = React.useState<string | null>(null);
+
+  // Client-side quick filters and search
+  const filteredTeachers = React.useMemo(() => {
+    return teachers.filter((teacher) => {
+      const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
+      const empId = (teacher.employeeId || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
+      if (searchQuery && !fullName.includes(query) && !empId.includes(query)) {
+        return false;
+      }
+
+      if (statusFilter !== 'ALL') {
+        const attendance = currentDayAttendanceMap.get(teacher.id);
+        const status = attendance?.status;
+        
+        if (statusFilter === 'UNMARKED') {
+          return !status;
+        } else {
+          return status === statusFilter;
+        }
+      }
+
+      return true;
+    });
+  }, [teachers, searchQuery, statusFilter, currentDayAttendanceMap]);
+
+  // Pagination calculations
+  const totalItems = filteredTeachers.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  React.useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedTeachers = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredTeachers.slice(startIndex, startIndex + pageSize);
+  }, [filteredTeachers, currentPage]);
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) {
+        pages.push('...');
+      }
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) {
+        pages.push('...');
+      }
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const handleMarkStatus = async (teacherId: string, status: AttendanceStatus) => {
     const existing = currentDayAttendanceMap.get(teacherId);
@@ -74,20 +128,19 @@ export function TeacherAttendanceManager() {
   };
 
   const handleMarkAllPresent = async () => {
-    const unmarkedTeachers = teachers.filter((t) => {
+    const unmarkedTeachers = filteredTeachers.filter((t) => {
       const state = currentDayAttendanceMap.get(t.id);
       return !state || (state.status !== AttendanceStatus.PRESENT && state.status !== AttendanceStatus.ON_LEAVE);
     });
 
     if (unmarkedTeachers.length === 0) {
-      toast.info('All teachers are already marked present or on leave.');
+      toast.info('All filtered teachers are already marked present or on leave.');
       return;
     }
 
     toast.loading(`Marking ${unmarkedTeachers.length} teachers as Present...`, { id: 'bulk-mark' });
 
     try {
-      // Loop and mark all as PRESENT in parallel
       await Promise.all(
         unmarkedTeachers.map((t) =>
           markAttendanceMut.mutateAsync({
@@ -97,7 +150,7 @@ export function TeacherAttendanceManager() {
           })
         )
       );
-      toast.success(`Successfully marked all unmarked teachers present!`, { id: 'bulk-mark' });
+      toast.success(`Successfully marked all unmarked filtered teachers present!`, { id: 'bulk-mark' });
     } catch (err) {
       toast.error('Failed to complete bulk attendance marking.', { id: 'bulk-mark' });
     }
@@ -107,33 +160,73 @@ export function TeacherAttendanceManager() {
 
   return (
     <div className="space-y-6">
-      {/* Date selector and Bulk Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-10 pl-9 pr-4 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-            />
+      {/* Date selector, Search, and Bulk Actions Bar */}
+      <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="h-10 pl-9 pr-4 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              Marking attendance for <span className="font-bold text-slate-700">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</span>
+            </p>
           </div>
-          <p className="text-xs text-slate-500">
-            Marking attendance for <span className="font-bold text-slate-700">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</span>
-          </p>
+
+          <Button
+            onClick={handleMarkAllPresent}
+            disabled={isLoading || filteredTeachers.length === 0}
+            variant="outline"
+            size="sm"
+            className="h-9 px-4 text-xs font-bold text-violet-600 border-violet-200 hover:bg-violet-50 hover:border-violet-300 transition-all"
+          >
+            <CheckCircle size={14} className="mr-1.5" />
+            Mark All Present
+          </Button>
         </div>
 
-        <Button
-          onClick={handleMarkAllPresent}
-          disabled={isLoading || teachers.length === 0}
-          variant="outline"
-          size="sm"
-          className="h-9 px-4 text-xs font-bold text-violet-600 border-violet-200 hover:bg-violet-50 hover:border-violet-300"
-        >
-          <CheckCircle size={14} className="mr-1.5" />
-          Mark All Present
-        </Button>
+        {/* Quick Search and Status Filter Row */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3 border-t border-slate-100 pt-4">
+          {/* Quick Search */}
+          <div className="relative min-w-[240px] flex-1 max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search teacher name or Emp ID..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-10 pl-9 pr-4 w-full rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* Attendance Status Filter */}
+          <div className="w-44">
+            <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
+              <SelectTrigger className="h-10 rounded-xl border-slate-200 text-xs font-semibold text-slate-600 bg-white">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="PRESENT">Present</SelectItem>
+                <SelectItem value="ABSENT">Absent</SelectItem>
+                <SelectItem value="HALF_DAY">Half Day</SelectItem>
+                <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+                <SelectItem value="UNMARKED">Unmarked</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
@@ -142,10 +235,10 @@ export function TeacherAttendanceManager() {
             <div key={i} className="h-16 rounded-xl bg-slate-50 border border-slate-100 animate-pulse" />
           ))}
         </div>
-      ) : teachers.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
+      ) : filteredTeachers.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
           <Users size={44} className="mx-auto text-slate-200 mb-3" />
-          <p className="text-sm font-semibold text-slate-400">No teachers found</p>
+          <p className="text-sm font-semibold text-slate-400">No teachers found matching the criteria</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
@@ -157,7 +250,7 @@ export function TeacherAttendanceManager() {
 
           {/* Teacher Rows */}
           <div className="divide-y divide-slate-100">
-            {teachers.map((teacher, idx) => {
+            {paginatedTeachers.map((teacher, idx) => {
               const attendance = currentDayAttendanceMap.get(teacher.id);
               const currentStatus = attendance?.status;
               const isLeave = currentStatus === AttendanceStatus.ON_LEAVE;
@@ -240,6 +333,64 @@ export function TeacherAttendanceManager() {
               );
             })}
           </div>
+
+          {/* Premium Pagination Bar */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4 px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+              <span className="text-xs text-slate-500 font-semibold">
+                Showing <span className="font-bold text-slate-700">{Math.min((currentPage - 1) * pageSize + 1, totalItems)}</span> to{' '}
+                <span className="font-bold text-slate-700">{Math.min(currentPage * pageSize, totalItems)}</span> of{' '}
+                <span className="font-bold text-slate-700">{totalItems}</span> teachers
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-50"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((page, i) => {
+                    if (page === '...') {
+                      return (
+                        <span key={`dots-${i}`} className="px-2 text-xs text-slate-400 font-bold">
+                          ...
+                        </span>
+                      );
+                    }
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setCurrentPage(page as number)}
+                        className={cn(
+                          "h-8 w-8 text-xs font-bold rounded-lg",
+                          currentPage === page
+                            ? "bg-violet-600 hover:bg-violet-700 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white hover:shadow-sm"
+                        )}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  className="h-8 px-3 text-xs font-bold border-slate-200 text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-50"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -94,6 +94,12 @@ export default function LoginPage() {
           const teacherDetails = await teacherService.getTeacherById(backendUserId);
           const assignedClass = teacherDetails.classTeacherAssignment ?? null;
           const coordinatorClasses = (teacherDetails.coordinatorMappings ?? []).map((m) => m.className);
+          if (teacherDetails.isPrincipal) {
+            document.cookie = `is-principal=true; path=/; SameSite=Strict`;
+          } else {
+            document.cookie = `is-principal=; Max-Age=0; path=/`;
+          }
+
           setAuth({
             user: {
               ...userObj,
@@ -140,8 +146,8 @@ export default function LoginPage() {
 
       <div className="relative z-10 flex flex-col lg:flex-row flex-1 w-full">
 
-        {/* LEFT SIDE: Branding & Value Prop */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 pt-12 pb-6 lg:py-12 lg:px-20">
+        {/* LEFT SIDE: Branding & Value Prop - Desktop Only */}
+        <div className="hidden lg:flex w-full lg:w-1/2 flex-col justify-center px-6 pt-12 pb-6 lg:py-12 lg:px-20">
           <div className="max-w-xl mx-auto lg:mx-0">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-6 lg:mb-10 group">
@@ -182,31 +188,43 @@ export default function LoginPage() {
         </div>
 
         {/* RIGHT SIDE: Login Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center px-4 pb-12 pt-6 lg:py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
-          <Card className="cardprime w-full max-w-md rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-2">
-            <CardHeader className="space-y-1 text-center pb-8">
-              <CardTitle className="text-2xl font-bold text-slate-900">Dashboard Login</CardTitle>
-              <CardDescription className="text-slate-500">Enter your official credentials below</CardDescription>
+        <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-4 pb-12 pt-12 lg:py-10 lg:bg-white/40 lg:backdrop-blur-sm lg:border-l border-slate-200">
+          
+          {/* Logo - Mobile Only */}
+          <div className="flex items-center gap-3 mb-8 lg:hidden group">
+            <div className="w-10 h-10 bg-[#00A99D] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <GraduationCap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 leading-none">SkoolConnect</h1>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-[#00A99D]">Enterprise Edition</span>
+            </div>
+          </div>
+
+          <Card className="cardprime w-full max-w-md rounded-[24px] sm:rounded-[40px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] bg-white p-1 sm:p-2">
+            <CardHeader className="space-y-1 text-center pb-6 sm:pb-8 px-4 sm:px-6">
+              <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Dashboard Login</CardTitle>
+              <CardDescription className="text-xs sm:text-sm text-slate-500">Enter your official credentials below</CardDescription>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
+                  <Label htmlFor="username" className="text-slate-700 font-medium text-xs sm:text-sm">Username</Label>
                   <Input
                     id="username"
                     placeholder="john.doe@school.edu"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="h-12 border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-blue-500 transition-all"
+                    className="h-11 sm:h-12 border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-blue-500 transition-all text-xs sm:text-sm"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                    <button type="button" className="text-xs text-[#00A99D] hover:text-[#00A99D] font-semibold transition-colors">
+                    <Label htmlFor="password" className="text-slate-700 font-medium text-xs sm:text-sm">Password</Label>
+                    <button type="button" className="text-[10px] sm:text-xs text-[#00A99D] hover:text-[#00A99D] font-semibold transition-colors">
                       Reset Password?
                     </button>
                   </div>
@@ -216,7 +234,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 pr-10 border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-blue-500 transition-all"
+                      className="h-11 sm:h-12 pr-10 border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-blue-500 transition-all text-xs sm:text-sm"
                       required
                     />
                     <button
@@ -230,7 +248,7 @@ export default function LoginPage() {
                 </div>
 
                 {error && (
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm flex items-center gap-2 animate-in fade-in zoom-in-95">
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in zoom-in-95">
                     <Shield className="w-4 h-4 shrink-0" />
                     {error}
                   </div>
@@ -238,7 +256,7 @@ export default function LoginPage() {
 
                 <Button
                   disabled={isLoading}
-                  className="w-full h-12 text-base font-bold bg-[#00A99D] hover:bg-[#00897B] text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-bold bg-[#00A99D] hover:bg-[#00897B] text-white shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
                 >
                   {isLoading ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
@@ -255,16 +273,16 @@ export default function LoginPage() {
       </div>
 
       {/* FOOTER */}
-      <footer className="relative z-10 px-6 py-6 border-t border-slate-100 bg-white/80 backdrop-blur-md">
+      <footer className="relative z-10 px-4 sm:px-6 py-6 border-t border-slate-100 bg-white/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-6 text-[13px] font-medium text-slate-400">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-[12px] sm:text-[13px] font-medium text-slate-400 text-center">
             <span>© 2026 SkoolConnect</span>
-            <div className="flex items-center gap-1.5 border-l pl-6 border-slate-200">
-              <Shield className="w-4 h-4 text-green-500" />
+            <div className="flex items-center gap-1.5 sm:border-l sm:pl-6 border-slate-200">
+              <Shield className="w-3.5 h-3.5 text-green-500" />
               <span className="text-slate-500">Secure AES-256 Encryption</span>
             </div>
           </div>
-          <nav className="flex gap-8 text-[13px] font-semibold text-slate-500">
+          <nav className="flex flex-wrap justify-center gap-4 sm:gap-8 text-[12px] sm:text-[13px] font-semibold text-slate-500">
             <a href="#" className="hover:text-[#00A99D] transition-colors">Documentation</a>
             <a href="#" className="hover:text-[#00A99D] transition-colors">Privacy</a>
             <a href="#" className="hover:text-[#00A99D] transition-colors">Contact</a>

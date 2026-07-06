@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +81,23 @@ export function ScheduleBuilder({ session }: Props) {
   const [copySourceExamId, setCopySourceExamId] = useState<number | ''>('');
   const [copySourceClassId, setCopySourceClassId] = useState<number | ''>('');
 
+  // Selected section filter for viewing schedules
+  const [selectedScheduleSectionId, setSelectedScheduleSectionId] = useState<number | ''>('');
+  // Selected schedules tab (upcoming or conducted)
+  const [scheduleTab, setScheduleTab] = useState<'upcoming' | 'conducted'>('upcoming');
+
+  // Automatically gather dates from active exam
+  useEffect(() => {
+    if (selectedExamId) {
+      const activeExam = exams.find((e: any) => e.id === Number(selectedExamId));
+      if (activeExam?.startDate) {
+        const formattedDate = new Date(activeExam.startDate).toISOString().split('T')[0];
+        setBulkStartDate(formattedDate);
+        setBulkScheduleDate(formattedDate);
+      }
+    }
+  }, [selectedExamId, exams]);
+
   // Restrict class choices to coordinator/teacher's own classes if not admin/principal
   const allowedClasses = React.useMemo(() => {
     if (userRole === 'school_admin' || isPrincipal) return schoolClasses;
@@ -126,11 +144,34 @@ export function ScheduleBuilder({ session }: Props) {
       );
     }
 
+    if (selectedScheduleSectionId !== '') {
+      list = list.filter((sch: any) => sch.classSectionId === Number(selectedScheduleSectionId));
+    }
+
     if (applyToAllSections || selectedSectionIds.length === 0) {
       return list;
     }
     return list.filter((sch: any) => selectedSectionIds.includes(sch.classSectionId));
-  }, [existingSchedules, applyToAllSections, selectedSectionIds, isNormalTeacher, mySectionIds, mySubjectIds]);
+  }, [existingSchedules, applyToAllSections, selectedSectionIds, isNormalTeacher, mySectionIds, mySubjectIds, selectedScheduleSectionId]);
+
+  const { upcomingSchedules, conductedSchedules } = React.useMemo(() => {
+    const upcoming: any[] = [];
+    const conducted: any[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    displayedSchedules.forEach((sch: any) => {
+      const examDate = new Date(sch.examDate);
+      examDate.setHours(0, 0, 0, 0);
+      if (examDate >= today) {
+        upcoming.push(sch);
+      } else {
+        conducted.push(sch);
+      }
+    });
+
+    return { upcomingSchedules: upcoming, conductedSchedules: conducted };
+  }, [displayedSchedules]);
 
   // Filter out subjects already scheduled in the current view
   const unscheduledSubjects = React.useMemo(() => {
@@ -446,6 +487,7 @@ export function ScheduleBuilder({ session }: Props) {
               const val = e.target.value ? Number(e.target.value) : '';
               setSelectedClassId(val);
               setSelectedSectionIds([]);
+              setSelectedScheduleSectionId('');
             }}
             className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
           >
@@ -454,6 +496,19 @@ export function ScheduleBuilder({ session }: Props) {
               <option key={c.id} value={c.id}>{c.className}</option>
             ))}
           </select>
+
+          {selectedClassId && (
+            <select
+              value={selectedScheduleSectionId}
+              onChange={(e) => setSelectedScheduleSectionId(e.target.value ? Number(e.target.value) : '')}
+              className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold animate-in fade-in slide-in-from-left-2 duration-300"
+            >
+              <option value="">All Sections</option>
+              {allowedSections.map((s: any) => (
+                <option key={s.id} value={s.id}>Section {s.sectionName}</option>
+              ))}
+            </select>
+          )}
 
           <Button
             variant="outline"
@@ -852,35 +907,77 @@ export function ScheduleBuilder({ session }: Props) {
             "rounded-2xl border border-border/80 shadow-sm bg-card overflow-hidden h-fit",
             isNormalTeacher ? "xl:col-span-3" : ""
           )}>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold">
-                {isNormalTeacher ? 'My Exam Schedules' : 'Existing Schedules'}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                {isNormalTeacher 
-                  ? 'Upcoming exams scheduled for your assigned subjects.' 
-                  : 'Schedules already established.'}
-              </CardDescription>
+            <CardHeader className="pb-3 border-b border-border/50 bg-muted/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg font-bold">
+                    {isNormalTeacher ? 'My Exam Schedules' : 'Existing Schedules'}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    View dates, timings, and action links for scheduled exams.
+                  </CardDescription>
+                </div>
+                <div className="flex rounded-xl bg-muted/40 p-1 border border-border/50 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleTab('upcoming')}
+                    className={cn(
+                      "px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                      scheduleTab === 'upcoming'
+                        ? "bg-white text-foreground shadow-sm font-bold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Upcoming ({upcomingSchedules.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleTab('conducted')}
+                    className={cn(
+                      "px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer",
+                      scheduleTab === 'conducted'
+                        ? "bg-white text-foreground shadow-sm font-bold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Conducted ({conductedSchedules.length})
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              {displayedSchedules.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-xs">
-                  No schedules found for this selection.
+              {((scheduleTab === 'upcoming' ? upcomingSchedules : conductedSchedules).length === 0) ? (
+                <div className="p-8 text-center text-muted-foreground text-xs font-medium">
+                  No {scheduleTab} schedules found for this selection.
                 </div>
               ) : (
                 <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-                  {displayedSchedules.map((sch: any) => {
+                  {(scheduleTab === 'upcoming' ? upcomingSchedules : conductedSchedules).map((sch: any) => {
                     const optSub = subjectOptions.find((s: any) => s.id === sch.subjectId);
                     const sec = allowedSections.find((s: any) => s.id === sch.classSectionId);
                     return (
-                      <div key={sch.id} className="p-4 hover:bg-muted/5 transition-colors flex justify-between items-center">
+                      <div key={sch.id} className="p-4 hover:bg-muted/5 transition-colors flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                         <div>
                           <p className="font-bold text-xs">{optSub?.subjectName || `Subject ${sch.subjectId}`} ({sec?.sectionName || `Section ${sch.classSectionId}`})</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">
                             {new Date(sch.examDate).toLocaleDateString()} | {sch.startTime} - {sch.endTime} {sch.roomNo && `| Room ${sch.roomNo}`}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2 shrink-0">
+                          {scheduleTab === 'conducted' && (
+                            <>
+                              <Link href="/dashboard/teacher/exams/result-entry">
+                                <Button size="sm" variant="outline" className="h-7 px-3 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer">
+                                  Enter Marks
+                                </Button>
+                              </Link>
+                              <Link href="/dashboard/teacher/exams/results">
+                                <Button size="sm" variant="outline" className="h-7 px-3 text-[10px] font-bold border-primary/20 text-primary hover:bg-primary/5 rounded-lg cursor-pointer">
+                                  View Results
+                                </Button>
+                              </Link>
+                            </>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"

@@ -55,6 +55,7 @@ api.interceptors.response.use(
         useAuthStore.getState().clearAuth();
         document.cookie = 'auth-token=; Max-Age=0; path=/';
         document.cookie = 'user-role=; Max-Age=0; path=/';
+        document.cookie = 'is-principal=; Max-Age=0; path=/';
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';
       } else if (status === 403) {

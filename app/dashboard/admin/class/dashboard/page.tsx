@@ -14,7 +14,6 @@ import {
   Users2,
   ChevronRight,
   BarChart3,
-  UserSquare2,
 } from 'lucide-react';
 
 const FEATURE_CARDS = [
@@ -37,7 +36,7 @@ const FEATURE_CARDS = [
     href: '/dashboard/admin/class/teachers',
   },
   {
-    icon: UserSquare2,
+    icon: Users,
     title: 'Class Students',
     description: 'View students section-wise with their today\'s attendance status',
     href: '/dashboard/admin/class/students',

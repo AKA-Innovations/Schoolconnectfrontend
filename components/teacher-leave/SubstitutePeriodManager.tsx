@@ -23,11 +23,15 @@ interface SubstitutePeriodManagerProps {
   isAdmin?: boolean;
 }
 
-import { useClassSectionLists, usePeriodSlots, useSubjectDetails } from '../../hooks/useClasses';
+import { useClassSectionLists, usePeriodSlots, useSubjectOptions } from '../../hooks/useClasses';
 import { useTeacherList } from '../../hooks/useTeachers';
 import { useAuthStore } from '../../store/authStore';
 
 export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProps) {
+  const user = useAuthStore((s) => s.user);
+  const role = useAuthStore((s) => s.role);
+  const schoolId = useAuthStore((s) => s.schoolId);
+
   const [selectedDate, setSelectedDate] = React.useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -37,12 +41,12 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
 
   const { data: periods = [], isLoading } = useSubstitutePeriods(selectedDate);
   const { data: classSections = [] } = useClassSectionLists();
-  const { data: teachersData } = useTeacherList({ page: 1, pageSize: 200 });
+  const { data: teachersData } = useTeacherList(
+    { schoolId: schoolId || '', page: 1, pageSize: 500 },
+    { enabled: !!isAdmin }
+  );
   const { data: periodSlots = [] } = usePeriodSlots();
-  const { data: subjectDetails = [] } = useSubjectDetails();
-
-  const user = useAuthStore((s) => s.user);
-  const role = useAuthStore((s) => s.role);
+  const { data: subjectOptions = [] } = useSubjectOptions();
 
   const teachers = teachersData?.data || [];
 
@@ -96,16 +100,13 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
 
   const subjectMap = React.useMemo(() => {
     const map = new Map<number, string>();
-    subjectDetails.forEach((sd) => {
-      if (sd.subjectDtlsId) {
-        map.set(sd.subjectDtlsId, sd.subjectName || '');
-      }
+    subjectOptions.forEach((sd) => {
       if (sd.id) {
         map.set(Number(sd.id), sd.subjectName || '');
       }
     });
     return map;
-  }, [subjectDetails]);
+  }, [subjectOptions]);
 
   // Group periods by original teacher so they form a "Timetable" for that absent teacher
   const groupedPeriods = React.useMemo(() => {

@@ -5,10 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { LeaveType } from '../../types/leave.types';
-import { useApplyLeave } from '../../hooks/useTeacherLeave';
+import { useApplyLeave, useLeaveList } from '../../hooks/useTeacherLeave';
+import { useAuthStore } from '../../store/authStore';
 import { CURRENT_SESSION } from '../../lib/constants';
 import { toast } from 'sonner';
-import { CalendarDays, FileText, Send } from 'lucide-react';
+import { CalendarDays, FileText, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LeaveRequestFormProps {
   open: boolean;
@@ -16,13 +17,36 @@ interface LeaveRequestFormProps {
 }
 
 export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) {
+  const user = useAuthStore((s) => s.user);
   const [leaveType, setLeaveType] = React.useState<string>('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
   const [reason, setReason] = React.useState('');
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
+  // Calendar navigation state
+  const [currentMonth, setCurrentMonth] = React.useState(new Date());
+
   const applyLeave = useApplyLeave();
+  
+  // Fetch existing leaves to show on the calendar
+  const { data: leaves = [] } = useLeaveList({ teacherId: user?.id });
+
+  const takenDates = React.useMemo(() => {
+    const dates = new Set<string>();
+    leaves.forEach((leave) => {
+      if (leave.status === 'APPROVED' || leave.status === 'PENDING') {
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const curr = new Date(start);
+        while (curr <= end) {
+          dates.add(curr.toISOString().split('T')[0]);
+          curr.setDate(curr.getDate() + 1);
+        }
+      }
+    });
+    return dates;
+  }, [leaves]);
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -74,9 +98,102 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
     { value: LeaveType.EMERGENCY, label: 'Emergency Leave' },
   ];
 
+  // Calendar generation helpers
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  const daysInMonth = React.useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      days.push(new Date(year, month, i));
+    }
+    return days;
+  }, [currentMonth]);
+
+  const handleDateClick = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Check if the clicked date itself is already taken
+    if (takenDates.has(dateStr)) {
+      toast.error('This date is already taken by another leave request.');
+      return;
+    }
+
+    if (!startDate || (startDate && endDate)) {
+      // First click
+      setStartDate(dateStr);
+      setEndDate('');
+    } else {
+      // Second click
+      const start = new Date(startDate);
+      if (date < start) {
+        setStartDate(dateStr);
+        setEndDate('');
+      } else {
+        // Check if any taken dates are in the range [startDate, clickedDate]
+        let hasConflict = false;
+        const curr = new Date(start);
+        while (curr <= date) {
+          if (takenDates.has(curr.toISOString().split('T')[0])) {
+            hasConflict = true;
+            break;
+          }
+          curr.setDate(curr.getDate() + 1);
+        }
+
+        if (hasConflict) {
+          toast.error('The selected range overlaps with existing leaves.');
+          setStartDate(dateStr);
+          setEndDate('');
+        } else {
+          setEndDate(dateStr);
+        }
+      }
+    }
+  };
+
+  const getDayClass = (date: Date | null) => {
+    if (!date) return 'invisible';
+    const dateStr = date.toISOString().split('T')[0];
+    const isToday = new Date().toISOString().split('T')[0] === dateStr;
+    const isTaken = takenDates.has(dateStr);
+    const isStart = startDate === dateStr;
+    const isEnd = endDate === dateStr;
+    const isInRange = startDate && endDate && dateStr > startDate && dateStr < endDate;
+
+    let base = "h-8 w-8 text-xs font-bold rounded-full flex items-center justify-center transition-all cursor-pointer select-none ";
+
+    if (isTaken) {
+      base += "bg-rose-50 text-rose-400 line-through cursor-not-allowed";
+    } else if (isStart || isEnd) {
+      base += "bg-violet-600 text-white shadow-sm";
+    } else if (isInRange) {
+      base += "bg-violet-100 text-violet-700 rounded-none";
+    } else if (isToday) {
+      base += "border border-violet-500 text-violet-600";
+    } else {
+      base += "hover:bg-slate-100 text-slate-700";
+    }
+
+    return base;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md rounded-[2rem]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
@@ -105,35 +222,55 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
             {errors.leaveType && <p className="text-xs text-red-500 mt-1">{errors.leaveType}</p>}
           </div>
 
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Start Date</label>
-              <div className="relative">
-                <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-                />
-              </div>
-              {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
+          {/* Interactive Date Range Selector */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-500">Select Date Range</label>
+              {startDate && (
+                <span className="text-[10px] bg-violet-50 text-violet-600 px-2 py-0.5 rounded-md font-bold">
+                  {startDate} {endDate ? `to ${endDate}` : '(Choose end date)'}
+                </span>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">End Date</label>
-              <div className="relative">
-                <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate || undefined}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-                />
+
+            <div className="border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-xs font-bold text-slate-700">
+                  {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </span>
+                <div className="flex gap-1">
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 rounded-lg" onClick={handlePrevMonth}>
+                    <ChevronLeft size={14} />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 rounded-lg" onClick={handleNextMonth}>
+                    <ChevronRight size={14} />
+                  </Button>
+                </div>
               </div>
-              {errors.endDate && <p className="text-xs text-red-500 mt-1">{errors.endDate}</p>}
+
+              <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 mb-1">
+                <span>Su</span>
+                <span>Mo</span>
+                <span>Tu</span>
+                <span>We</span>
+                <span>Th</span>
+                <span>Fr</span>
+                <span>Sa</span>
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-1 justify-items-center">
+                {daysInMonth.map((day, idx) => (
+                  <div
+                    key={idx}
+                    className={getDayClass(day)}
+                    onClick={() => day && handleDateClick(day)}
+                  >
+                    {day ? day.getDate() : ''}
+                  </div>
+                ))}
+              </div>
             </div>
+            {errors.startDate && <p className="text-xs text-red-500 mt-1">{errors.startDate}</p>}
           </div>
 
           {/* Reason */}
@@ -142,17 +279,11 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              rows={3}
+              rows={2}
               placeholder="Describe the reason for your leave..."
               className="w-full px-4 py-3 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none"
             />
             {errors.reason && <p className="text-xs text-red-500 mt-1">{errors.reason}</p>}
-          </div>
-
-          {/* Session info */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-            <CalendarDays size={14} className="text-slate-400" />
-            <span className="text-xs text-slate-500">Session: <span className="font-bold text-slate-700">{CURRENT_SESSION}</span></span>
           </div>
 
           {/* Actions */}
@@ -169,7 +300,7 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
             <Button
               type="submit"
               size="sm"
-              className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white"
+              className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-bold rounded-xl"
               disabled={applyLeave.isPending}
             >
               {applyLeave.isPending ? (

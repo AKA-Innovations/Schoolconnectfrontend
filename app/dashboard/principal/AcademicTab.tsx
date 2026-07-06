@@ -127,12 +127,88 @@ export function AcademicTab({
   // State & Hooks for Homework
   const [selectedHwClass, setSelectedHwClass] = useState('');
   const [selectedHwSection, setSelectedHwSection] = useState('');
-  const { data: rawHomeworks = [], isLoading: loadingHwData } = useHomeworks(selectedHwClass || undefined);
+  const [selectedHwSubject, setSelectedHwSubject] = useState('');
+
+  const hwClassSectionId = useMemo(() => {
+    if (!selectedHwClass || !selectedHwSection) return undefined;
+    const found = classSections.find(
+      (cs) => cs.className === selectedHwClass && cs.sectionName === selectedHwSection
+    );
+    return found?.masterSectionId;
+  }, [classSections, selectedHwClass, selectedHwSection]);
+
+  const hwSubjects = useMemo(() => {
+    if (!selectedHwClass || !selectedHwSection) return [];
+    return subjectDetails.filter(
+      (sd: any) =>
+        sd.className === selectedHwClass &&
+        sd.sectionName === selectedHwSection
+    );
+  }, [subjectDetails, selectedHwClass, selectedHwSection]);
+
+  const { data: rawHomeworks = [], isLoading: loadingHwData } = useHomeworks(
+    hwClassSectionId && selectedHwSubject
+      ? {
+          session: CURRENT_SESSION,
+          classSectionId: hwClassSectionId,
+          subjectId: Number(selectedHwSubject),
+        }
+      : undefined
+  );
 
   // State & Hooks for Classwork
   const [selectedCwClass, setSelectedCwClass] = useState('');
   const [selectedCwSection, setSelectedCwSection] = useState('');
-  const { data: rawClassworks = [], isLoading: loadingCwData } = useClassworks(selectedCwClass || undefined);
+  const [selectedCwSubject, setSelectedCwSubject] = useState('');
+
+  const cwClassSectionId = useMemo(() => {
+    if (!selectedCwClass || !selectedCwSection) return undefined;
+    const found = classSections.find(
+      (cs) => cs.className === selectedCwClass && cs.sectionName === selectedCwSection
+    );
+    return found?.masterSectionId;
+  }, [classSections, selectedCwClass, selectedCwSection]);
+
+  const cwSubjects = useMemo(() => {
+    if (!selectedCwClass || !selectedCwSection) return [];
+    return subjectDetails.filter(
+      (sd: any) =>
+        sd.className === selectedCwClass &&
+        sd.sectionName === selectedCwSection
+    );
+  }, [subjectDetails, selectedCwClass, selectedCwSection]);
+
+  const { data: rawClassworks = [], isLoading: loadingCwData } = useClassworks(
+    cwClassSectionId && selectedCwSubject
+      ? {
+          session: CURRENT_SESSION,
+          classSectionId: cwClassSectionId,
+          subjectId: Number(selectedCwSubject),
+        }
+      : undefined
+  );
+
+  // Reset/Auto-select homework subject
+  useEffect(() => {
+    setSelectedHwSubject('');
+  }, [selectedHwClass, selectedHwSection]);
+
+  useEffect(() => {
+    if (hwSubjects.length > 0 && !selectedHwSubject) {
+      setSelectedHwSubject(String(hwSubjects[0].subjectId));
+    }
+  }, [hwSubjects, selectedHwSubject]);
+
+  // Reset/Auto-select classwork subject
+  useEffect(() => {
+    setSelectedCwSubject('');
+  }, [selectedCwClass, selectedCwSection]);
+
+  useEffect(() => {
+    if (cwSubjects.length > 0 && !selectedCwSubject) {
+      setSelectedCwSubject(String(cwSubjects[0].subjectId));
+    }
+  }, [cwSubjects, selectedCwSubject]);
 
   const isWithinDaysLocal = useCallback((dateStr: string, days: string): boolean => {
     if (days === 'all') return true;
@@ -149,23 +225,18 @@ export function AcademicTab({
   }, []);
 
   const filteredHomeworksLocal = useMemo(() => {
-    if (!selectedHwClass || !selectedHwSection) return [];
+    if (!selectedHwClass || !selectedHwSection || !selectedHwSubject) return [];
     return rawHomeworks.filter(
-      (hw: any) =>
-        hw.className === selectedHwClass &&
-        hw.sectionName === selectedHwSection &&
-        isWithinDaysLocal(hw.assignedDate || hw.createdAt || '', hwDayFilter)
+      (hw: any) => isWithinDaysLocal(hw.assignedDate || hw.createdAt || '', hwDayFilter)
     );
-  }, [rawHomeworks, selectedHwClass, selectedHwSection, hwDayFilter, isWithinDaysLocal]);
+  }, [rawHomeworks, selectedHwClass, selectedHwSection, selectedHwSubject, hwDayFilter, isWithinDaysLocal]);
 
   const filteredClassworksLocal = useMemo(() => {
-    if (!selectedCwClass || !selectedCwSection) return [];
+    if (!selectedCwClass || !selectedCwSection || !selectedCwSubject) return [];
     return rawClassworks.filter((cw: any) => {
-      const matchClass = cw.classId === selectedCwClass || cw.className === selectedCwClass;
-      const matchSection = cw.sectionId === selectedCwSection || cw.sectionName === selectedCwSection;
-      return matchClass && matchSection && isWithinDaysLocal(cw.conductedOn || cw.createdAt || '', cwDayFilter);
+      return isWithinDaysLocal(cw.conductedOn || cw.createdAt || '', cwDayFilter);
     });
-  }, [rawClassworks, selectedCwClass, selectedCwSection, cwDayFilter, isWithinDaysLocal]);
+  }, [rawClassworks, selectedCwClass, selectedCwSection, selectedCwSubject, cwDayFilter, isWithinDaysLocal]);
 
   // Auto-select first class & section if not set
   useEffect(() => {
@@ -385,15 +456,32 @@ export function AcademicTab({
                   ))}
                 </select>
               </div>
+
+              {/* Subject Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedHwSubject}
+                  onChange={(e) => setSelectedHwSubject(e.target.value)}
+                  disabled={!selectedHwSection}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                >
+                  <option value="">Select Subject</option>
+                  {hwSubjects.map((sub: any) => (
+                    <option key={sub.subjectId} value={sub.subjectId}>
+                      {sub.subjectName}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {loadingHwData ? (
               <TableSkeleton />
-            ) : !selectedHwClass || !selectedHwSection ? (
+            ) : !selectedHwClass || !selectedHwSection || !selectedHwSubject ? (
               <div className="text-center py-10 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">Please select a class and section to view homework</p>
+                <p className="text-xs font-bold">Please select a class, section, and subject to view homework</p>
               </div>
             ) : filteredHomeworksLocal.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
@@ -460,7 +548,7 @@ export function AcademicTab({
                 ))}
               </div>
             )}
-            {selectedHwClass && selectedHwSection && (
+            {selectedHwClass && selectedHwSection && selectedHwSubject && (
               <p className="text-[10px] text-muted-foreground mt-3 font-bold">
                 {filteredHomeworksLocal.length} homework item{filteredHomeworksLocal.length !== 1 ? 's' : ''} shown
               </p>
@@ -548,20 +636,37 @@ export function AcademicTab({
                   ))}
                 </select>
               </div>
+
+              {/* Subject Select */}
+              <div className="w-full sm:w-40">
+                <select
+                  value={selectedCwSubject}
+                  onChange={(e) => setSelectedCwSubject(e.target.value)}
+                  disabled={!selectedCwSection}
+                  className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                >
+                  <option value="">Select Subject</option>
+                  {cwSubjects.map((sub: any) => (
+                    <option key={sub.subjectId} value={sub.subjectId}>
+                      {sub.subjectName}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {loadingCwData ? (
               <TableSkeleton />
-            ) : !selectedCwClass || !selectedCwSection ? (
+            ) : !selectedCwClass || !selectedCwSection || !selectedCwSubject ? (
               <div className="text-center py-10 text-muted-foreground">
                 <PenLine className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">Please select a class and section to view classwork</p>
+                <p className="text-xs font-bold">Please select a class, section, and subject to view classwork</p>
               </div>
             ) : filteredClassworksLocal.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
                 <PenLine className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                <p className="text-xs font-bold">No classwork found for Class {selectedCwClass} - {selectedCwSection} in the selected period</p>
+                <p className="text-xs font-bold">No classwork found for the selected period</p>
               </div>
             ) : cwView === 'list' ? (
               <div className="overflow-x-auto">
@@ -611,7 +716,7 @@ export function AcademicTab({
                 ))}
               </div>
             )}
-            {selectedCwClass && selectedCwSection && (
+            {selectedCwClass && selectedCwSection && selectedCwSubject && (
               <p className="text-[10px] text-muted-foreground mt-3 font-bold">
                 {filteredClassworksLocal.length} classwork item{filteredClassworksLocal.length !== 1 ? 's' : ''} shown
               </p>

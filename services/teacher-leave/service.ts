@@ -43,6 +43,11 @@ export const teacherLeaveService = {
     return response.data;
   },
 
+  revokeLeave: async (id: number): Promise<TeacherLeave> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER_LEAVE.REVOKE(id), {});
+    return response.data;
+  },
+
   // ─── Leave Balances ─────────────────────────────────────────────────────────
 
   getLeaveBalances: async (session: string): Promise<TeacherLeaveBalance[]> => {
@@ -87,6 +92,11 @@ export const teacherLeaveService = {
     month?: number;
   }): Promise<TeacherAttendanceRecord[]> => {
     const response = await api.get(API_ENDPOINTS.TEACHER_ATTENDANCE.BASE, { params });
+    return response.data;
+  },
+
+  getAttendanceForDay: async (date: string): Promise<TeacherAttendanceRecord[]> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER_ATTENDANCE.DAY, { params: { date } });
     return response.data;
   },
 };
