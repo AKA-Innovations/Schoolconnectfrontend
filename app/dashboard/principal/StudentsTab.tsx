@@ -41,6 +41,9 @@ export function StudentsTab({
   const itemsPerPage = 10;
 
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'analytics'>('list');
+  const [topperSearch, setTopperSearch] = useState('');
+  const [topperGradeFilter, setTopperGradeFilter] = useState('');
+  const [topperSortBy, setTopperSortBy] = useState<'rank-asc' | 'rank-desc' | 'pct-desc' | 'pct-asc' | 'name-asc' | 'name-desc'>('rank-asc');
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [analyticsClassId, setAnalyticsClassId] = useState<number | ''>('');
   const [analyticsSectionId, setAnalyticsSectionId] = useState<number | ''>('');
@@ -219,6 +222,68 @@ export function StudentsTab({
 
   const classOverviewData = classOverview?.data || classOverview;
   const toppers = toppersList?.data || (Array.isArray(toppersList) ? toppersList : []);
+
+  const studentMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    allStudents.forEach((s) => {
+      if (s.id) {
+        map[s.id] = s;
+      }
+    });
+    return map;
+  }, [allStudents]);
+
+  const uniqueTopperGrades = useMemo(() => {
+    const grades = toppers.map((t: any) => t.grade).filter(Boolean);
+    return [...new Set(grades)].sort();
+  }, [toppers]);
+
+  const processedToppers = useMemo(() => {
+    let result = toppers.map((t: any) => {
+      const studentObj = studentMap[t.studentId];
+      const studentName = studentObj ? `${studentObj.firstName} ${studentObj.lastName}` : 'Unknown Student';
+      const studentEmail = studentObj?.emailId || '';
+      return {
+        ...t,
+        studentName,
+        studentEmail,
+      };
+    });
+
+    if (topperSearch.trim()) {
+      const query = topperSearch.toLowerCase().trim();
+      result = result.filter(
+        (t: any) =>
+          t.studentName.toLowerCase().includes(query) ||
+          t.studentId.toLowerCase().includes(query)
+      );
+    }
+
+    if (topperGradeFilter) {
+      result = result.filter((t: any) => t.grade === topperGradeFilter);
+    }
+
+    result.sort((a: any, b: any) => {
+      switch (topperSortBy) {
+        case 'rank-asc':
+          return a.rank - b.rank;
+        case 'rank-desc':
+          return b.rank - a.rank;
+        case 'pct-desc':
+          return b.percentage - a.percentage;
+        case 'pct-asc':
+          return a.percentage - b.percentage;
+        case 'name-asc':
+          return a.studentName.localeCompare(b.studentName);
+        case 'name-desc':
+          return b.studentName.localeCompare(a.studentName);
+        default:
+          return a.rank - b.rank;
+      }
+    });
+
+    return result;
+  }, [toppers, studentMap, topperSearch, topperGradeFilter, topperSortBy]);
 
   const subjectData = useMemo(() => {
     if (examSubjects.length === 0) return mockSubjectAverages;
@@ -809,9 +874,46 @@ export function StudentsTab({
 
                     {/* Toppers Leaderboard */}
                     <Card className="rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 bg-white overflow-hidden">
-                      <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-6 py-4">
-                        <CardTitle className="text-base font-bold text-slate-800">Class Toppers List</CardTitle>
-                        <CardDescription className="text-xs text-slate-400">Highest-scoring student ranks for this assessment.</CardDescription>
+                      <CardHeader className="border-b border-slate-100 bg-slate-50/40 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-base font-bold text-slate-800">Class Toppers List</CardTitle>
+                          <CardDescription className="text-xs text-slate-400">Highest-scoring student ranks for this assessment.</CardDescription>
+                        </div>
+                        {toppers && toppers.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Search by name or ID..."
+                              value={topperSearch}
+                              onChange={(e) => setTopperSearch(e.target.value)}
+                              className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-44"
+                            />
+                            {uniqueTopperGrades.length > 0 && (
+                              <select
+                                value={topperGradeFilter}
+                                onChange={(e) => setTopperGradeFilter(e.target.value)}
+                                className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                              >
+                                <option value="">All Grades</option>
+                                {uniqueTopperGrades.map((g: string) => (
+                                  <option key={g} value={g}>Grade {g}</option>
+                                ))}
+                              </select>
+                            )}
+                            <select
+                              value={topperSortBy}
+                              onChange={(e) => setTopperSortBy(e.target.value as any)}
+                              className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            >
+                              <option value="rank-asc">Rank: Ascending</option>
+                              <option value="rank-desc">Rank: Descending</option>
+                              <option value="pct-desc">Percentage: High to Low</option>
+                              <option value="pct-asc">Percentage: Low to High</option>
+                              <option value="name-asc">Name: A to Z</option>
+                              <option value="name-desc">Name: Z to A</option>
+                            </select>
+                          </div>
+                        )}
                       </CardHeader>
                       <CardContent className="p-0">
                         {loadingToppers ? (
@@ -825,32 +927,45 @@ export function StudentsTab({
                             </p>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-sm">
-                              <thead>
-                                <tr className="border-b border-slate-100 text-xs font-semibold uppercase text-slate-400 bg-slate-50/30">
-                                  <th className="p-4 px-6">Rank</th>
-                                  <th className="p-4">Student ID</th>
-                                  <th className="p-4">Total Marks</th>
-                                  <th className="p-4">Obtained Marks</th>
-                                  <th className="p-4">Percentage</th>
-                                  <th className="p-4 pr-6 text-right">Grade</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {toppers.map((t: any) => (
-                                  <tr key={t.rank} className="hover:bg-slate-50/30">
-                                    <td className="p-4 px-6 font-bold text-indigo-600">#{t.rank}</td>
-                                    <td className="p-4 font-bold text-slate-800">{t.studentId}</td>
-                                    <td className="p-4 text-slate-400">{t.totalMarks}</td>
-                                    <td className="p-4 font-medium text-slate-600">{t.marksObtained}</td>
-                                    <td className="p-4 font-extrabold text-emerald-600">{t.percentage.toFixed(1)}%</td>
-                                    <td className="p-4 pr-6 text-right font-black text-slate-700">{t.grade}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          <>
+                            {processedToppers.length === 0 ? (
+                              <div className="py-12 text-center bg-slate-50/10">
+                                <Users className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                                <p className="text-xs font-bold text-slate-500">No matching toppers found</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Try clearing filters or adjusting your search term.</p>
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-sm">
+                                  <thead>
+                                    <tr className="border-b border-slate-100 text-xs font-semibold uppercase text-slate-400 bg-slate-50/30">
+                                      <th className="p-4 px-6">Rank</th>
+                                      <th className="p-4">Student</th>
+                                      <th className="p-4">Total Marks</th>
+                                      <th className="p-4">Obtained Marks</th>
+                                      <th className="p-4">Percentage</th>
+                                      <th className="p-4 pr-6 text-right">Grade</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {processedToppers.map((t: any) => (
+                                      <tr key={`${t.rank}-${t.studentId}`} className="hover:bg-slate-50/30">
+                                        <td className="p-4 px-6 font-bold text-indigo-600">#{t.rank}</td>
+                                        <td className="p-4">
+                                          <div className="font-bold text-slate-800">{t.studentName}</div>
+                                          <div className="text-[10px] text-slate-400 font-mono tracking-tight">{t.studentId}</div>
+                                        </td>
+                                        <td className="p-4 text-slate-400">{t.totalMarks}</td>
+                                        <td className="p-4 font-medium text-slate-600">{t.marksObtained}</td>
+                                        <td className="p-4 font-extrabold text-emerald-600">{t.percentage.toFixed(1)}%</td>
+                                        <td className="p-4 pr-6 text-right font-black text-slate-700">{t.grade}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </>
                         )}
                       </CardContent>
                     </Card>
