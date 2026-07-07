@@ -30,7 +30,8 @@ export function StudyMaterialManagement() {
 
   const { data, isLoading, isFetching, refetch } = useStudyMaterials();
   const { data: allSections = [] } = useSchoolSections();
-  const { data: allSubjects = [] } = useSubjectOptions();
+  const selectedSection = classSectionFilter ? allSections.find(s => String(s.id) === classSectionFilter) : undefined;
+  const { data: allSubjects = [] } = useSubjectOptions(selectedSection?.classId);
   const { data: teacherAssignments = [] } = useSubjectDetails(
     role === 'teacher' ? user?.id : undefined,
     'all'
@@ -233,8 +234,8 @@ export function StudyMaterialManagement() {
             value={subjectFilter}
             onValueChange={setSubjectFilter}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="All Subjects" />
+            <SelectTrigger disabled={!classSectionFilter}>
+              <SelectValue placeholder={classSectionFilter ? "All Subjects" : "Select Class First"} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">All Subjects</SelectItem>

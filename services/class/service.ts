@@ -223,10 +223,15 @@ export const classService = {
 
   // ─── Subject Master (subject-dtls) ─────────────────────────────────────────
 
-  /** Returns all subjects (session-global, not class-scoped) */
-  getSubjectOptions: async (schoolId?: string, searchText?: string): Promise<SubjectOption[]> => {
+  /** Returns all subjects filtered by class & session */
+  getSubjectOptions: async (schoolId?: string, classId?: number, session?: string, searchText?: string): Promise<SubjectOption[]> => {
     const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS, {
-      params: { schoolId, searchText },
+      params: { 
+        schoolId, 
+        classId, 
+        session, 
+        searchText: searchText || '' 
+      },
     });
     const raw = res.data;
     if (Array.isArray(raw)) return raw;

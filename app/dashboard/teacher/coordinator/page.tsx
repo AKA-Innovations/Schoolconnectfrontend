@@ -41,7 +41,6 @@ export default function CoordinatorWorkspacePage() {
   const { data: allClassSections = [] } = useClassSectionLists();
   const { data: subjectDetails   = [] } = useSubjectDetails();
   const { data: periodSlots      = [] } = usePeriodSlots();
-  const { data: subjectOptions   = [] } = useSubjectOptions();
   const { data: schoolClasses    = [] } = useSchoolClasses();
   const { data: teachersData }          = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
@@ -93,6 +92,8 @@ export default function CoordinatorWorkspacePage() {
     classId: resolvedClassId,
     classSectionId: selectedId || undefined,
   });
+
+  const { data: subjectOptions = [] } = useSubjectOptions(resolvedClassId);
 
   const sectionSubjects = useMemo(
     () => subjectDetails.filter((sd) => sd.className === className && sd.sectionName === sectionName),

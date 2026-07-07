@@ -10,9 +10,10 @@ import { LeaveApprovalDialog } from '@/components/teacher-leave/LeaveApprovalDia
 import { SubstitutePeriodManager } from '@/components/teacher-leave/SubstitutePeriodManager';
 import { TeacherAttendanceManager } from '@/components/teacher-leave/TeacherAttendanceManager';
 import { InitializeBalancesDialog } from '@/components/teacher-leave/InitializeBalancesDialog';
+import { LeaveRequestForm } from '@/components/teacher-leave/LeaveRequestForm';
 import type { TeacherLeave } from '@/types/leave.types';
 import { useSubstitutePeriods } from '@/hooks/useTeacherLeave';
-import { FileText, ArrowRightLeft, ClipboardCheck, Settings, CalendarDays, AlertCircle } from 'lucide-react';
+import { FileText, ArrowRightLeft, ClipboardCheck, Settings, CalendarDays, AlertCircle, Plus } from 'lucide-react';
 
 function AdminTeacherLeaveContent() {
   const searchParams = useSearchParams();
@@ -23,6 +24,7 @@ function AdminTeacherLeaveContent() {
   const [approvalMode, setApprovalMode] = useState<'approve' | 'reject'>('approve');
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [initDialogOpen, setInitDialogOpen] = useState(false);
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
@@ -71,6 +73,14 @@ function AdminTeacherLeaveContent() {
             >
               <Settings size={14} className="mr-1.5" />
               Initialize Balances
+            </Button>
+            <Button
+              size="sm"
+              className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-bold text-xs"
+              onClick={() => setApplyDialogOpen(true)}
+            >
+              <Plus size={14} className="mr-1.5" />
+              Record Leave
             </Button>
           </div>
         </div>
@@ -144,6 +154,11 @@ function AdminTeacherLeaveContent() {
       <InitializeBalancesDialog
         open={initDialogOpen}
         onOpenChange={setInitDialogOpen}
+      />
+      <LeaveRequestForm
+        open={applyDialogOpen}
+        onOpenChange={setApplyDialogOpen}
+        isAdmin
       />
     </div>
   );

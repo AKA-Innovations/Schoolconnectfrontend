@@ -23,7 +23,7 @@ interface SubstitutePeriodManagerProps {
   isAdmin?: boolean;
 }
 
-import { useClassSectionLists, usePeriodSlots, useSubjectOptions } from '../../hooks/useClasses';
+import { useClassSectionLists, usePeriodSlots, useSubjectDetails } from '../../hooks/useClasses';
 import { useTeacherList } from '../../hooks/useTeachers';
 import { useAuthStore } from '../../store/authStore';
 
@@ -46,7 +46,7 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
     { enabled: !!isAdmin }
   );
   const { data: periodSlots = [] } = usePeriodSlots();
-  const { data: subjectOptions = [] } = useSubjectOptions();
+  const { data: subjectDetails = [] } = useSubjectDetails();
 
   const teachers = teachersData?.data || [];
 
@@ -100,13 +100,13 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
 
   const subjectMap = React.useMemo(() => {
     const map = new Map<number, string>();
-    subjectOptions.forEach((sd) => {
-      if (sd.id) {
-        map.set(Number(sd.id), sd.subjectName || '');
+    subjectDetails.forEach((sd) => {
+      if (sd.subjectDtlsId && sd.subjectName) {
+        map.set(Number(sd.subjectDtlsId), sd.subjectName);
       }
     });
     return map;
-  }, [subjectOptions]);
+  }, [subjectDetails]);
 
   // Group periods by original teacher so they form a "Timetable" for that absent teacher
   const groupedPeriods = React.useMemo(() => {

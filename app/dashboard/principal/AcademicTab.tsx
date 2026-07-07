@@ -117,7 +117,7 @@ export function AcademicTab({
 
   const { data: rawMaterials = [], isLoading: loadingMaterials } = useStudyMaterials();
   const { data: classSections = [] } = useClassSectionLists();
-  const { data: subjectOptions = [] } = useSubjectOptions();
+  const { data: subjectOptions = [] } = useSubjectOptions(selectedClass || undefined);
 
   // State & Hooks for Syllabus Progress
   const [selectedProgressClass, setSelectedProgressClass] = useState('');

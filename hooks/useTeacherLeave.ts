@@ -25,11 +25,12 @@ export const leaveKeys = {
 
 // ─── Leave Queries ────────────────────────────────────────────────────────────
 
-export function useLeaveList(filters?: ListLeaveFilters) {
+export function useLeaveList(filters?: ListLeaveFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: leaveKeys.list(filters),
     queryFn: () => teacherLeaveService.listLeaves(filters),
     placeholderData: (prev) => prev,
+    enabled: options?.enabled ?? true,
   });
 }
 

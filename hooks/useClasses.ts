@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CURRENT_SESSION } from '../lib/constants';
 import {
@@ -249,12 +250,26 @@ export const subjectOptionKeys = {
   all: ['subject-options'] as const,
 };
 
-export function useSubjectOptions(className?: string) {
+export function useSubjectOptions(classIdOrName?: number | string, session?: string, searchText?: string) {
   const schoolId = useAuthStore((s) => s.schoolId);
+  const { data: classes = [] } = useSchoolClasses();
+
+  const resolvedClassId = useMemo(() => {
+    if (!classIdOrName || classIdOrName === 'all') return undefined;
+    if (typeof classIdOrName === 'number') return classIdOrName;
+    const found = classes.find(c => c.className.toLowerCase() === classIdOrName.toLowerCase());
+    return found ? found.id : undefined;
+  }, [classIdOrName, classes]);
+
   return useQuery({
-    queryKey: ['subject-options', schoolId, className],
-    queryFn: () => classService.getSubjectOptions(schoolId || '', className),
-    enabled: !!schoolId,
+    queryKey: ['subject-options', schoolId, resolvedClassId || classIdOrName, session, searchText],
+    queryFn: () => classService.getSubjectOptions(
+      schoolId || '',
+      resolvedClassId || (typeof classIdOrName === 'number' ? classIdOrName : undefined),
+      session,
+      searchText
+    ),
+    enabled: !!schoolId && (classIdOrName === undefined || classIdOrName === 'all' || typeof classIdOrName !== 'string' || classes.length > 0),
   });
 }
 

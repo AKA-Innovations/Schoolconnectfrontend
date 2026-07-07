@@ -124,7 +124,7 @@ export function ScheduleBuilder({ session }: Props) {
 
   // Fetch subject master options to resolve names
   const selectedClassName = schoolClasses.find(c => c.id === selectedClassId)?.className || '';
-  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassName || undefined);
+  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassId || undefined);
 
   // Get current schedules to display
   const { data: existingSchedules = [], refetch, isFetching } = useExamSchedules({

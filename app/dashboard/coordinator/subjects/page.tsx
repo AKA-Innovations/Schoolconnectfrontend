@@ -23,8 +23,8 @@ export default function CoordinatorSubjectsPage() {
   // Fetch all required data
   const { data: allClassSections = [], isLoading: loadingCs } = useClassSectionLists();
   const { data: subjectDetails = [], isLoading: loadingSd } = useSubjectDetails();
-  const { data: subjectOptions = [] } = useSubjectOptions();
   const { data: schoolClasses = [] } = useSchoolClasses();
+  
   const { data: teachersData } = useTeacherList({ schoolId: schoolId || '', page: 1, pageSize: 500 });
   const allTeachers = teachersData?.data ?? [];
 
@@ -35,6 +35,15 @@ export default function CoordinatorSubjectsPage() {
   const [selectedId, setSelectedId] = useState<number>(0);
   const [search, setSearch] = useState('');
   const selectedSection = classSections.find((cs) => cs.id === selectedId);
+
+  const selectedClassId = useMemo(() => {
+    if (!selectedSection) return undefined;
+    if (selectedSection.classId) return selectedSection.classId;
+    const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+    return sc?.id;
+  }, [selectedSection, schoolClasses]);
+
+  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassId);
 
   const sectionSubjects: SubjectDetail[] = useMemo(() => {
     if (!selectedSection) {

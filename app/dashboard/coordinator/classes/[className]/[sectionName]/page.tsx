@@ -72,7 +72,7 @@ export default function CoordinatorClassDetailPage() {
   }, [rawTimetableEntries, subjectDetails, className, sectionName]);
   
   const { data: periodSlots = [] } = usePeriodSlots();
-  const { data: subjectOptions = [] } = useSubjectOptions();
+  const { data: subjectOptions = [] } = useSubjectOptions(resolvedClassId);
   const { data: teachersData } = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
   const { data: studentsData, isLoading: loadingStudents } = useStudentList({ 

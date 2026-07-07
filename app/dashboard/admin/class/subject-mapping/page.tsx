@@ -44,7 +44,6 @@ const getLoadStatus = (periods: number) => {
 
 export default function SubjectDetailsPage() {
   const { data: mappings = [], isLoading } = useSubjectDetails();
-  const { data: subjects = [] } = useSubjectOptions();
   const { data: classSections = [] } = useClassSectionLists();
   const { data: schoolClasses = [] } = useSchoolClasses();
 
@@ -100,6 +99,30 @@ export default function SubjectDetailsPage() {
   const createMutation = useCreateSubjectDetail();
   const updateMutation = useUpdateSubjectDetail();
   const deleteMutation = useDeleteSubjectDetail();
+
+  // Drawer Subject Fetch
+  const formClassId = useMemo(() => {
+    const selectedSection = classSections.find(cs => cs.id === form.classSectionId);
+    if (!selectedSection) return undefined;
+    if (selectedSection.classId) return selectedSection.classId;
+    const sc = schoolClasses.find(c => c.className === selectedSection.className);
+    return sc?.id;
+  }, [form.classSectionId, classSections, schoolClasses]);
+
+  const { data: subjects = [] } = useSubjectOptions(formClassId);
+
+  // Bulk Subject Fetch
+  const bulkClassId = useMemo(() => {
+    if (bulkForm.classIds.length === 0) return undefined;
+    const firstSectionId = bulkForm.classIds[0];
+    const section = classSections.find(cs => cs.id === firstSectionId);
+    if (!section) return undefined;
+    if (section.classId) return section.classId;
+    const sc = schoolClasses.find(c => c.className === section.className);
+    return sc?.id;
+  }, [bulkForm.classIds, classSections, schoolClasses]);
+
+  const { data: bulkSubjects = [] } = useSubjectOptions(bulkClassId);
 
   // ── Maps ──────────────────────────────────────────────────────────────────
   const teacherNameMap = useMemo(() => {
@@ -267,6 +290,47 @@ export default function SubjectDetailsPage() {
       else        { await createMutation.mutateAsync(payload); toast.success('Mapping created'); }
       resetForm();
     } catch (err: any) { toast.error(err.response?.data?.message || 'Failed to save mapping'); }
+  };
+
+  const handleBulkSave = async () => {
+    if (!bulkForm.teacherId || !bulkForm.subjectId || bulkForm.classIds.length === 0) {
+      toast.error('All fields and at least one class are required');
+      return;
+    }
+
+    const selectedSubject = bulkSubjects.find(s => s.id === bulkForm.subjectId);
+    if (!selectedSubject) {
+      toast.error('Selected subject not found');
+      return;
+    }
+
+    const entries = [];
+    for (const classSectionId of bulkForm.classIds) {
+      const section = classSections.find(cs => cs.id === classSectionId);
+      if (section) {
+        let classId = section.classId;
+        if (!classId) {
+          const sc = schoolClasses.find(c => c.className === section.className);
+          classId = sc?.id || 0;
+        }
+        entries.push({
+          session: CURRENT_SESSION,
+          teacherId: bulkForm.teacherId,
+          classId,
+          classSectionId: section.masterSectionId,
+          subjectId: selectedSubject.id,
+        });
+      }
+    }
+
+    try {
+      await createMutation.mutateAsync({ entries });
+      toast.success(`Successfully assigned to ${entries.length} classes`);
+      setShowBulkAssign(false);
+      setBulkForm({ teacherId: '', subjectId: 0, classIds: [] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save assignments');
+    }
   };
 
   const handleDelete = async (id: string | number) => {
@@ -773,17 +837,6 @@ export default function SubjectDetailsPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-xs font-bold text-slate-500">Subject</Label>
-                <select
-                  value={bulkForm.subjectId ? String(bulkForm.subjectId) : ''}
-                  onChange={e => setBulkForm(f => ({ ...f, subjectId: Number(e.target.value) }))}
-                  className="mt-1 w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="">Select subject</option>
-                  {subjects.map(s => <option key={s.id} value={String(s.id)}>{s.subjectName}</option>)}
-                </select>
-              </div>
-              <div>
                 <Label className="text-xs font-bold text-slate-500">Classes (multi-select)</Label>
                 <div className="mt-1 grid grid-cols-2 gap-1.5 border border-slate-200 rounded-xl p-3 max-h-36 overflow-y-auto">
                   {classSections.map(cs => {
@@ -799,11 +852,27 @@ export default function SubjectDetailsPage() {
                   })}
                 </div>
               </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-500">Subject</Label>
+                <select
+                  value={bulkForm.subjectId ? String(bulkForm.subjectId) : ''}
+                  onChange={e => setBulkForm(f => ({ ...f, subjectId: Number(e.target.value) }))}
+                  disabled={bulkForm.classIds.length === 0}
+                  className="mt-1 w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">{bulkForm.classIds.length > 0 ? 'Select subject' : 'Select class section(s) first'}</option>
+                  {bulkSubjects.map(s => <option key={s.id} value={String(s.id)}>{s.subjectName}</option>)}
+                </select>
+              </div>
             </div>
             <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
               <Button variant="outline" onClick={() => setShowBulkAssign(false)} className="rounded-xl">Cancel</Button>
-              <Button onClick={() => { toast.success(`Assigned to ${bulkForm.classIds.length} classes`); setShowBulkAssign(false); setBulkForm({ teacherId: '', subjectId: 0, classIds: [] }); }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white">
-                Assign to Selected
+              <Button
+                onClick={handleBulkSave}
+                disabled={createMutation.isPending || bulkForm.classIds.length === 0}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+              >
+                {createMutation.isPending ? 'Assigning...' : 'Assign to Selected'}
               </Button>
             </div>
           </div>

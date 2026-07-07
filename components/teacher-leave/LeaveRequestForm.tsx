@@ -1,37 +1,50 @@
 'use client';
-
+ 
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { LeaveType } from '../../types/leave.types';
 import { useApplyLeave, useLeaveList } from '../../hooks/useTeacherLeave';
+import { useTeacherList } from '../../hooks/useTeachers';
 import { useAuthStore } from '../../store/authStore';
 import { CURRENT_SESSION } from '../../lib/constants';
 import { toast } from 'sonner';
 import { CalendarDays, FileText, Send, ChevronLeft, ChevronRight } from 'lucide-react';
-
+ 
 interface LeaveRequestFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isAdmin?: boolean;
 }
-
-export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) {
+ 
+export function LeaveRequestForm({ open, onOpenChange, isAdmin }: LeaveRequestFormProps) {
   const user = useAuthStore((s) => s.user);
+  const [selectedTeacherId, setSelectedTeacherId] = React.useState<string>('');
   const [leaveType, setLeaveType] = React.useState<string>('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
   const [reason, setReason] = React.useState('');
   const [errors, setErrors] = React.useState<Record<string, string>>({});
-
+ 
   // Calendar navigation state
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
-
+ 
   const applyLeave = useApplyLeave();
+
+  // Fetch teachers list for Admin dropdown
+  const { data: teacherData } = useTeacherList(
+    { page: 1, pageSize: 200 },
+    { enabled: !!isAdmin && open }
+  );
+  const teachersList = teacherData?.data || [];
   
   // Fetch existing leaves to show on the calendar
-  const { data: leaves = [] } = useLeaveList({ teacherId: user?.id });
-
+  const { data: leaves = [] } = useLeaveList(
+    { teacherId: isAdmin ? selectedTeacherId : user?.id },
+    { enabled: isAdmin ? !!selectedTeacherId && open : !!user?.id && open }
+  );
+ 
   const takenDates = React.useMemo(() => {
     const dates = new Set<string>();
     leaves.forEach((leave) => {
@@ -47,9 +60,10 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
     });
     return dates;
   }, [leaves]);
-
+ 
   const validate = () => {
     const errs: Record<string, string> = {};
+    if (isAdmin && !selectedTeacherId) errs.teacherId = 'Staff member is required';
     if (!leaveType) errs.leaveType = 'Leave type is required';
     if (!startDate) errs.startDate = 'Start date is required';
     if (!endDate) errs.endDate = 'End date is required';
@@ -60,11 +74,11 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
-
+ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-
+ 
     try {
       await applyLeave.mutateAsync({
         session: CURRENT_SESSION,
@@ -72,8 +86,9 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
         startDate,
         endDate,
         reason: reason.trim(),
+        teacherId: isAdmin ? selectedTeacherId : undefined,
       });
-      toast.success('Leave application submitted successfully');
+      toast.success(isAdmin ? 'Leave recorded successfully' : 'Leave application submitted successfully');
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
@@ -81,15 +96,16 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
       toast.error(message);
     }
   };
-
+ 
   const resetForm = () => {
+    setSelectedTeacherId('');
     setLeaveType('');
     setStartDate('');
     setEndDate('');
     setReason('');
     setErrors({});
   };
-
+ 
   const leaveTypeOptions = [
     { value: LeaveType.CASUAL, label: 'Casual Leave' },
     { value: LeaveType.SICK, label: 'Sick Leave' },
@@ -202,8 +218,28 @@ export function LeaveRequestForm({ open, onOpenChange }: LeaveRequestFormProps) 
             Apply for Leave
           </DialogTitle>
         </DialogHeader>
-
+ 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Select Staff Member (Admin Only) */}
+          {isAdmin && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Select Staff Member</label>
+              <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachersList.map((t: any) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.firstName} {t.lastName} {t.isPrincipal ? '(Principal)' : t.isCoordinator ? '(Coordinator)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.teacherId && <p className="text-xs text-red-500 mt-1">{errors.teacherId}</p>}
+            </div>
+          )}
+
           {/* Leave Type */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Leave Type</label>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,10 @@ import {
   useSubjectOptions,
   useCreateSubjectOption,
   useUpdateSubjectOption,
-  useClassList,
+  useDeleteSubjectOption,
+  useSchoolClasses,
 } from '@/hooks/useClasses';
-import { Plus, Edit2, BookOpen, Search, X } from 'lucide-react';
+import { Plus, Edit2, BookOpen, Search, X, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
@@ -23,36 +24,89 @@ import {
 import { CURRENT_SESSION } from '@/lib/constants';
 
 export default function SubjectsPage() {
-  const { data: subjects = [], isLoading } = useSubjectOptions();
-  const { data: uniqueclasses = [] } = useClassList();
+  const { data: classes = [] } = useSchoolClasses();
+  const [selectedClassId, setSelectedClassId] = useState<number | 'all' | ''>('all');
+
+  useEffect(() => {
+    if (classes.length > 0 && !selectedClassId) {
+      setSelectedClassId('all');
+    }
+  }, [classes, selectedClassId]);
+
+  const { data: subjects = [], isLoading } = useSubjectOptions(selectedClassId);
 
   const createMutation = useCreateSubjectOption();
   const updateMutation = useUpdateSubjectOption();
+  const deleteMutation = useDeleteSubjectOption();
 
   const [editingSubject, setEditingSubject] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '' });
+  const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '', classIds: [] as number[] });
 
   const [search, setSearch] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
 
-  const [form, setForm] = useState({
-    className: '',
-    session: CURRENT_SESSION,
-    subjects: [] as { subjectName: string; subjectCode: string }[],
-  });
-
-  const [subjectInput, setSubjectInput] = useState('');
+  // Bulk creation states
+  const [subjectNameInput, setSubjectNameInput] = useState('');
   const [subjectCodeInput, setSubjectCodeInput] = useState('');
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [reviewList, setReviewList] = useState<Array<{
+    tempId: string;
+    subjectName: string;
+    subjectCode: string;
+    classIds: number[];
+  }>>([]);
+
+  // Group subjects by subjectName so that they appear in a single row
+  const groupedSubjects = useMemo(() => {
+    const groups: Record<string, {
+      subjectName: string;
+      subjectCodes: string[];
+      ids: number[];
+      classIds: number[];
+      classNames: string[];
+    }> = {};
+
+    subjects.forEach((s: any) => {
+      const name = (s.subjectName || '').trim();
+      const key = name.toLowerCase();
+      
+      if (!groups[key]) {
+        groups[key] = {
+          subjectName: name,
+          subjectCodes: [],
+          ids: [],
+          classIds: [],
+          classNames: [],
+        };
+      }
+      groups[key].ids.push(s.id);
+      
+      if (s.subjectCode && !groups[key].subjectCodes.includes(s.subjectCode)) {
+        groups[key].subjectCodes.push(s.subjectCode);
+      }
+
+      if (s.classId) {
+        const clsMatch = classes.find(c => c.id === s.classId);
+        if (clsMatch) {
+          if (!groups[key].classIds.includes(s.classId)) {
+            groups[key].classIds.push(s.classId);
+            groups[key].classNames.push(clsMatch.className);
+          }
+        }
+      }
+    });
+
+    return Object.values(groups);
+  }, [subjects, classes]);
 
   // 🔍 Filter
-  const filtered = subjects.filter((s: any) => {
+  const filtered = groupedSubjects.filter((s: any) => {
     const q = search.toLowerCase();
     return s.subjectName?.toLowerCase().includes(q) ||
-      (s.subjectCode ?? '').toLowerCase().includes(q);
+      (s.subjectCodes || []).some((code: string) => code.toLowerCase().includes(q));
   });
 
   // 📄 Pagination
@@ -66,48 +120,92 @@ export default function SubjectsPage() {
   // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedClass]);
+  }, [search, selectedClassId]);
 
-  // ➕ Add subject
-  const addSubject = () => {
-    const name = subjectInput.trim();
-    const code = subjectCodeInput.trim();
-    if (!name || !code) { toast.error('Both subject name and code are required'); return; }
-    if (form.subjects.some((s) => s.subjectName === name)) {
-      toast.error('Subject already added'); return;
+  // ➕ Auto-generate subject code
+  const handleSubjectNameChange = (val: string) => {
+    setSubjectNameInput(val);
+    const clean = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (clean) {
+      setSubjectCodeInput(`${clean.slice(0, 4)}1001`);
+    } else {
+      setSubjectCodeInput('');
     }
-    setForm({ ...form, subjects: [...form.subjects, { subjectName: name, subjectCode: code }] });
-    setSubjectInput('');
-    setSubjectCodeInput('');
   };
 
-  // ❌ Remove subject
-  const removeSubject = (name: string) => {
-    setForm({ ...form, subjects: form.subjects.filter((s) => s.subjectName !== name) });
-  };
-
-  // 💾 Save
-  const handleSave = async () => {
-    if (!form.className.trim() || form.subjects.length === 0) {
-      toast.error('Class and at least one subject are required');
+  // ➕ Add to review list
+  const handleAddToReview = () => {
+    const name = subjectNameInput.trim();
+    if (!name) {
+      toast.error('Subject name is required');
+      return;
+    }
+    if (selectedClassIds.length === 0) {
+      toast.error('Please select at least one class');
       return;
     }
 
+    const newItems: any[] = [];
+    const cleanPrefix = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+
+    for (const classId of selectedClassIds) {
+      const cls = classes.find(c => c.id === classId);
+      const className = cls ? cls.className : '';
+      
+      const cleanClassName = className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const generatedCode = `${cleanPrefix}${cleanClassName}1001`;
+
+      if (reviewList.some(item => item.subjectCode.toLowerCase() === generatedCode.toLowerCase())) {
+        toast.error(`Subject code "${generatedCode}" is already in the review list`);
+        return;
+      }
+
+      newItems.push({
+        tempId: Math.random().toString(),
+        subjectName: name,
+        subjectCode: generatedCode,
+        classIds: [classId],
+      });
+    }
+
+    setReviewList(prev => [...prev, ...newItems]);
+
+    setSubjectNameInput('');
+    setSubjectCodeInput('');
+    setSelectedClassIds([]);
+  };
+
+  // ❌ Remove from review list
+  const handleRemoveFromReview = (tempId: string) => {
+    setReviewList(prev => prev.filter(item => item.tempId !== tempId));
+  };
+
+  // 💾 Bulk save
+  const handleBulkSubmit = async () => {
+    if (reviewList.length === 0) {
+      toast.error('No subjects in the review list to save');
+      return;
+    }
+
+    const payload: { subjectName: string; subjectCode: string; classId: number }[] = [];
+    reviewList.forEach(item => {
+      item.classIds.forEach(classId => {
+        payload.push({
+          subjectName: item.subjectName,
+          subjectCode: item.subjectCode,
+          classId,
+        });
+      });
+    });
+
     try {
       await createMutation.mutateAsync({
-        session: form.session,
-        subjects: form.subjects,
-      });
-
-      toast.success('Subjects created');
-
-      setForm({
-        className: '',
         session: CURRENT_SESSION,
-        subjects: [],
+        subjects: payload,
       });
-      setSubjectInput('');
-      setSubjectCodeInput('');
+
+      toast.success('Subjects created successfully');
+      setReviewList([]);
       setShowAdd(false);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save subjects');
@@ -115,25 +213,84 @@ export default function SubjectsPage() {
   };
 
   // ✏️ Edit
+  const startEdit = (s: any) => {
+    setEditingSubject(s);
+    setEditForm({
+      subjectName: s.subjectName,
+      subjectCode: s.subjectCodes[0] || '',
+      classIds: [...s.classIds],
+    });
+  };
+
   const handleEditSave = async () => {
     if (!editingSubject) return;
-    if (!editForm.subjectName.trim() || !editForm.subjectCode.trim()) {
-      toast.error('Both subject name and code are required');
+    const name = editForm.subjectName.trim();
+    if (!name) {
+      toast.error('Subject name is required');
+      return;
+    }
+    if (editForm.classIds.length === 0) {
+      toast.error('At least one class must be selected');
       return;
     }
 
+    const cleanPrefix = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+
     try {
-      await updateMutation.mutateAsync({
-        id: editingSubject.id,
-        data: {
-          subjectName: editForm.subjectName.trim(),
-          subjectCode: editForm.subjectCode.trim(),
-        },
-      });
-      toast.success('Subject updated successfully');
+      // 1. Identify deleted classes & delete them
+      const deletedClassIds = editingSubject.classIds.filter((cid: number) => !editForm.classIds.includes(cid));
+      for (const cid of deletedClassIds) {
+        const idx = editingSubject.classIds.indexOf(cid);
+        if (idx !== -1) {
+          const backendId = editingSubject.ids[idx];
+          await deleteMutation.mutateAsync(backendId);
+        }
+      }
+
+      // 2. Identify new classes & create them
+      const newClassIds = editForm.classIds.filter((cid: number) => !editingSubject.classIds.includes(cid));
+      if (newClassIds.length > 0) {
+        const newSubjectsPayload = newClassIds.map(classId => {
+          const cls = classes.find(c => c.id === classId);
+          const className = cls ? cls.className : '';
+          const cleanClassName = className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          return {
+            subjectName: name,
+            subjectCode: `${cleanPrefix}${cleanClassName}1001`,
+            classId,
+          };
+        });
+
+        await createMutation.mutateAsync({
+          session: CURRENT_SESSION,
+          subjects: newSubjectsPayload,
+        });
+      }
+
+      // 3. Identify updated classes (classes kept) & update name/code
+      const keptClassIds = editingSubject.classIds.filter((cid: number) => editForm.classIds.includes(cid));
+      for (const cid of keptClassIds) {
+        const idx = editingSubject.classIds.indexOf(cid);
+        if (idx !== -1) {
+          const backendId = editingSubject.ids[idx];
+          const cls = classes.find(c => c.id === cid);
+          const className = cls ? cls.className : '';
+          const cleanClassName = className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+          await updateMutation.mutateAsync({
+            id: backendId,
+            data: {
+              subjectName: name,
+              subjectCode: `${cleanPrefix}${cleanClassName}1001`,
+            },
+          });
+        }
+      }
+
+      toast.success('Subject details updated successfully');
       setEditingSubject(null);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update subject');
+      toast.error(err.response?.data?.message || 'Failed to update subject details');
     }
   };
 
@@ -161,72 +318,118 @@ export default function SubjectsPage() {
         <Card className="erp-card overflow-hidden border border-slate-100 shadow-xs animate-in slide-in-from-top duration-300">
           <CardContent className="p-6 space-y-4">
             <h3 className="text-base font-bold text-slate-800">Add New Subjects</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Class */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              {/* Subject Name */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class *</Label>
-                <select
-                  value={form.className}
-                  onChange={(e) => setForm({ ...form, className: e.target.value })}
-                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="">Select class</option>
-                  {uniqueclasses?.length ? (
-                    uniqueclasses.map((cls: string) => (
-                      <option key={cls} value={cls}>Class {cls}</option>
-                    ))
-                  ) : (
-                    <option disabled value="loading">Loading...</option>
-                  )}
-                </select>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Name *</Label>
+                <Input
+                  value={subjectNameInput}
+                  onChange={(e) => handleSubjectNameChange(e.target.value)}
+                  placeholder="Subject name (e.g. Physics)"
+                  className="rounded-xl border-slate-200 h-10"
+                />
               </div>
 
-              {/* Subjects */}
+              {/* Subject Code */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Add Subject Entries *</Label>
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <Input
-                      value={subjectInput}
-                      onChange={(e) => setSubjectInput(e.target.value)}
-                      placeholder="Subject name (e.g. Mathematics)"
-                      className="rounded-xl border-slate-200 h-10"
-                      onKeyDown={(e) => e.key === 'Enter' && addSubject()}
-                    />
-                  </div>
-                  <div className="w-36">
-                    <Input
-                      value={subjectCodeInput}
-                      onChange={(e) => setSubjectCodeInput(e.target.value)}
-                      placeholder="Code (e.g. MATH)"
-                      className="rounded-xl border-slate-200 h-10"
-                      onKeyDown={(e) => e.key === 'Enter' && addSubject()}
-                    />
-                  </div>
-                  <Button onClick={addSubject} type="button" className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white h-10 px-4 font-semibold text-xs">Add</Button>
-                </div>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Code *</Label>
+                <Input
+                  value={subjectCodeInput}
+                  onChange={(e) => setSubjectCodeInput(e.target.value.toUpperCase())}
+                  placeholder="Code (e.g. PHYS1001)"
+                  className="rounded-xl border-slate-200 h-10"
+                />
+              </div>
 
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {form.subjects.map((sub) => (
-                    <Badge key={sub.subjectName} variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-700 border-slate-200 text-xs">
-                      {sub.subjectName} <span className="opacity-60 text-[10px] font-bold">({sub.subjectCode})</span>
-                      <X
-                        className="h-3.5 w-3.5 cursor-pointer text-slate-400 hover:text-red-500 transition-colors"
-                        onClick={() => removeSubject(sub.subjectName)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
+              {/* Add Button */}
+              <div>
+                <Button onClick={handleAddToReview} type="button" className="w-full rounded-xl bg-slate-800 hover:bg-slate-900 text-white h-10 font-bold text-xs">
+                  Add to Review List
+                </Button>
               </div>
             </div>
 
+            {/* Classes Checklist */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Assign to Classes *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 border border-slate-100 rounded-xl p-3.5 max-h-32 overflow-y-auto bg-slate-50/50">
+                {classes.length ? (
+                  classes.map((cls) => {
+                    const checked = selectedClassIds.includes(cls.id);
+                    return (
+                      <label key={cls.id} className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:bg-white p-1.5 rounded-lg cursor-pointer transition-all border border-transparent hover:border-slate-100">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedClassIds(prev =>
+                              checked ? prev.filter(id => id !== cls.id) : [...prev, cls.id]
+                            );
+                          }}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                        />
+                        Class {cls.className}
+                      </label>
+                    );
+                  })
+                ) : (
+                  <span className="text-xs text-slate-400">Loading classes...</span>
+                )}
+              </div>
+            </div>
+
+            {/* Review List */}
+            {reviewList.length > 0 && (
+              <div className="border-t border-slate-100 pt-4 mt-4 space-y-2">
+                <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span>Subjects to Create</span>
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 rounded-full text-[10px] font-bold px-2 py-0.5">{reviewList.length}</Badge>
+                </h4>
+                <div className="border border-slate-200/60 rounded-xl overflow-hidden bg-white shadow-xs">
+                  <div className="grid grid-cols-[2fr_1fr_2fr_50px] bg-slate-50/80 py-2.5 px-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 border-b border-slate-100">
+                    <span>Subject</span>
+                    <span>Code</span>
+                    <span>Classes</span>
+                    <span className="text-center">Remove</span>
+                  </div>
+                  <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                    {reviewList.map((item) => (
+                      <div key={item.tempId} className="grid grid-cols-[2fr_1fr_2fr_50px] items-center py-2.5 px-4 text-xs hover:bg-slate-50/40">
+                        <span className="font-semibold text-slate-800">{item.subjectName}</span>
+                        <span className="font-mono text-slate-600 font-bold">{item.subjectCode}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {item.classIds.map(cid => {
+                            const match = classes.find(c => c.id === cid);
+                            return (
+                              <Badge key={cid} variant="secondary" className="text-[9px] bg-slate-100 text-slate-600 border-slate-200 rounded-md px-1.5 py-0.5">
+                                Class {match?.className}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                        <div className="text-center">
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveFromReview(item.tempId)} className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2 justify-end border-t border-slate-100 pt-4 mt-2">
-              <Button variant="outline" onClick={() => setShowAdd(false)} className="rounded-xl">
+              <Button variant="outline" onClick={() => { setShowAdd(false); setReviewList([]); }} className="rounded-xl">
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6">
-                Save Subjects
+              <Button
+                onClick={handleBulkSubmit}
+                disabled={reviewList.length === 0}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-6 disabled:opacity-50"
+              >
+                Save & Submit
               </Button>
             </div>
           </CardContent>
@@ -250,24 +453,31 @@ export default function SubjectsPage() {
           <div className="flex items-center gap-2 w-full md:w-auto ml-auto">
             {/* Class Filter */}
             <select
-              value={selectedClass}
-              onChange={e => setSelectedClass(e.target.value)}
+              value={selectedClassId}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === 'all') {
+                  setSelectedClassId('all');
+                } else {
+                  setSelectedClassId(val ? Number(val) : '');
+                }
+              }}
               className="h-9 px-3 w-[180px] rounded-xl text-xs border border-slate-200 bg-white shadow-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">Filter by class</option>
-              {uniqueclasses?.map((cls: string) => (
-                <option key={cls} value={cls}>Class {cls}</option>
+              <option value="all">All Classes</option>
+              {classes?.map((cls) => (
+                <option key={cls.id} value={cls.id}>Class {cls.className}</option>
               ))}
             </select>
 
             {/* Reset */}
-            {(search || selectedClass) && (
+            {(search || (selectedClassId && selectedClassId !== 'all')) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setSearch('');
-                  setSelectedClass('');
+                  setSelectedClassId('all');
                 }}
                 className="rounded-xl text-xs hover:bg-slate-100 text-slate-500 hover:text-slate-800"
               >
@@ -281,10 +491,10 @@ export default function SubjectsPage() {
       {/* Table */}
       <Card className="erp-card overflow-hidden shadow-xs border border-slate-100">
         <CardContent className="p-0">
-          <div className="grid grid-cols-[80px_2fr_1fr_100px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
+          <div className="grid grid-cols-[80px_2fr_2fr_100px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">#</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Subject</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Code</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Classes</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right">Actions</span>
           </div>
 
@@ -304,14 +514,16 @@ export default function SubjectsPage() {
               {paginatedData.map((s: any, idx: number) => {
                 const serialNum = (currentPage - 1) * ITEMS_PER_PAGE + idx + 1;
                 return (
-                  <div key={s.id} className="grid grid-cols-[80px_2fr_1fr_100px] items-center px-4 py-3 hover:bg-slate-50/60 transition-colors">
+                  <div key={s.subjectName} className="grid grid-cols-[80px_2fr_2fr_100px] items-center px-4 py-3 hover:bg-slate-50/60 transition-colors">
                     <span className="text-sm text-slate-500 font-medium">#{serialNum}</span>
                     <span className="text-sm font-semibold text-slate-800">{s.subjectName}</span>
-                    <div>
-                      {s.subjectCode ? (
-                        <Badge variant="outline" className="rounded-lg bg-emerald-50/50 text-emerald-700 border-emerald-100 text-xs font-semibold px-2 py-0.5">
-                          {s.subjectCode}
-                        </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {s.classNames && s.classNames.length > 0 ? (
+                        s.classNames.map((name: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-[10px] bg-slate-100 text-slate-600 border-slate-200">
+                            Class {name}
+                          </Badge>
+                        ))
                       ) : (
                         <span className="text-xs text-slate-400">—</span>
                       )}
@@ -320,10 +532,7 @@ export default function SubjectsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditingSubject(s);
-                          setEditForm({ subjectName: s.subjectName, subjectCode: s.subjectCode || '' });
-                        }}
+                        onClick={() => startEdit(s)}
                         className="h-8 w-8 rounded-lg hover:bg-slate-100"
                       >
                         <Edit2 className="h-4 w-4 text-slate-500 hover:text-slate-800" />
@@ -388,18 +597,60 @@ export default function SubjectsPage() {
               <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Code</Label>
               <Input
                 value={editForm.subjectCode}
-                onChange={(e) => setEditForm({ ...editForm, subjectCode: e.target.value })}
+                onChange={(e) => setEditForm({ ...editForm, subjectCode: e.target.value.toUpperCase() })}
                 placeholder="E.g. MATH"
                 className="rounded-xl border-slate-200"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Assigned Classes</Label>
+              <div className="grid grid-cols-2 gap-2 border border-slate-100 rounded-xl p-3 max-h-36 overflow-y-auto bg-slate-50/50">
+                {classes.map((cls) => {
+                  const checked = editForm.classIds.includes(cls.id);
+                  return (
+                    <label key={cls.id} className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:bg-white p-1 rounded-lg cursor-pointer transition-all border border-transparent hover:border-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setEditForm(prev => ({
+                            ...prev,
+                            classIds: checked
+                              ? prev.classIds.filter(id => id !== cls.id)
+                              : [...prev.classIds, cls.id]
+                          }));
+                        }}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                      />
+                      Class {cls.className}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button variant="outline" onClick={() => setEditingSubject(null)} className="rounded-xl">
               Cancel
             </Button>
-            <Button onClick={handleEditSave} disabled={(updateMutation as any).isPending || (updateMutation as any).isLoading} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5">
-              {((updateMutation as any).isPending || (updateMutation as any).isLoading) ? 'Saving...' : 'Save Changes'}
+            <Button
+              onClick={handleEditSave}
+              disabled={
+                (updateMutation as any).isPending ||
+                (updateMutation as any).isLoading ||
+                (createMutation as any).isPending ||
+                (createMutation as any).isLoading ||
+                (deleteMutation as any).isPending ||
+                (deleteMutation as any).isLoading
+              }
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5"
+            >
+              {((updateMutation as any).isPending ||
+                (updateMutation as any).isLoading ||
+                (createMutation as any).isPending ||
+                (createMutation as any).isLoading ||
+                (deleteMutation as any).isPending ||
+                (deleteMutation as any).isLoading) ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </DialogContent>

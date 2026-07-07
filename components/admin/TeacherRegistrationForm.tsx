@@ -136,7 +136,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
     classSectionId: undefined,
     subjectId: undefined,
   });
-  const { data: subjectOptions = [] } = useSubjectOptions();
+  const { data: subjectOptions = [] } = useSubjectOptions(newClass.classId);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

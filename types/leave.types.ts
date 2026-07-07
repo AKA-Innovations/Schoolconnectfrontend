@@ -110,6 +110,7 @@ export interface ApplyLeaveDto {
   startDate: string;
   endDate: string;
   reason: string;
+  teacherId?: string;
 }
 
 export interface ApproveLeaveDto {

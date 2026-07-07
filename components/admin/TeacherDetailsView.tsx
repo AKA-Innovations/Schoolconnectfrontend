@@ -682,12 +682,6 @@ function ClassForm({ data, onChange, onSave, onCancel, saving, mode }: {
 // ─── Pedagogical Mapping Section (GET/POST/DELETE /class/subject-dtls) ───────
 
 function PedagogicalSection({ teacherId }: { teacherId: string }) {
-  const { data: allDetails, isLoading } = useSubjectDetails();
-  const { data: subjectOptsData } = useSubjectOptions();
-  const { data: classSectionsData } = useClassSectionLists();
-  const createMutation = useCreateSubjectDetail();
-  const deleteMutation = useDeleteSubjectDetail();
-
   const [showAdd, setShowAdd] = useState(false);
   const [newMapping, setNewMapping] = useState({
     classId: 0,
@@ -697,6 +691,12 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
     sectionName: '',
     subjectName: ''
   });
+
+  const { data: allDetails, isLoading } = useSubjectDetails();
+  const { data: subjectOptsData } = useSubjectOptions(newMapping.classId || undefined);
+  const { data: classSectionsData } = useClassSectionLists();
+  const createMutation = useCreateSubjectDetail();
+  const deleteMutation = useDeleteSubjectDetail();
 
   const mappings: SubjectDetail[] = (allDetails ?? []).filter((d: SubjectDetail) => d.teacherId === teacherId);
 

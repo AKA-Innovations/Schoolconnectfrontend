@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTeacherDashboard } from '../../../hooks/useTeacherDashboard';
-import { useFetchTimetable, useSubjectDetails, usePeriodSlots, useSubjectOptions, useClassSectionLists } from '../../../hooks/useClasses';
+import { useFetchTimetable, useSubjectDetails, usePeriodSlots, useClassSectionLists } from '../../../hooks/useClasses';
 import { useSubstitutePeriods, useTeacherAttendance, useLeaveList } from '../../../hooks/useTeacherLeave';
 import { StatsRow } from '../../../components/dashboard/StatsRow';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
@@ -60,7 +60,6 @@ export default function TeacherDashboard() {
 
   const { data: substitutePeriods = [] } = useSubstitutePeriods(todayStr);
   const { data: classSections = [] } = useClassSectionLists();
-  const { data: subjectOptions = [] } = useSubjectOptions();
 
   // Fetch teacher's monthly attendance and leave lists for the leave prompts
   const now = useMemo(() => new Date(), []);
@@ -129,7 +128,7 @@ export default function TeacherDashboard() {
       .filter((p) => p.substituteTeacherId === user?.id && p.status === 'ASSIGNED')
       .map((p) => {
         const csMatch = classSections.find(cs => (cs.masterSectionId || cs.id) === p.classSectionId);
-        const subjMatch = subjectOptions.find(so => Number(so.id) === p.subjectId);
+        const subjMatch = subjectDetails.find(sd => Number(sd.subjectDtlsId) === p.subjectId);
         const slot = periodSlots.find(ps => ps.id === p.periodId);
         
         return {
@@ -147,7 +146,7 @@ export default function TeacherDashboard() {
           isSubstitute: true,
         };
       });
-  }, [substitutePeriods, user, classSections, subjectOptions, periodSlots]);
+  }, [substitutePeriods, user, classSections, subjectDetails, periodSlots]);
 
   const timetable = useMemo(() => {
     const entries = Array.isArray(rawTimetable) ? rawTimetable : [];

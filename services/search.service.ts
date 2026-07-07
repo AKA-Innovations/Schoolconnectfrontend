@@ -92,14 +92,10 @@ export const searchService = {
         console.error('Class search failed:', err);
       }
 
-      // 4. Search Subjects
       try {
-        const subjects = await classService.getSubjectOptions();
+        const subjects = await classService.getSubjectOptions(schoolId, undefined, undefined, query);
         if (Array.isArray(subjects)) {
-          subjects.filter(s => 
-            s.subjectName?.toLowerCase().includes(query.toLowerCase()) ||
-            s.subjectCode?.toLowerCase().includes(query.toLowerCase())
-          ).forEach(s => {
+          subjects.forEach(s => {
             results.push({
               id: s.id?.toString() || Math.random().toString(),
               name: s.subjectName,

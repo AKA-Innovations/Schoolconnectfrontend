@@ -40,7 +40,7 @@ export function ExamSubjectConfig({ session }: Props) {
     ? subjectsData 
     : (subjectsData as any)?.data || (subjectsData as any)?.items || [];
 
-  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassName || undefined);
+  const { data: subjectOptions = [] } = useSubjectOptions(selectedClassId || undefined);
 
   const createMutation = useCreateExamSubjects();
   const deleteMutation = useDeleteExamSubject();

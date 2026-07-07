@@ -28,7 +28,6 @@ export default function CoordinatorSubjectMappingPage() {
   const coordinatorClasses = user?.coordinatorClasses ?? [];
 
   const { data: allMappings = [], isLoading } = useSubjectDetails();
-  const { data: allSubjects = [] } = useSubjectOptions();
   const { data: allClassSections = [] } = useClassSectionLists();
   const { data: schoolClasses = [] } = useSchoolClasses();
   
@@ -48,9 +47,7 @@ export default function CoordinatorSubjectMappingPage() {
       : allClassSections,
     [allClassSections, coordClassNames]
   );
-  
-  // Subjects are session-global (not class-scoped) — show all
-  const subjects = allSubjects;
+
 
   const mappings = useMemo(
     () => coordClassNames.length > 0
@@ -77,8 +74,17 @@ export default function CoordinatorSubjectMappingPage() {
 
   // Available subjects filtered to the selected class-section
   const selectedSection = classSections.find((cs) => cs.id === form.classSectionId);
-  // Subjects are session-global — show all available subjects
+
+  const selectedClassId = useMemo(() => {
+    if (!selectedSection) return undefined;
+    if (selectedSection.classId) return selectedSection.classId;
+    const sc = schoolClasses.find((c) => c.className === selectedSection.className);
+    return sc?.id;
+  }, [selectedSection, schoolClasses]);
+
+  const { data: allSubjects = [] } = useSubjectOptions(selectedClassId);
   const availableSubjects = allSubjects;
+  const subjects = allSubjects;
 
   const filtered = mappings.filter((m) => {
     const q = search.toLowerCase();
@@ -212,8 +218,8 @@ export default function CoordinatorSubjectMappingPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Subject *</Label>
-                <Select value={form.subjectId ? String(form.subjectId) : ''} onValueChange={(v) => setForm({ ...form, subjectId: Number(v) })} disabled={!form.classSectionId}>
-                  <SelectTrigger className="rounded-xl"><SelectValue placeholder={form.classSectionId ? 'Select subject' : 'Select class first'} /></SelectTrigger>
+                <Select value={form.subjectId ? String(form.subjectId) : ''} onValueChange={(v) => setForm({ ...form, subjectId: Number(v) })}>
+                  <SelectTrigger className="rounded-xl" disabled={!form.classSectionId}><SelectValue placeholder={form.classSectionId ? 'Select subject' : 'Select class first'} /></SelectTrigger>
                   <SelectContent>
                     {availableSubjects.map((s) => (
                       <SelectItem key={s.id} value={String(s.id)}>
