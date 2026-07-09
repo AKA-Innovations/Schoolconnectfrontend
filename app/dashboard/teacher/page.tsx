@@ -275,7 +275,7 @@ export default function TeacherDashboard() {
       return hours * 60 + minutes;
     };
 
-    const upcoming = timetable.find((item) => parseTimeToMinutes(item.startTime) > currentMinutes);
+    const upcoming = timetable.find((item) => parseTimeToMinutes(item.startTime || '') > currentMinutes);
     return upcoming || null;
   }, [timetable]);
 

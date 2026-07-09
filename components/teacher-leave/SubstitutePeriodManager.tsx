@@ -223,7 +223,7 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <span className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg">
-                              Period {periodMap.get(period.periodId) ?? period.periodNumber ?? period.periodId}
+                              Period {periodMap.get(period.periodId) ?? (period as any).periodNumber ?? period.periodId}
                             </span>
                             <Badge variant={status.variant === 'warning' ? 'outline' : 'secondary'} className="text-[9px] py-0.5 px-2 font-bold">
                               {status.label}
@@ -232,7 +232,7 @@ export function SubstitutePeriodManager({ isAdmin }: SubstitutePeriodManagerProp
 
                           <div className="space-y-1 mt-3">
                             <div className="text-xs font-bold text-slate-500">
-                              Subject: <span className="text-slate-700 font-semibold">{period.subjectName ?? subjectMap.get(period.subjectId) ?? `Subject #${period.subjectId}`}</span>
+                               Subject: <span className="text-slate-700 font-semibold">{(period as any).subjectName ?? subjectMap.get(period.subjectId) ?? `Subject #${period.subjectId}`}</span>
                             </div>
                             <div className="text-xs font-bold text-slate-500">
                               Class-Section: <span className="text-slate-700 font-semibold">{classSectionMap.get(period.classSectionId) || `Section #${period.classSectionId}`}</span>

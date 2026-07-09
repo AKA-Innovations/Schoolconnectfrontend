@@ -13,7 +13,7 @@ export interface User {
   isClassTeacher?: boolean;
   isSubjectTeacher?: boolean;
   /** The class this teacher is assigned to as class teacher (first match) */
-  classTeacherClass?: { className: string; sectionName: string } | null;
+  classTeacherClass?: { classDtlsId?: number; className: string; sectionName: string } | null;
   /** Class mapping details this coordinator is responsible for */
   coordinatorClasses?: CoordinatorClassMapping[];
 }

@@ -85,8 +85,11 @@ export default function LoginPage() {
 
       // Set auth immediately so the API interceptor has the token for subsequent calls
       setAuth({ user: userObj, token: data.accessToken });
-      document.cookie = `auth-token=${data.accessToken}; path=/; SameSite=Strict`;
-      document.cookie = `user-role=${data.role}; path=/; SameSite=Strict`;
+      
+      const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      const securePart = isSecure ? '; Secure' : '';
+      document.cookie = `auth-token=${data.accessToken}; path=/; SameSite=Strict${securePart}`;
+      document.cookie = `user-role=${data.role}; path=/; SameSite=Strict${securePart}`;
 
       // If teacher or subject_coordinator, enrich auth store with sub-role flags
       if ((data.role === 'teacher' || data.role === 'subject_coordinator') && backendUserId) {
@@ -95,7 +98,7 @@ export default function LoginPage() {
           const assignedClass = teacherDetails.classTeacherAssignment ?? null;
           const coordinatorClasses = (teacherDetails.coordinatorMappings ?? []).map((m) => m.className);
           if (teacherDetails.isPrincipal) {
-            document.cookie = `is-principal=true; path=/; SameSite=Strict`;
+            document.cookie = `is-principal=true; path=/; SameSite=Strict${securePart}`;
           } else {
             document.cookie = `is-principal=; Max-Age=0; path=/`;
           }

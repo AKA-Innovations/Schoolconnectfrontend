@@ -42,10 +42,10 @@ export function StudyMaterialManagement() {
   const sectionsMap = useMemo(() => new Map(allSections.map((s) => [s.id, s])), [allSections]);
 
   const sections = useMemo(() => {
-    if (role === 'principal' || role === 'admin') {
+    if (role === 'principal' || role === 'super_admin' || role === 'school_admin') {
       return allSections;
     }
-    if (role === 'coordinator' || role === 'subject_coordinator') {
+    if (role === 'subject_coordinator') {
       const coordClasses = (user?.coordinatorClasses ?? []).map(c => 
         String(typeof c === 'object' ? c.className : c)
       ).filter(Boolean);
@@ -60,15 +60,15 @@ export function StudyMaterialManagement() {
   const subjects = useMemo(() => {
     let filteredSubjects = allSubjects;
 
-    if (role === 'principal' || role === 'admin') {
+    if (role === 'principal' || role === 'super_admin' || role === 'school_admin') {
       filteredSubjects = allSubjects;
-    } else if (role === 'coordinator' || role === 'subject_coordinator') {
+    } else if (role === 'subject_coordinator') {
       const coordClasses = (user?.coordinatorClasses ?? []).map(c => 
         String(typeof c === 'object' ? c.className : c)
       ).filter(Boolean);
       
       const coordinatorSubjects = subjectDetails
-        .filter(sd => coordClasses.includes(sd.className))
+        .filter(sd => coordClasses.includes(sd.className || ''))
         .map(sd => sd.subjectName);
 
       filteredSubjects = allSubjects.filter(sub => coordinatorSubjects.includes(sub.subjectName));

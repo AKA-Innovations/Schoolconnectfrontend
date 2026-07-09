@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const ALLOWED_HOSTS = [
+  new URL(process.env.NEXT_PUBLIC_API_URL || 'https://skoolconnectbackend.onrender.com').hostname,
+  'localhost',
+  '127.0.0.1',
+  'res.cloudinary.com',
+  'storage.googleapis.com',
+];
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fileUrl = searchParams.get('url');
@@ -10,6 +18,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const parsedUrl = new URL(fileUrl);
+    if (!ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+      return NextResponse.json({ error: 'Forbidden host' }, { status: 403 });
+    }
+
     const response = await fetch(fileUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch file: ${response.statusText}`);

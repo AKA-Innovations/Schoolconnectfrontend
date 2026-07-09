@@ -895,7 +895,7 @@ export function StudentsTab({
                                 className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                               >
                                 <option value="">All Grades</option>
-                                {uniqueTopperGrades.map((g: string) => (
+                                {uniqueTopperGrades.map((g: any) => (
                                   <option key={g} value={g}>Grade {g}</option>
                                 ))}
                               </select>

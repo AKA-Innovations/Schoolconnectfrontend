@@ -157,10 +157,45 @@ export function ResultMonitoring({ session }: Props) {
   const handleGenerateResults = async () => {
     if (!selectedExamId || !selectedClassId || !selectedSectionId) return;
 
+    // Find the currently selected exam detail
+    const currentExam = exams.find((e: any) => e.id === Number(selectedExamId));
+    let examIdsPayload = [Number(selectedExamId)];
+
+    if (currentExam) {
+      const nameLower = currentExam.examName.toLowerCase();
+      
+      // Auto-aggregation logic matching Step 3 of Backend Academic Structure:
+      if (nameLower.includes('half yearly') || nameLower.includes('semester 1') || nameLower.includes('sem 1') || nameLower.includes('hy')) {
+        // Semester 1 aggregates: Half Yearly (Primary, first) + UT1 + UT2
+        const ut1 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 1') || e.examName.toLowerCase().includes('ut1') || e.examName.toLowerCase().includes('ut 1'));
+        const ut2 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 2') || e.examName.toLowerCase().includes('ut2') || e.examName.toLowerCase().includes('ut 2'));
+        
+        const list = [Number(selectedExamId)];
+        if (ut1) list.push(ut1.id);
+        if (ut2) list.push(ut2.id);
+        examIdsPayload = list;
+      } else if (nameLower.includes('final') || nameLower.includes('semester 2') || nameLower.includes('sem 2') || nameLower.includes('fi') || nameLower.includes('annual')) {
+        // Semester 2 & Overall Academic Year aggregates: Final Exam (Primary) + UT1 + UT2 + HY + UT3 + UT4
+        const ut1 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 1') || e.examName.toLowerCase().includes('ut1') || e.examName.toLowerCase().includes('ut 1'));
+        const ut2 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 2') || e.examName.toLowerCase().includes('ut2') || e.examName.toLowerCase().includes('ut 2'));
+        const hy = exams.find((e: any) => e.examName.toLowerCase().includes('half yearly') || e.examName.toLowerCase().includes('hy') || e.examName.toLowerCase().includes('semester 1') || e.examName.toLowerCase().includes('sem 1'));
+        const ut3 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 3') || e.examName.toLowerCase().includes('ut3') || e.examName.toLowerCase().includes('ut 3'));
+        const ut4 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 4') || e.examName.toLowerCase().includes('ut4') || e.examName.toLowerCase().includes('ut 4'));
+
+        const list = [Number(selectedExamId)];
+        if (ut1) list.push(ut1.id);
+        if (ut2) list.push(ut2.id);
+        if (hy) list.push(hy.id);
+        if (ut3) list.push(ut3.id);
+        if (ut4) list.push(ut4.id);
+        examIdsPayload = list;
+      }
+    }
+
     try {
       await generateMutation.mutateAsync({
         session,
-        examIds: [Number(selectedExamId)],
+        examIds: examIdsPayload,
         classId: Number(selectedClassId),
         classSectionId: Number(selectedSectionId),
       });

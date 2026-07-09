@@ -195,7 +195,8 @@ export function AcademicTab({
 
   useEffect(() => {
     if (hwSubjects.length > 0 && !selectedHwSubject) {
-      setSelectedHwSubject(String(hwSubjects[0].subjectId));
+      const firstSub = hwSubjects[0] as any;
+      setSelectedHwSubject(String(firstSub.subjectId ?? firstSub.subjectDtlsId ?? firstSub.id));
     }
   }, [hwSubjects, selectedHwSubject]);
 
@@ -206,7 +207,8 @@ export function AcademicTab({
 
   useEffect(() => {
     if (cwSubjects.length > 0 && !selectedCwSubject) {
-      setSelectedCwSubject(String(cwSubjects[0].subjectId));
+      const firstSub = cwSubjects[0] as any;
+      setSelectedCwSubject(String(firstSub.subjectId ?? firstSub.subjectDtlsId ?? firstSub.id));
     }
   }, [cwSubjects, selectedCwSubject]);
 

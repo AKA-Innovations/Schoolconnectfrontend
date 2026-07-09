@@ -694,19 +694,25 @@ export function MarksEntryManager({ session }: Props) {
                 Show Only Marked
               </label>
 
-              {selectedStudents.length > 0 && (
+              {selectedStudents.length > 0 && !isMarksLocked && (
                 <Button variant="outline" size="sm" onClick={handleBulkAbsent} className="rounded-lg text-xs hover:bg-rose-50 text-rose-600 border-rose-200">
                   Mark Selected Absent ({selectedStudents.length})
                 </Button>
               )}
               {isMarksLocked ? (
-                <Button variant="outline" size="sm" onClick={() => handleLockUnlock('unlock')} className="rounded-lg text-xs gap-1">
-                  <Unlock className="h-3.5 w-3.5" /> Unlock Marks
-                </Button>
+                // Unlock can only be done by coordinator, principal, school_admin
+                (isPowerUser || user?.role === 'subject_coordinator') && (
+                  <Button variant="outline" size="sm" onClick={() => handleLockUnlock('unlock')} className="rounded-lg text-xs gap-1">
+                    <Unlock className="h-3.5 w-3.5" /> Unlock Marks
+                  </Button>
+                )
               ) : (
-                <Button variant="outline" size="sm" onClick={() => handleLockUnlock('lock')} className="rounded-lg text-xs gap-1">
-                  <Lock className="h-3.5 w-3.5" /> Lock Marks
-                </Button>
+                // Lock can be done by teacher or class teacher
+                (user?.role === 'teacher' || isClassTeacher) && (
+                  <Button variant="outline" size="sm" onClick={() => handleLockUnlock('lock')} className="rounded-lg text-xs gap-1">
+                    <Lock className="h-3.5 w-3.5" /> Lock Marks
+                  </Button>
+                )
               )}
             </div>
           </CardHeader>

@@ -47,7 +47,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Topbar onMobileMenuClick={() => setMobileOpen(true)} />
+        <Suspense fallback={<div className="h-16 border-b border-slate-100 bg-white" />}>
+          <Topbar onMobileMenuClick={() => setMobileOpen(true)} />
+        </Suspense>
         <main id="main layout" className="flex-1 overflow-y-auto">
           <Suspense fallback={
             <div className="flex items-center justify-center h-full">

@@ -101,10 +101,10 @@ export function ClassworkManagement() {
 
   // Filter sections options to only show teacher-assigned classes/sections
   const filteredSections = useMemo(() => {
-    if (role === 'principal' || role === 'admin' || role === 'school_admin') {
+    if (role === 'principal' || role === 'super_admin' || role === 'school_admin') {
       return allSections.filter(s => s.id > 0);
     }
-    if (role === 'coordinator' || role === 'subject_coordinator') {
+    if (role === 'subject_coordinator') {
       const coordClasses = (user?.coordinatorClasses ?? []).map(c => 
         String(typeof c === 'object' ? c.className : c)
       ).filter(Boolean);

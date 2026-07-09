@@ -48,7 +48,7 @@ export default function StudentHomeworkPage() {
     page: 1,
     limit: 100,
   });
-  const homeworks = homeworksData?.items ?? [];
+  const homeworks = Array.isArray(homeworksData) ? homeworksData : ((homeworksData as any)?.items ?? []);
 
   const [selectedHw, setSelectedHw] = useState<any>(null);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
@@ -115,7 +115,7 @@ export default function StudentHomeworkPage() {
         await updateSubMut.mutateAsync({
           id: mySubmission.id,
           data: {
-            remarks: remarks || mySubmission.remarks,
+            remarks: remarks || mySubmission.remarks || undefined,
             status,
             submittedAt: new Date().toISOString(),
           },
@@ -164,7 +164,7 @@ export default function StudentHomeworkPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
-            {homeworks.map((hw) => {
+            {homeworks.map((hw: any) => {
               const isSelected = selectedHw?.id === hw.id;
               return (
                 <div
@@ -235,7 +235,7 @@ export default function StudentHomeworkPage() {
                       {mySubmission.status === 'GRADED' && (
                         <div className="pt-2 border-t border-slate-200">
                           <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">Teacher Grade / Remarks:</span>
-                          <p className="text-xs text-slate-800 font-bold mt-0.5">{mySubmission.grade || 'No Grade'}</p>
+                          <p className="text-xs text-slate-800 font-bold mt-0.5">{(mySubmission as any).grade || 'No Grade'}</p>
                           <p className="text-xs text-slate-500">{mySubmission.remarks || 'No remarks.'}</p>
                         </div>
                       )}
