@@ -356,17 +356,28 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
 
         const payload = {
           ...flatFields,
-          teacherPersonalData: { bloodGroup, maritalStatus, nationality, religion },
-          teacherAcademicData: { highestQualification, specialization, university, passingYear },
-          teacherProfessionalData: { designation, totalExperience, previousSchool },
-          teacherFamilyDetails: { fatherName, motherName, emergencyContactName, emergencyContactPhone },
           classTeacherClass: cs ? { className: cs.className, sectionName: cs.sectionName } : undefined,
           coordinatorClasses: formData.isCoordinator
             ? coordinatorClasses.map((className) => ({ className, session: CURRENT_SESSION }))
             : undefined,
         };
 
-        await teacherService.registerTeacher(payload as any);
+        const res = await teacherService.registerTeacher(payload as any);
+        const registeredId = res?.data?.teacherDtls?.id ?? res?.data?.user?.id;
+
+        if (registeredId) {
+          try {
+            await teacherService.updateTeacherDetails(registeredId, {
+              teacherPersonalData: { bloodGroup, maritalStatus, nationality, religion },
+              teacherAcademicData: { highestQualification, specialization, university, passingYear },
+              teacherProfessionalData: { designation, totalExperience, previousSchool },
+              teacherFamilyDetails: { fatherName, motherName, emergencyContactName, emergencyContactPhone },
+            });
+          } catch (updateErr) {
+            console.error('Failed to update extra teacher details after registration:', updateErr);
+            toast.warning('Faculty member registered, but failed to save additional details.');
+          }
+        }
 
         toast.success('Faculty member onboarded successfully');
       }
@@ -752,7 +763,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
         </Card>
 
         {/* Academic Assignments */}
-        <Card className="erp-card overflow-hidden">
+        {/* <Card className="erp-card overflow-hidden">
           <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -878,7 +889,7 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
               )}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Form Actions */}
         <div className="flex items-center justify-end gap-4 pt-4">

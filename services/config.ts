@@ -17,8 +17,8 @@ export const API_ENDPOINTS = {
     FETCH_SECTIONS: '/school/fetch/sections',
     SECTION_UPDATE: (id: number) => `/school/sections/${id}`,
     SECTION_DELETE: (id: number) => `/school/sections/${id}`,
-    CLASS_UPDATE: (classDtlsId: number) => `/school/class/update/${classDtlsId}`,
-    CLASS_DELETE: (classDtlsId: number) => `/school/class/${classDtlsId}`,
+    CLASS_UPDATE: (id: number) => `/school/classes/${id}`,
+    CLASS_DELETE: (id: number) => `/school/classes/${id}`,
     CLASS_TEACHERS: '/school/class-teachers',
   },
   ADMINISTRATOR: {

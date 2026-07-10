@@ -59,7 +59,6 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Dashboard', href: '/dashboard/admin/class/dashboard' },
         { name: 'Subjects', href: '/dashboard/admin/class/subjects' },
         { name: 'Mapping', href: '/dashboard/admin/class/subject-mapping' },
-        { name: 'Periods', href: '/dashboard/admin/class/period-slots' },
         { name: 'Timetable', href: '/dashboard/admin/class/timetable' },
         { name: 'Class Teachers', href: '/dashboard/admin/class/teachers' },
       ]
@@ -111,6 +110,8 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       icon: Building2,
       subLinks: [
         { name: 'Profile', href: '/dashboard/admin/school' },
+        { name: 'School Structure', href: '/dashboard/admin/school?tab=structure' },
+        { name: 'Periods', href: '/dashboard/admin/school?tab=periods' },
         { name: 'Onboard Student', href: '/dashboard/admin/student/register' },
       ]
     },

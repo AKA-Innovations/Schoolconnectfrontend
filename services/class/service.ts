@@ -317,7 +317,7 @@ export const classService = {
   },
 
   createPeriodSlot: async (data: CreatePeriodSlotPayload): Promise<PeriodSlot> => {
-    const res = await api.post(API_ENDPOINTS.CLASS.PERIOD_SLOTS, data);
+    const res = await api.post(API_ENDPOINTS.CLASS.PERIOD_SLOTS, [data]);
     return res.data;
   },
 

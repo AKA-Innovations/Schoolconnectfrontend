@@ -80,6 +80,7 @@ export default function SubjectDetailsPage() {
   const [editId, setEditId]               = useState<string | number | null>(null);
   const [form, setForm]                   = useState(EMPTY_FORM);
   const [activeMenuId, setActiveMenuId]   = useState<string | number | null>(null);
+  const [selectedClass, setSelectedClass] = useState<string>('');
 
   // Drawer for pre-selecting a teacher
   const [drawerTeacherId, setDrawerTeacherId] = useState<string>('');
@@ -94,7 +95,28 @@ export default function SubjectDetailsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
+
+  // Filter unique classes and available sections for separate dropdown selectors
+  const uniqueClasses = useMemo(() => {
+    const list: string[] = [];
+    classSections.forEach(cs => {
+      if (cs.className && !list.includes(cs.className)) {
+        list.push(cs.className);
+      }
+    });
+    return list.sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+  }, [classSections]);
+
+  const availableSections = useMemo(() => {
+    if (!selectedClass) return [];
+    return classSections.filter(cs => cs.className === selectedClass);
+  }, [classSections, selectedClass]);
 
   const createMutation = useCreateSubjectDetail();
   const updateMutation = useUpdateSubjectDetail();
@@ -341,6 +363,7 @@ export default function SubjectDetailsPage() {
   const startEdit = (m: any) => {
     setEditId(m.id);
     const cs = classSections.find(c => c.className === m.className && c.sectionName === m.sectionName);
+    setSelectedClass(cs?.className || '');
     setForm({ teacherId: m.teacherId, classSectionId: cs?.id || 0, subjectId: m.subjectDtlsId || m.subjectId || 0 });
     setShowDrawer(true);
     setActiveMenuId(null);
@@ -348,6 +371,7 @@ export default function SubjectDetailsPage() {
 
   const handleDuplicate = (m: any) => {
     const cs = classSections.find(c => c.className === m.className && c.sectionName === m.sectionName);
+    setSelectedClass(cs?.className || '');
     setForm({ teacherId: m.teacherId, classSectionId: cs?.id || 0, subjectId: m.subjectDtlsId || m.subjectId || 0 });
     setEditId(null);
     setShowDrawer(true);
@@ -355,12 +379,19 @@ export default function SubjectDetailsPage() {
     toast.info('Duplicated — update if needed and save.');
   };
 
-  const resetForm = () => { setShowDrawer(false); setEditId(null); setForm(EMPTY_FORM); setDrawerTeacherId(''); };
+  const resetForm = () => {
+    setShowDrawer(false);
+    setEditId(null);
+    setForm(EMPTY_FORM);
+    setDrawerTeacherId('');
+    setSelectedClass('');
+  };
 
   const openAddForTeacher = (teacherId: string) => {
     setForm({ ...EMPTY_FORM, teacherId });
     setDrawerTeacherId(teacherId);
     setEditId(null);
+    setSelectedClass('');
     setShowDrawer(true);
   };
 
@@ -467,10 +498,10 @@ export default function SubjectDetailsPage() {
       </Card>
 
       {/* ── Teacher-centric Table ── */}
-      <Card className="erp-card overflow-hidden shadow-xs border border-slate-100">
+      <Card className="erp-card overflow-visible shadow-xs border border-slate-100">
         <CardContent className="p-0">
           {/* Table header */}
-          <div className="grid grid-cols-[2fr_3fr_1fr_1fr_80px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
+          <div className="grid grid-cols-[2fr_3fr_1fr_1fr_80px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 rounded-t-2xl">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Teacher</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Assignments (Class → Subject)</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Weekly Periods</span>
@@ -584,7 +615,7 @@ export default function SubjectDetailsPage() {
                     {/* ── Expanded detail rows ── */}
                     {isOpen && (
                       <div className="border-t border-slate-100 bg-slate-50/30">
-                        <div className="overflow-x-auto pl-12">
+                        <div className="overflow-visible pl-12">
                           <table className="w-full">
                             <thead>
                               <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
@@ -760,18 +791,42 @@ export default function SubjectDetailsPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class / Section *</Label>
-                  <select
-                    value={form.classSectionId ? String(form.classSectionId) : ''}
-                    onChange={e => setForm(f => ({ ...f, classSectionId: Number(e.target.value) }))}
-                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  >
-                    <option value="">Select class section</option>
-                    {classSections.map(cs => (
-                      <option key={cs.id} value={String(cs.id)}>{cs.className} — {cs.sectionName}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class *</Label>
+                    <select
+                      value={selectedClass}
+                      onChange={e => {
+                        const nextClass = e.target.value;
+                        setSelectedClass(nextClass);
+                        setForm(f => ({ ...f, classSectionId: 0, subjectId: 0 }));
+                      }}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="">Select class</option>
+                      {uniqueClasses.map(c => (
+                        <option key={c} value={c}>Class {c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Section *</Label>
+                    <select
+                      value={form.classSectionId ? String(form.classSectionId) : ''}
+                      onChange={e => {
+                        const nextSectionId = Number(e.target.value);
+                        setForm(f => ({ ...f, classSectionId: nextSectionId, subjectId: 0 }));
+                      }}
+                      disabled={!selectedClass}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">{selectedClass ? 'Select section' : 'Select class first'}</option>
+                      {availableSections.map(cs => (
+                        <option key={cs.id} value={String(cs.id)}>{cs.sectionName}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

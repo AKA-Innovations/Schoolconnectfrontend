@@ -40,13 +40,17 @@ export default function SubjectsPage() {
   const deleteMutation = useDeleteSubjectOption();
 
   const [editingSubject, setEditingSubject] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '', classIds: [] as number[] });
+  const [editForm, setEditForm] = useState({
+    subjectName: '',
+    classIds: [] as number[],
+    classCodes: {} as Record<number, { id: number; subjectCode: string }>,
+  });
 
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
+  const ITEMS_PER_PAGE = 10;
 
   // Bulk creation states
   const [subjectNameInput, setSubjectNameInput] = useState('');
@@ -215,10 +219,22 @@ export default function SubjectsPage() {
   // ✏️ Edit
   const startEdit = (s: any) => {
     setEditingSubject(s);
+    
+    // Find all matching subjects to get their classId -> subjectCode & backendId mappings
+    const classCodeMap: Record<number, { id: number; subjectCode: string }> = {};
+    subjects.forEach((subj: any) => {
+      if (subj.subjectName.toLowerCase() === s.subjectName.toLowerCase() && subj.classId) {
+        classCodeMap[subj.classId] = {
+          id: subj.id,
+          subjectCode: subj.subjectCode || '',
+        };
+      }
+    });
+
     setEditForm({
       subjectName: s.subjectName,
-      subjectCode: s.subjectCodes[0] || '',
       classIds: [...s.classIds],
+      classCodes: classCodeMap,
     });
   };
 
@@ -234,7 +250,15 @@ export default function SubjectsPage() {
       return;
     }
 
-    const cleanPrefix = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+    // Validate that all assigned classes have a subject code
+    for (const cid of editForm.classIds) {
+      const code = (editForm.classCodes[cid]?.subjectCode || '').trim();
+      if (!code) {
+        const cls = classes.find(c => c.id === cid);
+        toast.error(`Subject code for Class ${cls?.className || cid} is required`);
+        return;
+      }
+    }
 
     try {
       // 1. Identify deleted classes & delete them
@@ -251,12 +275,10 @@ export default function SubjectsPage() {
       const newClassIds = editForm.classIds.filter((cid: number) => !editingSubject.classIds.includes(cid));
       if (newClassIds.length > 0) {
         const newSubjectsPayload = newClassIds.map(classId => {
-          const cls = classes.find(c => c.id === classId);
-          const className = cls ? cls.className : '';
-          const cleanClassName = className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          const codeInfo = editForm.classCodes[classId];
           return {
             subjectName: name,
-            subjectCode: `${cleanPrefix}${cleanClassName}1001`,
+            subjectCode: codeInfo ? codeInfo.subjectCode : '',
             classId,
           };
         });
@@ -270,18 +292,15 @@ export default function SubjectsPage() {
       // 3. Identify updated classes (classes kept) & update name/code
       const keptClassIds = editingSubject.classIds.filter((cid: number) => editForm.classIds.includes(cid));
       for (const cid of keptClassIds) {
+        const codeInfo = editForm.classCodes[cid];
         const idx = editingSubject.classIds.indexOf(cid);
-        if (idx !== -1) {
+        if (idx !== -1 && codeInfo) {
           const backendId = editingSubject.ids[idx];
-          const cls = classes.find(c => c.id === cid);
-          const className = cls ? cls.className : '';
-          const cleanClassName = className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-
           await updateMutation.mutateAsync({
             id: backendId,
             data: {
               subjectName: name,
-              subjectCode: `${cleanPrefix}${cleanClassName}1001`,
+              subjectCode: codeInfo.subjectCode,
             },
           });
         }
@@ -593,15 +612,6 @@ export default function SubjectsPage() {
                 className="rounded-xl border-slate-200"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Code</Label>
-              <Input
-                value={editForm.subjectCode}
-                onChange={(e) => setEditForm({ ...editForm, subjectCode: e.target.value.toUpperCase() })}
-                placeholder="E.g. MATH"
-                className="rounded-xl border-slate-200"
-              />
-            </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Assigned Classes</Label>
               <div className="grid grid-cols-2 gap-2 border border-slate-100 rounded-xl p-3 max-h-36 overflow-y-auto bg-slate-50/50">
@@ -613,12 +623,29 @@ export default function SubjectsPage() {
                         type="checkbox"
                         checked={checked}
                         onChange={() => {
-                          setEditForm(prev => ({
-                            ...prev,
-                            classIds: checked
+                          setEditForm(prev => {
+                            const isChecked = prev.classIds.includes(cls.id);
+                            const nextClassIds = isChecked
                               ? prev.classIds.filter(id => id !== cls.id)
-                              : [...prev.classIds, cls.id]
-                          }));
+                              : [...prev.classIds, cls.id];
+                            
+                            const nextClassCodes = { ...prev.classCodes };
+                            if (!isChecked) {
+                              if (!nextClassCodes[cls.id]) {
+                                const cleanPrefix = prev.subjectName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+                                const cleanClassName = cls.className.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                                nextClassCodes[cls.id] = {
+                                  id: 0,
+                                  subjectCode: `${cleanPrefix}${cleanClassName}1001`,
+                                };
+                              }
+                            }
+                            return {
+                              ...prev,
+                              classIds: nextClassIds,
+                              classCodes: nextClassCodes,
+                            };
+                          });
                         }}
                         className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
                       />
@@ -628,6 +655,40 @@ export default function SubjectsPage() {
                 })}
               </div>
             </div>
+            {editForm.classIds.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Subject Codes Class-wise</Label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+                  {editForm.classIds.map((cid) => {
+                    const cls = classes.find(c => c.id === cid);
+                    const codeInfo = editForm.classCodes[cid] || { id: 0, subjectCode: '' };
+                    return (
+                      <div key={cid} className="flex items-center justify-between gap-3 bg-white p-2 rounded-lg border border-slate-100">
+                        <span className="text-xs font-bold text-slate-700">Class {cls?.className}</span>
+                        <Input
+                          value={codeInfo.subjectCode}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setEditForm(prev => ({
+                              ...prev,
+                              classCodes: {
+                                ...prev.classCodes,
+                                [cid]: {
+                                  ...prev.classCodes[cid],
+                                  subjectCode: val,
+                                }
+                              }
+                            }));
+                          }}
+                          placeholder="Subject Code"
+                          className="h-8 w-40 text-xs rounded-lg border-slate-200 text-right font-mono"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button variant="outline" onClick={() => setEditingSubject(null)} className="rounded-xl">

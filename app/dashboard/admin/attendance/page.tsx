@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthStore } from '@/store/authStore';
 import { useClassSectionLists } from '@/hooks/useClasses';
 import { useFilterAttendance, useStudentList, useBulkAttendance, useUpdateAttendance } from '@/hooks/useStudents';
@@ -33,6 +34,8 @@ export default function AdminAttendancePage() {
 
   const [viewMode, setViewMode] = useState<'overview' | 'detail'>('overview');
   const [selectedSection, setSelectedSection] = useState('');
+  const [selectedClass, setSelectedClass] = useState('all');
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState('all');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [search, setSearch] = useState('');
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});
@@ -173,21 +176,49 @@ export default function AdminAttendancePage() {
     }
   };
 
+  const uniqueClasses = useMemo(() => {
+    const classes = Array.from(new Set(allSections.map(s => s.className).filter(Boolean)));
+    return classes.sort((a, b) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.localeCompare(b);
+    });
+  }, [allSections]);
+
+  const uniqueSections = useMemo(() => {
+    const sections = Array.from(new Set(allSections.map(s => s.sectionName).filter(Boolean)));
+    return sections.sort((a, b) => a.localeCompare(b));
+  }, [allSections]);
+
   const filteredSections = useMemo(() => {
-    if (!search) return allSections;
-    const q = search.toLowerCase();
-    return allSections.filter(s => 
-      (s.className ?? '').toLowerCase().includes(q) || 
-      (s.sectionName ?? '').toLowerCase().includes(q)
-    );
-  }, [allSections, search]);
+    return allSections.filter(s => {
+      if (selectedClass !== 'all' && String(s.className) !== selectedClass) {
+        return false;
+      }
+      if (selectedSectionFilter !== 'all' && String(s.sectionName) !== selectedSectionFilter) {
+        return false;
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        const matchesClass = (s.className ?? '').toLowerCase().includes(q);
+        const matchesSection = (s.sectionName ?? '').toLowerCase().includes(q);
+        if (!matchesClass && !matchesSection) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allSections, selectedClass, selectedSectionFilter, search]);
 
   if (viewMode === 'overview') {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
               <ShieldCheck size={28} />
             </div>
             <div>
@@ -195,57 +226,110 @@ export default function AdminAttendancePage() {
               <p className="text-sm text-muted-foreground">Global administrative access for all {allSections.length} classes</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-             <div className="relative">
+          
+          <div className="flex flex-wrap items-center gap-3">
+             <div className="relative w-full sm:w-60">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   value={search} 
                   onChange={e => setSearch(e.target.value)} 
                   placeholder="Search class or section..." 
-                  className="pl-10 h-10 w-64 rounded-xl border-border/50 shadow-xs focus:ring-primary/20 transition-all"
+                  className="pl-10 h-10 w-full rounded-xl border-slate-200 focus:border-primary/50 focus:ring-primary/20 transition-all shadow-xs"
                 />
              </div>
+
+             {/* Class Option Filter */}
+             <div className="w-[140px] max-sm:w-full">
+               <Select value={selectedClass} onValueChange={setSelectedClass}>
+                 <SelectTrigger className="h-10 rounded-xl border-slate-200 shadow-xs">
+                   <SelectValue placeholder="Class" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">All Classes</SelectItem>
+                   {uniqueClasses.map((cls) => (
+                     <SelectItem key={cls} value={cls}>Class {cls}</SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+
+             {/* Section Option Filter */}
+             <div className="w-[140px] max-sm:w-full">
+               <Select value={selectedSectionFilter} onValueChange={setSelectedSectionFilter}>
+                 <SelectTrigger className="h-10 rounded-xl border-slate-200 shadow-xs">
+                   <SelectValue placeholder="Section" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">All Sections</SelectItem>
+                   {uniqueSections.map((sec) => (
+                     <SelectItem key={sec} value={sec}>Section {sec}</SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+             </div>
+
              <Input 
               type="date" 
               value={date} 
               onChange={e => setDate(e.target.value)} 
-              className="h-10 w-40 rounded-xl font-semibold"
+              className="h-10 w-40 max-sm:w-full rounded-xl font-semibold border-slate-200 shadow-xs"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filteredSections.map((s) => {
-            const sectionKey = `${s.className}|${s.sectionName}`;
-            return (
-              <Card 
-                key={sectionKey} 
-                className="group border-border/50 hover:border-primary/40 hover:shadow-xl transition-all cursor-pointer rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm"
-                onClick={() => {
-                  setSelectedSection(sectionKey);
-                  setViewMode('detail');
-                }}
-              >
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-2 text-[10px] font-bold">
-                       CLASSROOM
-                    </Badge>
-                    <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-foreground">{s.className}</h3>
-                    <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Section {s.sectionName}</p>
-                  </div>
-                  <div className="pt-2 border-t border-border/10 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-muted-foreground">CLICK TO MANAGE</span>
-                    <ArrowLeft className="h-4 w-4 text-primary rotate-180 opacity-0 group-hover:opacity-100 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {filteredSections.length === 0 ? (
+          <Card className="border-dashed border-2 border-slate-200 flex flex-col items-center justify-center p-12 text-center bg-white/30 backdrop-blur-sm rounded-2xl">
+            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 mb-4">
+              <Search size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-foreground">No classes found</h3>
+            <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or search query.</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedClass('all');
+                setSelectedSectionFilter('all');
+                setSearch('');
+              }}
+              className="mt-4 rounded-xl font-bold border-slate-200 hover:bg-slate-50"
+            >
+              Reset Filters
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filteredSections.map((s) => {
+              const sectionKey = `${s.className}|${s.sectionName}`;
+              return (
+                <Card 
+                  key={sectionKey} 
+                  className="group border-border/50 hover:border-primary/40 hover:shadow-xl transition-all cursor-pointer rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm"
+                  onClick={() => {
+                    setSelectedSection(sectionKey);
+                    setViewMode('detail');
+                  }}
+                >
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 rounded-lg px-2 text-[10px] font-bold">
+                         CLASSROOM
+                      </Badge>
+                      <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-foreground">{s.className}</h3>
+                      <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Section {s.sectionName}</p>
+                    </div>
+                    <div className="pt-2 border-t border-border/10 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-muted-foreground">CLICK TO MANAGE</span>
+                      <ArrowLeft className="h-4 w-4 text-primary rotate-180 opacity-0 group-hover:opacity-100 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
