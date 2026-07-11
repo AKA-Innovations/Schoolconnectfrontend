@@ -359,7 +359,8 @@ export const classService = {
   },
 
   deleteTimetableEntry: async (id: number | string): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id as any));
+    const numericId = Number(id);
+    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(numericId));
   },
 
   fetchTimetable: async (params: any): Promise<TimetableEntry[]> => {

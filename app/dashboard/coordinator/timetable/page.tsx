@@ -227,7 +227,7 @@ export default function CoordinatorTimetablePage() {
       if (existing) {
         if (String(existing.classSubjectId) === draft.classSubjectId) continue;
         toUpdate.push({
-          id: existing.id,
+          id: existing.id ?? (existing as any).timetableId ?? (existing as any).timetable_id,
           data: {
             session: CURRENT_SESSION,
             classSubjectId: draft.classSubjectId,
@@ -496,7 +496,7 @@ function ExistingCell({
       )}
       <Button
         variant="ghost" size="icon"
-        onClick={() => onDelete(entry.id)}
+        onClick={() => onDelete(entry.id ?? (entry as any).timetableId ?? (entry as any).timetable_id)}
         disabled={isDeleting}
         className="h-5 w-5 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
       >

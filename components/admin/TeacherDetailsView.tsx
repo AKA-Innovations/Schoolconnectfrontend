@@ -156,7 +156,7 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
           <TabsContent value="personal"    className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} readOnly={readOnly} /></TabsContent>
           <TabsContent value="employment"  className="mt-0"><EmploymentForm teacher={teacher} teacherId={teacherId} readOnly={readOnly} /></TabsContent>
           <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} readOnly={readOnly} /></TabsContent>
-          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} teacher={teacher} classes={teacher.classes || []} readOnly={readOnly} /></TabsContent>
           <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} readOnly={readOnly} /></TabsContent>
         </div>
       </Tabs>
@@ -604,7 +604,7 @@ function AddressForm({ data, onChange, onSave, onCancel, saving, mode }: {
 
 // ─── Classes Section (POST + PUT + DELETE /teacher/class) ────────────────────
 
-function ClassesSection({ teacherId, classes, readOnly }: { teacherId: string; classes: TeacherClass[]; readOnly: boolean }) {
+function ClassesSection({ teacherId, teacher, classes, readOnly }: { teacherId: string; teacher: Teacher; classes: TeacherClass[]; readOnly: boolean }) {
   const addClassMutation = useAddClass(teacherId);
   const updateClassMutation = useUpdateClass(teacherId);
   const deleteClassMutation = useDeleteClass(teacherId);
@@ -638,61 +638,108 @@ function ClassesSection({ teacherId, classes, readOnly }: { teacherId: string; c
     });
   };
 
+  const ctc = teacher.classTeacherClass;
+
   return (
-    <Card className="erp-card overflow-hidden">
-      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-6 px-8">
-        <div>
-          <CardTitle className="text-xl font-bold tracking-tight">Class Assignments</CardTitle>
-          <CardDescription className="text-xs font-medium opacity-70 mt-1">Academic load and instructional assignments.</CardDescription>
-        </div>
-        {!readOnly && (
-          <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
-            onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
-            <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Class'}
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="p-8 space-y-6">
-        {showAdd && <ClassForm data={newClass} onChange={setNewClass} onSave={handleAdd} onCancel={() => setShowAdd(false)} saving={saving} mode="add" />}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {classes.map(cls => (
-            <div key={cls.id}>
-              {editingId === cls.id ? (
-                <ClassForm data={editClass} onChange={setEditClass} onSave={() => cls.id !== undefined && handleUpdate(cls.id)} onCancel={() => setEditingId(null)} saving={saving} mode="edit" />
-              ) : (
-                <div className="p-5 rounded-2xl bg-muted/5 border border-border/50 group hover:border-primary/40 hover:bg-background transition-all">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600/70 group-hover:scale-110 transition-transform">
-                      <BookOpen className="h-5 w-5" />
-                    </div>
-                    {!readOnly && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
-                          onClick={() => { setEditingId(cls.id!); setEditClass({ className: cls.className, sectionName: cls.sectionName, subjectName: cls.subjectName }); setShowAdd(false); }}>
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10"
-                          onClick={() => cls.id !== undefined && handleDelete(cls.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <h4 className="font-bold text-foreground/80">{cls.className} — {cls.sectionName}</h4>
-                  <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-1.5">{cls.subjectName}</p>
-                </div>
-              )}
+    <div className="space-y-6">
+      {/* Class Teacher Assignment Card */}
+      <Card className="erp-card overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8">
+          <CardTitle className="text-base font-bold tracking-tight flex items-center gap-2">
+            <GraduationCap className="h-5 w-5 text-orange-500" />
+            Class Teacher Assignment
+          </CardTitle>
+          <CardDescription className="text-xs font-medium opacity-70 mt-0.5">
+            The homeroom section this teacher is responsible for.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-8">
+          {ctc?.className ? (
+            <div className="flex items-center gap-5 p-5 rounded-2xl bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900">
+              <div className="h-14 w-14 rounded-2xl bg-orange-500/15 flex items-center justify-center shrink-0">
+                <GraduationCap className="h-7 w-7 text-orange-600" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold uppercase tracking-widest text-orange-600/70">Assigned Homeroom</p>
+                <p className="text-2xl font-black text-foreground">
+                  Class {ctc.className} &mdash; Section {ctc.sectionName}
+                </p>
+                {ctc.classDtlsId && (
+                  <p className="text-xs text-muted-foreground font-mono">ID: {ctc.classDtlsId}</p>
+                )}
+              </div>
             </div>
-          ))}
-          {classes.length === 0 && !showAdd && (
-            <div className="col-span-full py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-20" />
-              <p className="text-[10px] font-bold uppercase tracking-widest">No class assignments.</p>
+          ) : (
+            <div className="py-10 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+              <GraduationCap className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="text-[11px] font-bold uppercase tracking-widest">No class teacher assignment</p>
+              <p className="text-xs text-muted-foreground/30 mt-1">Assign via the Class Teacher Mapping page or teacher profile edit.</p>
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Subject / Teaching Classes */}
+      <Card className="erp-card overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-8">
+          <div>
+            <CardTitle className="text-base font-bold tracking-tight flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Subject Teaching Assignments
+            </CardTitle>
+            <CardDescription className="text-xs font-medium opacity-70 mt-0.5">
+              Classes where this teacher delivers instruction.
+            </CardDescription>
+          </div>
+          {!readOnly && (
+            <Button variant="secondary" size="sm" className="rounded-xl h-9 px-4 font-semibold text-xs border border-border/50"
+              onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />{showAdd ? 'Cancel' : 'Add'}
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="p-8 space-y-6">
+          {showAdd && <ClassForm data={newClass} onChange={setNewClass} onSave={handleAdd} onCancel={() => setShowAdd(false)} saving={saving} mode="add" />}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classes.map(cls => (
+              <div key={cls.id}>
+                {editingId === cls.id ? (
+                  <ClassForm data={editClass} onChange={setEditClass} onSave={() => cls.id !== undefined && handleUpdate(cls.id)} onCancel={() => setEditingId(null)} saving={saving} mode="edit" />
+                ) : (
+                  <div className="p-5 rounded-2xl bg-muted/5 border border-border/50 group hover:border-primary/40 hover:bg-background transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                        <BookOpen className="h-5 w-5" />
+                      </div>
+                      {!readOnly && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
+                            onClick={() => { setEditingId(cls.id!); setEditClass({ className: cls.className, sectionName: cls.sectionName, subjectName: cls.subjectName }); setShowAdd(false); }}>
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10"
+                            onClick={() => cls.id !== undefined && handleDelete(cls.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-foreground/80">Class {cls.className} — {cls.sectionName}</h4>
+                    <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-1.5">{cls.subjectName}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+            {classes.length === 0 && !showAdd && (
+              <div className="col-span-full py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+                <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p className="text-[10px] font-bold uppercase tracking-widest">No subject teaching assignments.</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

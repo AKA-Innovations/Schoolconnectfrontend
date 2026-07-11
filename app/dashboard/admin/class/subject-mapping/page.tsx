@@ -10,7 +10,7 @@ import {
   useSubjectDetails, useCreateSubjectDetail,
   useUpdateSubjectDetail, useDeleteSubjectDetail,
   useSubjectOptions, useClassSectionLists,
-  useSchoolClasses, useTimetable, timetableKeys,
+  useSchoolClasses, useTimetable, timetableKeys, usePeriodSlots,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 
 const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectId: 0 };
 
@@ -88,6 +90,10 @@ export default function SubjectDetailsPage() {
   // Bulk Assign
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkForm, setBulkForm] = useState({ teacherId: '', subjectId: 0, classIds: [] as number[] });
+
+  // Timetable modal state
+  const [timetableModalTeacher, setTimetableModalTeacher] = useState<{ id: string; name: string } | null>(null);
+  const { data: periodSlots = [] } = usePeriodSlots();
 
   // CSV import
   const [showImportCsv, setShowImportCsv] = useState(false);
@@ -616,7 +622,7 @@ export default function SubjectDetailsPage() {
                               <Plus className="h-3 w-3 text-slate-400" /> Add Assignment
                             </button>
                             <div className="border-t border-slate-100 my-0.5" />
-                            <button onClick={() => { setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                            <button onClick={() => { setTimetableModalTeacher({ id: row.teacherId, name: row.name }); setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                               <Calendar className="h-3 w-3 text-slate-400" /> View Timetable
                             </button>
                           </div>
@@ -961,13 +967,82 @@ export default function SubjectDetailsPage() {
               <FileText className="h-10 w-10 text-slate-300" />
               <span className="text-sm font-semibold text-slate-600">Drop CSV here or click to browse</span>
               {csvFile && <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />{csvFile.name}</span>}
-              <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
             </label>
             <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
               <Button variant="outline" onClick={() => setShowImportCsv(false)} className="rounded-xl">Cancel</Button>
               <Button onClick={() => { if (!csvFile) { toast.error('Select a file first'); return; } toast.success('Import complete'); setShowImportCsv(false); setCsvFile(null); }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">
                 Upload & Import
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TEACHER TIMETABLE MODAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {timetableModalTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setTimetableModalTeacher(null)} />
+          <div className="relative z-10 w-full max-w-5xl bg-white p-6 rounded-2xl shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Weekly Timetable</h3>
+                <p className="text-xs text-slate-500">Scheduled classes for {timetableModalTeacher.name}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setTimetableModalTeacher(null)} className="h-7 w-7 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Timetable Grid */}
+            <div className="overflow-x-auto max-h-[60vh]">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="p-3 text-left font-bold text-slate-600 border border-slate-200">Day</th>
+                    {[...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber).map(slot => (
+                      <th key={slot.id} className="p-3 text-center font-bold text-slate-600 border border-slate-200 min-w-[120px]">
+                        Period {slot.periodNumber}
+                        <div className="text-[9px] font-normal text-slate-400 mt-0.5">{slot.startTime} - {slot.endTime}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {DAYS.map(day => {
+                    const dayEntries = timetableEntries.filter(e => {
+                      const isTeacherMatch = (e.teacherId === timetableModalTeacher.id) ||
+                        (e.teacherName && e.teacherName.toLowerCase() === timetableModalTeacher.name.toLowerCase());
+                      return isTeacherMatch && e.dayOfWeek === day;
+                    });
+
+                    return (
+                      <tr key={day} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-bold text-slate-700 bg-slate-50/30 border border-slate-200">{day}</td>
+                        {[...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber).map(slot => {
+                          const entry = dayEntries.find(e => Number(e.periodId) === Number(slot.id) || Number(e.periodNumber) === Number(slot.periodNumber));
+
+                          return (
+                            <td key={slot.id} className="p-3 text-center border border-slate-200">
+                              {entry ? (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-emerald-600">{entry.subjectName}</div>
+                                  <div className="text-[10px] text-slate-500 font-semibold">
+                                    Class {entry.className} - {entry.sectionName}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300 font-normal">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

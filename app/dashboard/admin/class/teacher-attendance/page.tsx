@@ -1,4 +1,4 @@
-import { ClassStudentsView } from '@/components/admin/class/ClassStudentsView';
+import { TeacherAttendanceAnalytics } from '@/components/admin/class/TeacherAttendanceAnalytics';
 
 export default function Page() {
   return (
@@ -12,17 +12,17 @@ export default function Page() {
               Administration &middot; Academic Hub
             </p>
             <h1 className="text-3xl font-black tracking-tight text-foreground">
-              Student Roster
+              Teacher Attendance Analytics
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-xl">
-              Search and view student lists section-by-section along with details of their daily attendance logs.
+              Track daily faculty presence, monitor attendance statistics, and mark half day or absent records from backend datastores.
             </p>
           </div>
         </div>
 
-        {/* Roster View */}
+        {/* Analytics View */}
         <div className="pt-2">
-          <ClassStudentsView />
+          <TeacherAttendanceAnalytics />
         </div>
 
       </div>

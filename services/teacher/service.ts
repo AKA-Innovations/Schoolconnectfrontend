@@ -273,8 +273,13 @@ export const teacherService = {
     return response.data;
   },
 
-  removeClassTeacher: async (data: ClassTeacherAssignment): Promise<any> => {
-    const response = await api.delete(API_ENDPOINTS.TEACHER.REMOVE_CLASS_TEACHER, { data });
+  removeClassTeacher: async (data: { className: string; sectionName: string; schoolId?: string; classTeacherId?: string }): Promise<any> => {
+    const response = await api.delete(API_ENDPOINTS.TEACHER.REMOVE_CLASS_TEACHER, {
+      params: {
+        className: data.className,
+        sectionName: data.sectionName,
+      }
+    });
     return response.data;
   },
 

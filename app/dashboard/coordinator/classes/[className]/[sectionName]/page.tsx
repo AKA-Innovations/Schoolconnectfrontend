@@ -506,14 +506,16 @@ function ScheduleTab({
 
     if (selectedSdId === '' && existing) {
       // Delete
-      deleteMutation.mutate(existing.id, {
+      const entryId = existing.id ?? (existing as any).timetableId ?? (existing as any).timetable_id;
+      deleteMutation.mutate(entryId, {
         onSuccess: () => { toast.success('Slot cleared'); setEditingCell(null); },
         onError: () => toast.error('Failed to clear slot'),
       });
     } else if (selectedSdId && existing) {
       // Update
+      const entryId = existing.id ?? (existing as any).timetableId ?? (existing as any).timetable_id;
       updateMutation.mutate(
-        { id: existing.id, data: { classSubjectId: selectedSdId } },
+        { id: entryId, data: { classSubjectId: selectedSdId } },
         {
           onSuccess: () => { toast.success('Slot updated'); setEditingCell(null); },
           onError: () => toast.error('Failed to update slot'),

@@ -68,7 +68,7 @@ export default function AdminAttendancePage() {
 
   useEffect(() => {
     if (viewMode === 'detail' && students.length > 0) {
-      const newMap: Record<string, { status: AttendanceStatus; remarks: string }> = {};
+      const newMap: Record<string, { status: AttendanceStatus | null; remarks: string }> = {};
       students.forEach((s: any) => {
         const roll = s.academics?.[0]?.rollNumber;
         const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
@@ -78,11 +78,11 @@ export default function AdminAttendancePage() {
           (a.studentName && a.studentName.toLowerCase().trim() === fullName)
         );
         newMap[s.id] = {
-          status: (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus,
+          status: (existing?.attendanceStatus || existing?.status || null) as AttendanceStatus | null,
           remarks: existing?.remarks ?? '',
         };
       });
-      setAttendanceMap(newMap);
+      setAttendanceMap(newMap as any);
     }
   }, [viewMode, serializedAttendance, serializedStudents]);
 
@@ -361,24 +361,9 @@ export default function AdminAttendancePage() {
                   <h2 className="text-4xl font-black tracking-tighter">Class {className} — {sectionName}</h2>
                 </div>
                 <p className="text-muted-foreground font-medium flex items-center gap-2">
-                  <Users size={18} /> {students.length} Total Students
+                  <Users size={18} /> {students.length} Total Students &nbsp;·&nbsp; <ShieldCheck size={18} className="text-amber-500" /> Administrative Override Mode
                 </p>
               </div>
-              <Button 
-                onClick={handleSave} 
-                disabled={bulkMutation.isPending || updateMutation.isPending || students.length === 0}
-                className={cn(
-                  "rounded-2xl text-white font-black h-14 px-10 shadow-xl transition-all",
-                  isMarked ? "bg-amber-600 hover:bg-amber-700 shadow-amber-200/20" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200/20"
-                )}
-              >
-                {isMarked ? <Save size={20} className="mr-3" /> : <ClipboardCheck size={20} className="mr-3" />}
-                {bulkMutation.isPending || updateMutation.isPending 
-                  ? 'Saving...' 
-                  : isMarked 
-                    ? 'Save Attendance Updates' 
-                    : 'Submit Initial Attendance'}
-              </Button>
            </div>
         </CardHeader>
         <CardContent className="p-8">
@@ -431,22 +416,6 @@ export default function AdminAttendancePage() {
                       </td>
                       <td className="p-5">
                           <div className="flex items-center gap-3">
-                             <div className="flex gap-2">
-                                {statusOptions.map(st => (
-                                  <button 
-                                    key={st} 
-                                    onClick={() => setStudentStatus(s.id, st as AttendanceStatus)}
-                                    className={cn(
-                                      "h-10 w-10 flex items-center justify-center rounded-xl text-xs font-black border-2 transition-all",
-                                      att?.status === st 
-                                        ? "border-primary bg-primary text-primary-foreground shadow-lg scale-110" 
-                                        : "border-border hover:border-primary/50 text-muted-foreground"
-                                    )}
-                                  >
-                                    {st.charAt(0)}
-                                  </button>
-                                ))}
-                             </div>
                              {(() => {
                                const roll = s.academics?.[0]?.rollNumber;
                                const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
@@ -455,24 +424,50 @@ export default function AdminAttendancePage() {
                                  (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
                                  (a.studentName && a.studentName.toLowerCase().trim() === fullName)
                                );
-                               const currentStatus = existing?.attendanceStatus || existing?.status;
-                               
-                               return (att?.status !== currentStatus) && (
-                                 <Button
-                                   size="sm"
-                                   variant="ghost"
-                                   onClick={() => handleSaveSingle(s.id)}
-                                   className="h-10 w-10 p-0 text-primary hover:text-primary hover:bg-primary/10 rounded-xl group border-2 border-transparent"
-                                   title="Update student attendance"
-                                 >
-                                   <Save size={18} className="transition-transform group-hover:scale-110" />
-                                 </Button>
+                               const hasRecorded = !!(existing?.attendanceStatus || existing?.status);
+
+                               if (!hasRecorded) {
+                                 return <span className="text-xs font-semibold text-muted-foreground/30 px-3">&mdash;</span>;
+                               }
+
+                               return (
+                                 <div className="flex gap-1.5">
+                                   {statusOptions.map(st => {
+                                     const isActive = att?.status === st;
+                                     const isPresent = st === 'Present';
+                                     const isAbsent = st === 'Absent';
+                                     const isLate = st === 'Late';
+                                     const isHalfDay = st === 'HalfDay';
+
+                                     return (
+                                       <button 
+                                         key={st} 
+                                         onClick={() => handleSaveSingleOverride(s.id, st as AttendanceStatus)}
+                                         className={cn(
+                                           "h-8 w-8 flex items-center justify-center rounded-lg text-xs font-bold border transition-all duration-200",
+                                           isActive 
+                                             ? isPresent 
+                                               ? "bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-500/20 scale-105" 
+                                               : isAbsent 
+                                                 ? "bg-rose-600 border-rose-600 text-white shadow-sm shadow-rose-500/20 scale-105"
+                                                 : isLate
+                                                   ? "bg-amber-600 border-amber-600 text-white shadow-sm shadow-amber-500/20 scale-105"
+                                                   : "bg-sky-600 border-sky-600 text-white shadow-sm shadow-sky-500/20 scale-105"
+                                             : "border-border bg-background hover:border-slate-400 text-muted-foreground"
+                                         )}
+                                         title={`Override to ${st}`}
+                                       >
+                                         {st.charAt(0)}
+                                       </button>
+                                     );
+                                   })}
+                                 </div>
                                );
                              })()}
                           </div>
                       </td>
                     </tr>
-                 )})}
+                  )})}
                </tbody>
             </table>
           </div>
@@ -481,7 +476,35 @@ export default function AdminAttendancePage() {
     </div>
   );
 
-  function setStudentStatus(studentId: string, status: AttendanceStatus) {
-    setAttendanceMap(prev => ({ ...prev, [studentId]: { ...prev[studentId], status } }));
+  async function handleSaveSingleOverride(studentId: string, newStatus: AttendanceStatus) {
+    const s = students.find((st: any) => st.id === studentId);
+    if (!s) return;
+
+    const roll = s.academics?.[0]?.rollNumber;
+    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase().trim();
+    const existing = attendance.find((a: any) => 
+      (a.studentId && String(a.studentId) === String(s.id)) ||
+      (roll && String(a.studentRollNumber || a.rollNumber).trim() === String(roll).trim()) ||
+      (a.studentName && a.studentName.toLowerCase().trim() === fullName)
+    );
+
+    if (!existing) {
+      toast.error("Cannot override: Attendance must be initially marked by the class teacher first.");
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({ 
+        recordId: Number(existing.recordId || existing.id), 
+        data: { 
+          status: newStatus,
+          attendanceStatus: newStatus
+        } as any 
+      });
+      setAttendanceMap(prev => ({ ...prev, [studentId]: { ...prev[studentId], status: newStatus } }));
+      toast.success(`Override saved for ${s.firstName}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update attendance override');
+    }
   }
 }

@@ -56,11 +56,13 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       href: '/dashboard/admin/class/dashboard', 
       icon: BookOpen,
       subLinks: [
-        { name: 'Dashboard', href: '/dashboard/admin/class/dashboard' },
+        { name: 'Capacity Management', href: '/dashboard/admin/class/dashboard' },
         { name: 'Subjects', href: '/dashboard/admin/class/subjects' },
         { name: 'Mapping', href: '/dashboard/admin/class/subject-mapping' },
         { name: 'Timetable', href: '/dashboard/admin/class/timetable' },
         { name: 'Class Teachers', href: '/dashboard/admin/class/teachers' },
+        { name: 'Student Roster', href: '/dashboard/admin/class/students' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/class/teacher-attendance' },
       ]
     },
     { 
