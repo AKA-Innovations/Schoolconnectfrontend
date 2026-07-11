@@ -31,10 +31,10 @@ export default function CoordinatorStudentsPage() {
 
   const [selectedId, setSelectedId] = useState<number>(0);
   const [search, setSearch] = useState('');
-  const selectedSection = classSections.find((cs) => cs.id === selectedId);
+  const selectedSection = classSections.find((cs) => (cs.masterSectionId || cs.id) === selectedId);
 
   // Fetch students for the selected class-section (or first class when none selected)
-  const filterId = selectedId || classSections[0]?.id;
+  const filterId = selectedId || (classSections[0]?.masterSectionId || classSections[0]?.id);
 
   const { data: studentsData, isLoading } = useStudentList({
     classSectionId: filterId,
@@ -43,14 +43,23 @@ export default function CoordinatorStudentsPage() {
   const students = studentsData?.items ?? [];
 
   const filtered = useMemo(() => {
-    if (!search) return students;
+    let list = students;
+    if (filterId) {
+      list = list.filter((s) => {
+        const acad = s.academics?.[0];
+        if (!acad) return false;
+        const studentSectionId = (acad as any).classSectionId || (acad as any).classSectionsId;
+        return studentSectionId === filterId;
+      });
+    }
+    if (!search) return list;
     const q = search.toLowerCase();
-    return students.filter((s) =>
+    return list.filter((s) =>
       `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
       s.mobileNumber?.includes(q) ||
       s.academics?.[0]?.rollNumber?.toLowerCase().includes(q),
     );
-  }, [students, search]);
+  }, [students, search, filterId]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
@@ -71,9 +80,12 @@ export default function CoordinatorStudentsPage() {
         <select value={selectedId || ''} onChange={(e) => setSelectedId(Number(e.target.value))}
           className="h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring w-52">
           <option value="">All sections</option>
-          {classSections.map((cs) => (
-            <option key={cs.id} value={cs.id}>{cs.className} — {cs.sectionName}</option>
-          ))}
+          {classSections.map((cs) => {
+            const sectionVal = cs.masterSectionId || cs.id;
+            return (
+              <option key={cs.id} value={sectionVal}>{cs.className} — {cs.sectionName}</option>
+            );
+          })}
         </select>
       </div>
 
