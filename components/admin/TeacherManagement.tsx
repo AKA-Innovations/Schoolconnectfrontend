@@ -53,7 +53,12 @@ export function TeacherManagement() {
   );
 
   if (viewMode === 'details' && selectedTeacher) return (
-    <TeacherDetailsView teacherId={selectedTeacher.id} onBack={() => setViewMode('list')} />
+    <TeacherDetailsView
+      teacherId={selectedTeacher.id}
+      onBack={() => setViewMode('list')}
+      onEdit={() => setViewMode('add')}
+      readOnly={true}
+    />
   );
 
   return (

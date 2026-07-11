@@ -25,11 +25,13 @@ import { cn } from '@/lib/utils';
 interface TeacherDetailsViewProps {
   teacherId: string;
   onBack: () => void;
+  onEdit?: () => void;
+  readOnly?: boolean;
 }
 
 // ─── Root Component ──────────────────────────────────────────────────────────
 
-export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProps) {
+export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false }: TeacherDetailsViewProps) {
   const [activeTab, setActiveTab] = useState('personal');
   const { data: teacher, isLoading, isFetching, refetch } = useTeacher(teacherId);
 
@@ -63,7 +65,7 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
       {/* Header / Profile Card */}
       <Card className="erp-card overflow-hidden">
         <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
-          <ProfileImageSection teacher={teacher} teacherId={teacherId} />
+          <ProfileImageSection teacher={teacher} teacherId={teacherId} readOnly={readOnly} />
           <div className="flex-1 text-center md:text-left space-y-1.5">
             <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1.5">
               <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border border-border/40">
@@ -98,11 +100,26 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
             <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-3">
               {teacher.isPrincipal && <RoleBadge label="Principal" color="purple" />}
               {teacher.isCoordinator && <RoleBadge label="Coordinator" color="blue" />}
-              {teacher.isClassTeacher && <RoleBadge label="Class Teacher" color="orange" />}
+              {teacher.isClassTeacher && (
+                <RoleBadge 
+                  label={teacher.classTeacherClass?.className 
+                    ? `Class Teacher: ${teacher.classTeacherClass.className}—${teacher.classTeacherClass.sectionName}`
+                    : "Class Teacher"
+                  } 
+                  color="orange" 
+                />
+              )}
               {teacher.isSubjectTeacher && <RoleBadge label="Subject Teacher" color="green" />}
             </div>
           </div>
           <div className="absolute top-4 right-4 flex gap-2">
+            {readOnly && onEdit && (
+              <Button variant="secondary" size="icon" onClick={onEdit}
+                className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background animate-in zoom-in duration-300"
+                title="Edit Profile">
+                <Edit2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
             <Button variant="secondary" size="icon" onClick={() => refetch()}
               className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background"
               title="Refresh">
@@ -123,10 +140,10 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
           <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
             {[
               { id: 'personal',     label: 'Identity & Details' },
-              { id: 'employment',   label: 'Employment'    },
-              { id: 'pedagogical',  label: 'Pedagogical'   },
-              { id: 'classes',      label: 'Classes'       },
-              { id: 'addresses',    label: 'Addresses'     },
+              { id: 'employment',   label: 'Employment' },
+              { id: 'pedagogical',  label: 'Pedagogical' },
+              { id: 'classes',      label: 'Classes' },
+              { id: 'addresses',    label: 'Addresses' },
             ].map(tab => (
               <TabsTrigger key={tab.id} value={tab.id}
                 className="rounded-xl px-6 py-2.5 text-[10px] font-bold tracking-widest uppercase data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
@@ -136,11 +153,11 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
           </TabsList>
         </div>
         <div className="mt-6">
-          <TabsContent value="personal"    className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} /></TabsContent>
-          <TabsContent value="employment"  className="mt-0"><EmploymentForm teacher={teacher} teacherId={teacherId} /></TabsContent>
-          <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} /></TabsContent>
-          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} /></TabsContent>
-          <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} /></TabsContent>
+          <TabsContent value="personal"    className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="employment"  className="mt-0"><EmploymentForm teacher={teacher} teacherId={teacherId} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} addresses={teacher.addresses || []} readOnly={readOnly} /></TabsContent>
         </div>
       </Tabs>
     </div>
@@ -149,7 +166,7 @@ export function TeacherDetailsView({ teacherId, onBack }: TeacherDetailsViewProp
 
 // ─── Profile Image (PUT + DELETE /teacher/:id/profile-image) ─────────────────
 
-function ProfileImageSection({ teacher, teacherId }: { teacher: Teacher; teacherId: string }) {
+function ProfileImageSection({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadTeacherImage(teacherId);
   const deleteMutation = useDeleteTeacherImage(teacherId);
@@ -173,7 +190,7 @@ function ProfileImageSection({ teacher, teacherId }: { teacher: Teacher; teacher
   const busy = uploadMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div className="shrink-0 relative group cursor-pointer">
+    <div className={cn("shrink-0 relative group", !readOnly && "cursor-pointer")}>
       <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50">
         {teacher.profileImageUrl ? (
           <img src={teacher.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
@@ -182,21 +199,23 @@ function ProfileImageSection({ teacher, teacherId }: { teacher: Teacher; teacher
             {(teacher.firstName ?? '?').charAt(0)}{(teacher.lastName ?? '').charAt(0)}
           </div>
         )}
-        <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
-            <Camera className="h-3 w-3" />
-            {busy ? 'Uploading…' : 'Upload'}
-          </button>
-          {teacher.profileImageUrl && (
-            <button type="button" onClick={handleDelete}
-              className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
-              <Trash2 className="h-3 w-3" />Remove
+        {!readOnly && (
+          <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
+              <Camera className="h-3 w-3" />
+              {busy ? 'Uploading…' : 'Upload'}
             </button>
-          )}
-        </div>
+            {teacher.profileImageUrl && (
+              <button type="button" onClick={handleDelete}
+                className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
+                <Trash2 className="h-3 w-3" />Remove
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+      {!readOnly && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />}
       <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-green-500 border-2 border-card shadow-sm flex items-center justify-center">
         <ShieldCheck className="h-3 w-3 text-white" />
       </div>
@@ -206,7 +225,7 @@ function ProfileImageSection({ teacher, teacherId }: { teacher: Teacher; teacher
 
 // ─── Personal Identity Form (PUT /teacher/:id/details) ───────────────────────
 
-function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacherId: string }) {
+function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
   const updateMutation = useUpdateTeacher(teacherId);
   const [form, setForm] = useState({
     firstName: teacher.firstName ?? '',
@@ -275,17 +294,19 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
           <CardTitle className="text-xl font-bold tracking-tight">Identity & Details</CardTitle>
           <CardDescription className="text-xs font-medium opacity-70 mt-1">Core identity fields, role assignments, and extended profile datasets.</CardDescription>
         </div>
-        <Button onClick={handleSave} disabled={updateMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
-          <Save className="mr-2 h-4 w-4" />{updateMutation.isPending ? 'Saving…' : 'Save Changes'}
-        </Button>
+        {!readOnly && (
+          <Button onClick={handleSave} disabled={updateMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
+            <Save className="mr-2 h-4 w-4" />{updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-8 space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FieldGroup label="First Name"><Input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Last Name"><Input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Date of Birth"><Input type="date" value={form.dateOfBirth} onChange={e => setForm(p => ({ ...p, dateOfBirth: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="First Name"><Input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Last Name"><Input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Date of Birth"><Input type="date" value={form.dateOfBirth} onChange={e => setForm(p => ({ ...p, dateOfBirth: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
           <FieldGroup label="Gender">
-            <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
+            <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))} disabled={readOnly}
               className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="">Select</option>
               <option value="Male">Male</option>
@@ -293,9 +314,9 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
               <option value="Other">Other</option>
             </select>
           </FieldGroup>
-          <FieldGroup label="Mobile Number"><Input value={form.mobileNumber} onChange={e => setForm(p => ({ ...p, mobileNumber: e.target.value }))} className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Alternate Mobile (optional)"><Input value={form.alternateMobileNumber} onChange={e => setForm(p => ({ ...p, alternateMobileNumber: e.target.value }))} placeholder="Optional" className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Personal Email" className="md:col-span-2"><Input type="email" value={form.emailId} onChange={e => setForm(p => ({ ...p, emailId: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Mobile Number"><Input value={form.mobileNumber} onChange={e => setForm(p => ({ ...p, mobileNumber: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Alternate Mobile (optional)"><Input value={form.alternateMobileNumber} onChange={e => setForm(p => ({ ...p, alternateMobileNumber: e.target.value }))} disabled={readOnly} placeholder="Optional" className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Personal Email" className="md:col-span-2"><Input type="email" value={form.emailId} onChange={e => setForm(p => ({ ...p, emailId: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Institutional Roles</p>
@@ -307,10 +328,26 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
               { key: 'isSubjectTeacher', label: 'Subject Teacher' },
             ] as const).map(r => (
               <button key={r.key} type="button"
-                onClick={() => setForm(p => ({ ...p, [r.key]: !(p as any)[r.key] }))}
+                onClick={() => {
+                  if (readOnly) return;
+                  setForm(p => {
+                    const nextValue = !(p as any)[r.key];
+                    const next = { ...p, [r.key]: nextValue };
+                    const EXCLUSIVE = ['isPrincipal', 'isCoordinator', 'isClassTeacher'];
+                    if (nextValue && EXCLUSIVE.includes(r.key)) {
+                      EXCLUSIVE.forEach(k => {
+                        if (k !== r.key) (next as any)[k] = false;
+                      });
+                    }
+                    return next;
+                  });
+                }}
                 className={cn(
                   'flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all',
-                  (form as any)[r.key] ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/30 border-border/50 hover:bg-muted/50'
+                  (form as any)[r.key] 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : cn('bg-muted/30 border-border/50', !readOnly && 'hover:bg-muted/50'),
+                  readOnly && 'cursor-default'
                 )}>
                 {r.label}
                 {(form as any)[r.key] && <CheckCircle2 className="h-4 w-4 shrink-0" />}
@@ -323,9 +360,9 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
         <div className="border-t border-border/50 pt-8 space-y-6">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Personal Data</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <FieldGroup label="Blood Group"><Input value={form.bloodGroup} onChange={e => setForm(p => ({ ...p, bloodGroup: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Blood Group"><Input value={form.bloodGroup} onChange={e => setForm(p => ({ ...p, bloodGroup: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
             <FieldGroup label="Marital Status">
-              <select value={form.maritalStatus} onChange={e => setForm(p => ({ ...p, maritalStatus: e.target.value }))}
+              <select value={form.maritalStatus} onChange={e => setForm(p => ({ ...p, maritalStatus: e.target.value }))} disabled={readOnly}
                 className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="">Select</option>
                 <option value="Single">Single</option>
@@ -334,8 +371,8 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
                 <option value="Widowed">Widowed</option>
               </select>
             </FieldGroup>
-            <FieldGroup label="Nationality"><Input value={form.nationality} onChange={e => setForm(p => ({ ...p, nationality: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Religion"><Input value={form.religion} onChange={e => setForm(p => ({ ...p, religion: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Nationality"><Input value={form.nationality} onChange={e => setForm(p => ({ ...p, nationality: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Religion"><Input value={form.religion} onChange={e => setForm(p => ({ ...p, religion: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
           </div>
         </div>
 
@@ -343,10 +380,10 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
         <div className="border-t border-border/50 pt-8 space-y-6">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Academic Data</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <FieldGroup label="Highest Qualification"><Input value={form.highestQualification} onChange={e => setForm(p => ({ ...p, highestQualification: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Specialization"><Input value={form.specialization} onChange={e => setForm(p => ({ ...p, specialization: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="University/College"><Input value={form.university} onChange={e => setForm(p => ({ ...p, university: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Passing Year"><Input value={form.passingYear} onChange={e => setForm(p => ({ ...p, passingYear: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Highest Qualification"><Input value={form.highestQualification} onChange={e => setForm(p => ({ ...p, highestQualification: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Specialization"><Input value={form.specialization} onChange={e => setForm(p => ({ ...p, specialization: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="University/College"><Input value={form.university} onChange={e => setForm(p => ({ ...p, university: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Passing Year"><Input value={form.passingYear} onChange={e => setForm(p => ({ ...p, passingYear: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
           </div>
         </div>
 
@@ -354,9 +391,9 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
         <div className="border-t border-border/50 pt-8 space-y-6">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Professional Data</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FieldGroup label="Designation"><Input value={form.designation} onChange={e => setForm(p => ({ ...p, designation: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Experience (Years)"><Input value={form.totalExperience} onChange={e => setForm(p => ({ ...p, totalExperience: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Previous School/Employer"><Input value={form.previousSchool} onChange={e => setForm(p => ({ ...p, previousSchool: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Designation"><Input value={form.designation} onChange={e => setForm(p => ({ ...p, designation: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Experience (Years)"><Input value={form.totalExperience} onChange={e => setForm(p => ({ ...p, totalExperience: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Previous School/Employer"><Input value={form.previousSchool} onChange={e => setForm(p => ({ ...p, previousSchool: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
           </div>
         </div>
 
@@ -364,10 +401,10 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
         <div className="border-t border-border/50 pt-8 space-y-6">
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Family & Emergency Details</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FieldGroup label="Father's Name"><Input value={form.fatherName} onChange={e => setForm(p => ({ ...p, fatherName: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Mother's Name"><Input value={form.motherName} onChange={e => setForm(p => ({ ...p, motherName: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Emergency Contact Name"><Input value={form.emergencyContactName} onChange={e => setForm(p => ({ ...p, emergencyContactName: e.target.value }))} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Emergency Contact Phone"><Input value={form.emergencyContactPhone} onChange={e => setForm(p => ({ ...p, emergencyContactPhone: e.target.value }))} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Father's Name"><Input value={form.fatherName} onChange={e => setForm(p => ({ ...p, fatherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Mother's Name"><Input value={form.motherName} onChange={e => setForm(p => ({ ...p, motherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Emergency Contact Name"><Input value={form.emergencyContactName} onChange={e => setForm(p => ({ ...p, emergencyContactName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+            <FieldGroup label="Emergency Contact Phone"><Input value={form.emergencyContactPhone} onChange={e => setForm(p => ({ ...p, emergencyContactPhone: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
           </div>
         </div>
       </CardContent>
@@ -377,7 +414,7 @@ function PersonalDetailsForm({ teacher, teacherId }: { teacher: Teacher; teacher
 
 // ─── Employment / School Record Form (PUT /teacher/school-record/:recordId) ───
 
-function EmploymentForm({ teacher, teacherId }: { teacher: Teacher; teacherId: string }) {
+function EmploymentForm({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
   const record = teacher.schoolRecords?.[0];
   const updateRecordMutation = useUpdateSchoolRecord(teacherId);
   const [form, setForm] = useState({
@@ -401,15 +438,17 @@ function EmploymentForm({ teacher, teacherId }: { teacher: Teacher; teacherId: s
           <CardTitle className="text-xl font-bold tracking-tight">Employment Record</CardTitle>
           <CardDescription className="text-xs font-medium opacity-70 mt-1">School employment details and official contact.</CardDescription>
         </div>
-        <Button onClick={handleSave} disabled={updateRecordMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
-          <Save className="mr-2 h-4 w-4" />{updateRecordMutation.isPending ? 'Saving…' : 'Save Changes'}
-        </Button>
+        {!readOnly && (
+          <Button onClick={handleSave} disabled={updateRecordMutation.isPending} className="rounded-xl h-10 px-6 font-bold shadow-sm text-xs">
+            <Save className="mr-2 h-4 w-4" />{updateRecordMutation.isPending ? 'Saving…' : 'Save Changes'}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FieldGroup label="Employee ID"><Input value={form.employeeId} onChange={e => setForm(p => ({ ...p, employeeId: e.target.value }))} className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Joining Date"><Input type="date" value={form.joiningDate} onChange={e => setForm(p => ({ ...p, joiningDate: e.target.value }))} className="rounded-xl" /></FieldGroup>
-          <FieldGroup label="Professional Email" className="md:col-span-2"><Input type="email" value={form.employeeEmail} onChange={e => setForm(p => ({ ...p, employeeEmail: e.target.value }))} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Employee ID"><Input value={form.employeeId} onChange={e => setForm(p => ({ ...p, employeeId: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Joining Date"><Input type="date" value={form.joiningDate} onChange={e => setForm(p => ({ ...p, joiningDate: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Professional Email" className="md:col-span-2"><Input type="email" value={form.employeeEmail} onChange={e => setForm(p => ({ ...p, employeeEmail: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
         </div>
         {!record?.id && (
           <p className="mt-4 text-xs text-destructive font-semibold">No school record found — cannot save changes.</p>
@@ -424,7 +463,7 @@ function EmploymentForm({ teacher, teacherId }: { teacher: Teacher; teacherId: s
 type AddrFields = Omit<Address, 'id'>;
 const emptyAddr = (): AddrFields => ({ isPermanent: false, address: '', state: '', city: '', country: '', pincode: '', googleAddressUrl: '', latitude: '', longitude: '' });
 
-function AddressSection({ teacherId, addresses }: { teacherId: string; addresses: Address[] }) {
+function AddressSection({ teacherId, addresses, readOnly }: { teacherId: string; addresses: Address[]; readOnly: boolean }) {
   const addAddrMutation = useAddAddress(teacherId);
   const updateAddrMutation = useUpdateAddress(teacherId);
   const deleteAddrMutation = useDeleteAddress(teacherId);
@@ -464,10 +503,12 @@ function AddressSection({ teacherId, addresses }: { teacherId: string; addresses
           <CardTitle className="text-xl font-bold tracking-tight">Addresses</CardTitle>
           <CardDescription className="text-xs font-medium opacity-70 mt-1">Physical residency and contact locations.</CardDescription>
         </div>
-        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
-          onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
-          <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Address'}
-        </Button>
+        {!readOnly && (
+          <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
+            onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
+            <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Address'}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {showAdd && <AddressForm data={newAddr} onChange={setNewAddr} onSave={handleAdd} onCancel={() => setShowAdd(false)} saving={saving} mode="add" />}
@@ -494,15 +535,17 @@ function AddressSection({ teacherId, addresses }: { teacherId: string; addresses
                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
-                      onClick={() => { setEditingId(addr.id); setEditAddr({ isPermanent: addr.isPermanent, address: addr.address, state: addr.state, city: addr.city, country: addr.country, pincode: addr.pincode, googleAddressUrl: addr.googleAddressUrl ?? '', latitude: addr.latitude ?? '', longitude: addr.longitude ?? '' }); setShowAdd(false); }}>
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleDelete(addr.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {!readOnly && (
+                    <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
+                        onClick={() => { setEditingId(addr.id); setEditAddr({ isPermanent: addr.isPermanent, address: addr.address, state: addr.state, city: addr.city, country: addr.country, pincode: addr.pincode, googleAddressUrl: addr.googleAddressUrl ?? '', latitude: addr.latitude ?? '', longitude: addr.longitude ?? '' }); setShowAdd(false); }}>
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleDelete(addr.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -561,7 +604,7 @@ function AddressForm({ data, onChange, onSave, onCancel, saving, mode }: {
 
 // ─── Classes Section (POST + PUT + DELETE /teacher/class) ────────────────────
 
-function ClassesSection({ teacherId, classes }: { teacherId: string; classes: TeacherClass[] }) {
+function ClassesSection({ teacherId, classes, readOnly }: { teacherId: string; classes: TeacherClass[]; readOnly: boolean }) {
   const addClassMutation = useAddClass(teacherId);
   const updateClassMutation = useUpdateClass(teacherId);
   const deleteClassMutation = useDeleteClass(teacherId);
@@ -602,10 +645,12 @@ function ClassesSection({ teacherId, classes }: { teacherId: string; classes: Te
           <CardTitle className="text-xl font-bold tracking-tight">Class Assignments</CardTitle>
           <CardDescription className="text-xs font-medium opacity-70 mt-1">Academic load and instructional assignments.</CardDescription>
         </div>
-        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
-          onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
-          <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Class'}
-        </Button>
+        {!readOnly && (
+          <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
+            onClick={() => { setShowAdd(v => !v); setEditingId(null); }}>
+            <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Class'}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {showAdd && <ClassForm data={newClass} onChange={setNewClass} onSave={handleAdd} onCancel={() => setShowAdd(false)} saving={saving} mode="add" />}
@@ -620,16 +665,18 @@ function ClassesSection({ teacherId, classes }: { teacherId: string; classes: Te
                     <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600/70 group-hover:scale-110 transition-transform">
                       <BookOpen className="h-5 w-5" />
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
-                        onClick={() => { setEditingId(cls.id!); setEditClass({ className: cls.className, sectionName: cls.sectionName, subjectName: cls.subjectName }); setShowAdd(false); }}>
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10"
-                        onClick={() => cls.id !== undefined && handleDelete(cls.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-muted"
+                          onClick={() => { setEditingId(cls.id!); setEditClass({ className: cls.className, sectionName: cls.sectionName, subjectName: cls.subjectName }); setShowAdd(false); }}>
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10"
+                          onClick={() => cls.id !== undefined && handleDelete(cls.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <h4 className="font-bold text-foreground/80">{cls.className} — {cls.sectionName}</h4>
                   <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-1.5">{cls.subjectName}</p>
@@ -677,11 +724,9 @@ function ClassForm({ data, onChange, onSave, onCancel, saving, mode }: {
   );
 }
 
-
-
 // ─── Pedagogical Mapping Section (GET/POST/DELETE /class/subject-dtls) ───────
 
-function PedagogicalSection({ teacherId }: { teacherId: string }) {
+function PedagogicalSection({ teacherId, readOnly }: { teacherId: string; readOnly: boolean }) {
   const [showAdd, setShowAdd] = useState(false);
   const [newMapping, setNewMapping] = useState({
     classId: 0,
@@ -762,10 +807,12 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
             Subject assignments for the current session ({CURRENT_SESSION}).
           </CardDescription>
         </div>
-        <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
-          onClick={() => setShowAdd(v => !v)}>
-          <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Mapping'}
-        </Button>
+        {!readOnly && (
+          <Button variant="secondary" size="sm" className="rounded-xl h-10 px-6 font-bold text-xs border border-border/50"
+            onClick={() => setShowAdd(v => !v)}>
+            <Plus className="mr-2 h-4 w-4" />{showAdd ? 'Cancel' : 'Add Mapping'}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {showAdd && (
@@ -851,11 +898,13 @@ function PedagogicalSection({ teacherId }: { teacherId: string }) {
                   <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600/70 group-hover:scale-110 transition-transform">
                     <GraduationCap className="h-5 w-5" />
                   </div>
-                  <Button size="icon" variant="ghost"
-                    className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                    onClick={() => handleDelete(m.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {!readOnly && (
+                    <Button size="icon" variant="ghost"
+                      className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+                      onClick={() => handleDelete(m.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
                 <h4 className="font-bold text-foreground/80">{m.className} — {m.sectionName}</h4>
                 <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-1.5">{m.subjectName}</p>

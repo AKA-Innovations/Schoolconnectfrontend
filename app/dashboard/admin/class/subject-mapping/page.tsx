@@ -308,8 +308,20 @@ export default function SubjectDetailsPage() {
     if (!payload || !form.teacherId || !form.subjectId) { toast.error('All fields are required'); return; }
     if (drawerConflict?.type === 'error') { toast.error('Cannot save — conflict detected'); return; }
     try {
-      if (editId) { await updateMutation.mutateAsync({ id: editId as any, data: payload }); toast.success('Mapping updated'); }
-      else        { await createMutation.mutateAsync(payload); toast.success('Mapping created'); }
+      if (editId) {
+        const entry = payload.entries[0];
+        await updateMutation.mutateAsync({
+          id: editId as any,
+          data: {
+            teacherId: entry.teacherId,
+            classId: entry.classId,
+            classSectionId: entry.classSectionId,
+            subjectId: entry.subjectId,
+          }
+        });
+        toast.success('Mapping updated');
+      }
+      else { await createMutation.mutateAsync(payload); toast.success('Mapping created'); }
       resetForm();
     } catch (err: any) { toast.error(err.response?.data?.message || 'Failed to save mapping'); }
   };

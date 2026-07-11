@@ -127,7 +127,16 @@ export default function CoordinatorSubjectMappingPage() {
     }
     try {
       if (editId) {
-        await updateMutation.mutateAsync({ id: editId as any, data: payload });
+        const entry = payload.entries[0];
+        await updateMutation.mutateAsync({
+          id: editId as any,
+          data: {
+            teacherId: entry.teacherId,
+            classId: entry.classId,
+            classSectionId: entry.classSectionId,
+            subjectId: entry.subjectId,
+          }
+        });
         toast.success('Mapping updated');
       } else {
         await createMutation.mutateAsync(payload);

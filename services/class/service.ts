@@ -295,7 +295,7 @@ export const classService = {
   },
 
   deleteSubjectDetail: async (id: number): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS_BY_ID(id));
+    await api.delete(API_ENDPOINTS.CLASS.SUBJECT_DTLS_BY_ID(id));
   },
 
   getStudentSubjectDetails: async (): Promise<SubjectDetail[]> => {

@@ -48,7 +48,7 @@ export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabPro
     classSections.forEach(cs => {
       lastDates.forEach(date => {
         configs.push({
-          queryKey: ['attendance-overview', cs.className, cs.sectionName, date],
+          queryKey: ['attendance-by-class-section-date', cs.className, cs.sectionName, date],
           queryFn: () => studentService.filterAttendance({
             className: cs.className,
             sectionName: cs.sectionName,
@@ -56,6 +56,8 @@ export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabPro
           }),
           enabled: !!cs.className && !!cs.sectionName && !!date,
           staleTime: 5 * 60 * 1000,
+          retry: false,
+          refetchOnWindowFocus: false,
         });
       });
     });

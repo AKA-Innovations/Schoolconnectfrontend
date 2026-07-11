@@ -42,7 +42,7 @@ export function AdminStatsTab({ summary, isLoading }: StatsTabProps) {
     classSections.forEach(cs => {
       lastDates.forEach(date => {
         configs.push({
-          queryKey: ['attendance-stats', cs.className, cs.sectionName, date],
+          queryKey: ['attendance-by-class-section-date', cs.className, cs.sectionName, date],
           queryFn: () => studentService.filterAttendance({
             className: cs.className,
             sectionName: cs.sectionName,
@@ -50,6 +50,8 @@ export function AdminStatsTab({ summary, isLoading }: StatsTabProps) {
           }),
           enabled: !!cs.className && !!cs.sectionName && !!date,
           staleTime: 5 * 60 * 1000,
+          retry: false,
+          refetchOnWindowFocus: false,
         });
       });
     });

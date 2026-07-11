@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { teacherService } from '@/services/teacher.service';
+import { classService } from '@/services/class.service';
 import { useCreateSubjectDetail, useDeleteSubjectDetail } from '@/hooks/useClasses';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { TeacherRegistrationData, TeacherClass } from '@/types/roles';
@@ -113,8 +114,27 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
   console.log('INITIAL DATA 👉', initialData);
   // ─── Class Teacher Assignment state ──────────────────────────────────────
   const [classTeacherClassId, setClassTeacherClassId] = useState<number | null>(
-    initialData?.classTeacherAssignment?.classDtlsId ?? null
+    initialData?.classTeacherClass?.classDtlsId ?? initialData?.classTeacherAssignment?.classDtlsId ?? null
   );
+  const [selectedClass, setSelectedClass] = useState<string>('');
+
+  useEffect(() => {
+    if (classTeacherClassId && classSections.length > 0) {
+      const found = classSections.find((cs: any) => cs.masterSectionId === classTeacherClassId);
+      if (found) {
+        setSelectedClass(found.className);
+      }
+    }
+  }, [classTeacherClassId, classSections]);
+
+  const handleClassChange = (className: string) => {
+    setSelectedClass(className);
+    setClassTeacherClassId(null);
+  };
+
+  const handleSectionChange = (sectionId: number | null) => {
+    setClassTeacherClassId(sectionId);
+  };
 
   // ─── Coordinator class scope state ───────────────────────────────────────
   const [coordinatorClasses, setCoordinatorClasses] = useState<string[]>([]);
@@ -236,38 +256,35 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
 
         // 2. Handle class teacher assignment changes
         if (formData.isClassTeacher && classTeacherClassId) {
-          const prevClassId = initialData?.classTeacherAssignment?.classDtlsId;
+          const prevClassId = initialData?.classTeacherClass?.classDtlsId ?? initialData?.classTeacherAssignment?.classDtlsId;
           if (prevClassId && prevClassId !== classTeacherClassId) {
             const prevClass = classSections.find((c: any) => c.masterSectionId === prevClassId);
-            if (prevClass) {
-              await teacherService.removeClassTeacher({
-                classTeacherId: initialData.id,
-                className: prevClass.className,
-                sectionName: prevClass.sectionName,
-                schoolId: formData.schoolId,
-              });
+            if (prevClass && prevClass.mappingId) {
+              await classService.deleteClass(prevClass.mappingId);
             }
           }
           if (prevClassId !== classTeacherClassId) {
             const cs = classSections.find((c: any) => c.masterSectionId === classTeacherClassId);
             if (cs) {
-              await teacherService.addClassTeacher({
+              if (cs.isMapped && cs.mappingId) {
+                await classService.deleteClass(cs.mappingId);
+              }
+              await classService.createClassTeacherMapping({
+                session: CURRENT_SESSION,
+                classSectionsId: cs.masterSectionId,
                 classTeacherId: initialData.id,
-                className: cs.className,
-                sectionName: cs.sectionName,
-                schoolId: formData.schoolId,
+                maxLimit: cs.maxLimit || 40,
               });
             }
           }
-        } else if (!formData.isClassTeacher && initialData?.classTeacherAssignment?.classDtlsId) {
-          const prevClass = classSections.find((c: any) => c.masterSectionId === initialData.classTeacherAssignment.classDtlsId);
-          if (!prevClass) return;
-          await teacherService.removeClassTeacher({
-            classTeacherId: initialData.id,
-            className: prevClass.className,
-            sectionName: prevClass.sectionName,
-            schoolId: formData.schoolId,
-          });
+        } else if (!formData.isClassTeacher) {
+          const prevClassId = initialData?.classTeacherClass?.classDtlsId ?? initialData?.classTeacherAssignment?.classDtlsId;
+          if (prevClassId) {
+            const prevClass = classSections.find((c: any) => c.masterSectionId === prevClassId);
+            if (prevClass && prevClass.mappingId) {
+              await classService.deleteClass(prevClass.mappingId);
+            }
+          }
         }
 
         // 3. Handle coordinator class mapping changes
@@ -568,21 +585,46 @@ export function TeacherRegistrationForm({ onCancel, onSuccess, initialData }: Te
                   </div>
                 </CardHeader>
                 <CardContent className="p-8">
-                  <FG label="Assigned Class-Section" required>
-                    <select
-                      value={classTeacherClassId ?? ''}
-                      onChange={(e) => setClassTeacherClassId(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      required={formData.isClassTeacher}
-                    >
-                      <option value="">Select Class-Section</option>
-                      {classSections.map((cs: any) => (
-                        <option key={cs.masterSectionId} value={cs.masterSectionId}>
-                          {cs.className} — {cs.sectionName}
-                        </option>
-                      ))}
-                    </select>
-                  </FG>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FG label="Assigned Class" required>
+                      <select
+                        value={selectedClass}
+                        onChange={(e) => handleClassChange(e.target.value)}
+                        className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        required={formData.isClassTeacher}
+                      >
+                        <option value="">Select Class</option>
+                        {Array.from(new Set(classSections.map((cs: any) => cs.className)))
+                          .sort()
+                          .map((className: any) => (
+                            <option key={className} value={className}>
+                              {className}
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </FG>
+
+                    <FG label="Assigned Section" required>
+                      <select
+                        value={classTeacherClassId ?? ''}
+                        onChange={(e) => handleSectionChange(e.target.value ? Number(e.target.value) : null)}
+                        className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        disabled={!selectedClass}
+                        required={formData.isClassTeacher}
+                      >
+                        <option value="">Select Section</option>
+                        {classSections
+                          .filter((cs: any) => cs.className === selectedClass)
+                          .map((cs: any) => (
+                            <option key={cs.masterSectionId} value={cs.masterSectionId}>
+                              {cs.sectionName}
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </FG>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>

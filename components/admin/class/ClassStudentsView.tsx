@@ -53,17 +53,20 @@ export function ClassStudentsView() {
     (s: any) => s.className === selectedClass && s.sectionName === selectedSection
   );
 
-  // Fetch students for selected section, up to 200
-  const { data: studentData, isLoading: loadingStudents } = useStudentList({
-    classSectionId: selSectionRecord?.id,
-    limit: 200,
-  });
+  // Only fetch when BOTH class AND section are selected.
+  // The backend student/attendance APIs reject className as a query param (400).
+  const canFetch = !!selectedClass && !!selectedSection && !!selSectionRecord?.masterSectionId;
 
-  // Fetch today's attendance for the selected section
-  const { data: rawAttendance, isLoading: loadingAttendance } = useFilterAttendance({
-    classSectionId: selSectionRecord?.id,
-    date: selectedClass ? today : undefined,
-  });
+  // Student fetch — filtered by masterSectionId only
+  const { data: studentData, isLoading: loadingStudents } = useStudentList(
+    { classSectionId: selSectionRecord?.masterSectionId, limit: 200 },
+    { enabled: canFetch }
+  );
+
+  // Attendance fetch — filtered by masterSectionId + today
+  const { data: rawAttendance, isLoading: loadingAttendance } = useFilterAttendance(
+    { classSectionId: selSectionRecord?.masterSectionId, date: today },
+  );
 
   const attendanceRecords: AttendanceRecord[] = Array.isArray(rawAttendance) ? rawAttendance : [];
 
@@ -146,7 +149,7 @@ export function ClassStudentsView() {
             </select>
           </div>
           <div className="flex flex-col gap-1.5 min-w-40">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section (optional)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section</label>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
@@ -253,6 +256,12 @@ export function ClassStudentsView() {
         <div className="py-24 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
           <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-20" />
           <p className="text-[11px] font-bold uppercase tracking-widest">Select a class to view students</p>
+        </div>
+      ) : !selectedSection ? (
+        <div className="py-24 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+          <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-[11px] font-bold uppercase tracking-widest">Select a section to load students</p>
+          <p className="text-xs text-muted-foreground/30 mt-2">{sectionsForClass.length} section{sectionsForClass.length !== 1 ? 's' : ''} available for Class {selectedClass}</p>
         </div>
       ) : isLoading ? (
         <div className="grid grid-cols-1 gap-6">
