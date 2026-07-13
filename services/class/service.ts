@@ -424,4 +424,16 @@ export const classService = {
   deleteSchoolClass: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.SCHOOL.CLASS_DELETE(id));
   },
+
+  checkTimetableClash: async (params: {
+    teacherId: string;
+    dayOfWeek: string;
+    periodId: number;
+    session?: string;
+    schoolId?: string;
+    excludeTimetableId?: number;
+  }): Promise<any> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE_CHECK_CLASH, { params });
+    return res.data;
+  },
 };

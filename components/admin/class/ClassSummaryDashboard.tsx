@@ -10,9 +10,8 @@ const STAT_CONFIG = [
     label: 'Grade Levels',
     sublabel: 'Active class groups',
     icon: BookOpen,
-    accent: '#10b981',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
-    iconColor: 'text-emerald-600',
+    bg: 'bg-primary/10',
+    iconColor: 'text-primary',
     trend: '+2 this year',
   },
   {
@@ -20,9 +19,8 @@ const STAT_CONFIG = [
     label: 'Total Sections',
     sublabel: 'Across all grades',
     icon: Layers,
-    accent: '#3b82f6',
-    bg: 'bg-blue-50 dark:bg-blue-950/30',
-    iconColor: 'text-blue-600',
+    bg: 'bg-primary/10',
+    iconColor: 'text-primary',
     trend: 'All active',
   },
   {
@@ -30,9 +28,8 @@ const STAT_CONFIG = [
     label: 'Teachers Mapped',
     sublabel: 'Class assignments',
     icon: GraduationCap,
-    accent: '#8b5cf6',
-    bg: 'bg-violet-50 dark:bg-violet-950/30',
-    iconColor: 'text-violet-600',
+    bg: 'bg-primary/10',
+    iconColor: 'text-primary',
     trend: 'Fully staffed',
   },
 ];
@@ -50,11 +47,6 @@ export function ClassSummaryDashboard() {
             key={stat.key}
             className="relative rounded-2xl border border-border bg-card overflow-hidden group hover:shadow-md transition-all duration-300"
           >
-            {/* Accent bar */}
-            <div
-              className="absolute top-0 left-0 right-0 h-[3px]"
-              style={{ background: stat.accent }}
-            />
             <div className="p-6">
               <div className="flex items-start justify-between mb-5">
                 <div className={`h-11 w-11 rounded-xl ${stat.bg} flex items-center justify-center`}>

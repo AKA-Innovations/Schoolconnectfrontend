@@ -562,3 +562,18 @@ export function useDeleteSchoolClass() {
     },
   });
 }
+
+export function useTimetableCheckClash(params: {
+  teacherId: string;
+  dayOfWeek: string;
+  periodId: number;
+  session?: string;
+  schoolId?: string;
+  excludeTimetableId?: number;
+}, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['timetable', 'check-clash', params],
+    queryFn: () => classService.checkTimetableClash(params),
+    enabled: options?.enabled ?? (!!params.teacherId && !!params.dayOfWeek && !!params.periodId),
+  });
+}

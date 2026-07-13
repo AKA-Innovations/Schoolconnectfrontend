@@ -176,14 +176,14 @@ export function ClassCapacityAnalytics() {
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <Card className="rounded-2xl border-border bg-gradient-to-br from-indigo-50/50 to-transparent dark:from-indigo-950/10">
+        <Card className="rounded-2xl border-border bg-card">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Strength</span>
               <p className="text-3xl font-black tracking-tight">{overallStats.totalFilled} / {overallStats.totalCapacity}</p>
-              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Students enrolled vs seats</span>
+              <span className="text-xs text-muted-foreground/60 font-medium">Students enrolled vs seats</span>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
               <Users className="h-6 w-6" />
             </div>
           </CardContent>

@@ -247,7 +247,7 @@ export const teacherService = {
   },
 
   updateSchoolRecord: async (recordId: number, record: Partial<SchoolRecord>): Promise<any> => {
-    const response = await api.put(API_ENDPOINTS.TEACHER.SCHOOL_RECORD(recordId), record);
+    const response = await api.put(API_ENDPOINTS.TEACHER.SCHOOL_RECORD_UPDATE(recordId), record);
     return response.data;
   },
 
@@ -291,6 +291,101 @@ export const teacherService = {
 
   removeCoordinatorClass: async (mappingId: number): Promise<any> => {
     const response = await api.delete(API_ENDPOINTS.TEACHER.COORDINATOR_CLASS_DELETE(mappingId));
+    return response.data;
+  },
+
+  // ─── New Tab-Wise Details API Methods ───────────────────────────────────────
+  getBasicDetails: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.BASIC_DETAILS(id));
+    return response.data;
+  },
+
+  updateBasicDetails: async (id: string, data: any): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.BASIC_DETAILS(id), data);
+    return response.data;
+  },
+
+  getPersonalData: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.PERSONAL_DATA(id));
+    return response.data;
+  },
+
+  updatePersonalData: async (id: string, data: any): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.PERSONAL_DATA(id), data);
+    return response.data;
+  },
+
+  getAcademicData: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.ACADEMIC_DATA(id));
+    return response.data;
+  },
+
+  updateAcademicData: async (id: string, data: any): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.ACADEMIC_DATA(id), data);
+    return response.data;
+  },
+
+  getProfessionalData: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.PROFESSIONAL_DATA(id));
+    return response.data;
+  },
+
+  updateProfessionalData: async (id: string, data: any): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.PROFESSIONAL_DATA(id), data);
+    return response.data;
+  },
+
+  getFamilyDetails: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.FAMILY_DETAILS(id));
+    return response.data;
+  },
+
+  updateFamilyDetails: async (id: string, data: any): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.FAMILY_DETAILS(id), data);
+    return response.data;
+  },
+
+  getAddresses: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.ADDRESS(id));
+    return response.data;
+  },
+
+  getSchoolRecord: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.SCHOOL_RECORD(id));
+    return response.data;
+  },
+
+  getCoordinatorClasses: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.COORDINATOR_CLASSES(id));
+    return response.data;
+  },
+
+  updateCoordinatorClasses: async (id: string, data: { session: string; classes: { className: string }[] }): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.COORDINATOR_CLASSES(id), data);
+    return response.data;
+  },
+
+  getClassTeacher: async (id: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.CLASS_TEACHER(id));
+    return response.data;
+  },
+
+  assignClassTeacher: async (data: { teacherId: string; classDtlsId: number; schoolId?: string }): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.TEACHER.ASSIGN_CLASS_TEACHER, data);
+    return response.data;
+  },
+
+  getClassSubjectDetails: async (teacherId?: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.CLASS_SUBJECT_DETAILS, {
+      params: { teacherId },
+    });
+    return response.data;
+  },
+
+  getBirthdays: async (date: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.BIRTHDAYS, {
+      params: { date },
+    });
     return response.data;
   },
 };

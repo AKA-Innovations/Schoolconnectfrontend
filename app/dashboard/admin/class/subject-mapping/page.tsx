@@ -30,16 +30,14 @@ const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectId: 0 };
 
 // Deterministic pastel chip color for subjects
 const getSubjectColor = (name: string) => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const h = Math.abs(hash) % 360;
-  return { bg: `hsl(${h},80%,96%)`, text: `hsl(${h},85%,28%)`, border: `hsl(${h},45%,83%)` };
+  return { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981', border: 'rgba(16, 185, 129, 0.2)' };
 };
 
 // Load status helpers
-const getLoadStatus = (periods: number) => {
-  if (periods > 30) return { label: 'Overallocated', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
-  if (periods > 20) return { label: 'Near Limit',    color: 'text-amber-700 bg-amber-50 border-amber-200', dot: 'bg-amber-400' };
+const getLoadStatus = (periods: number, maxLoad: number) => {
+  const nearLimit = Math.max(1, maxLoad - 10);
+  if (periods > maxLoad) return { label: 'Overallocated', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
+  if (periods > nearLimit) return { label: 'Near Limit',    color: 'text-amber-700 bg-amber-50 border-amber-200', dot: 'bg-amber-400' };
   if (periods > 0)  return { label: 'Balanced',      color: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' };
   return { label: 'Unassigned', color: 'text-slate-500 bg-slate-50 border-slate-200', dot: 'bg-slate-300' };
 };
@@ -86,6 +84,29 @@ export default function SubjectDetailsPage() {
 
   // Drawer for pre-selecting a teacher
   const [drawerTeacherId, setDrawerTeacherId] = useState<string>('');
+
+  // Overload threshold
+  const [maxPeriods, setMaxPeriods] = useState<number>(30);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('schoolconnect_overload_threshold');
+    if (saved) {
+      const val = parseInt(saved, 10);
+      if (!isNaN(val) && val > 0) {
+        setMaxPeriods(val);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('schoolconnect_overload_threshold', String(maxPeriods));
+    }
+  }, [maxPeriods, mounted]);
+
+  const displayMaxPeriods = mounted ? maxPeriods : 30;
 
   // Bulk Assign
   const [showBulkAssign, setShowBulkAssign] = useState(false);
@@ -240,14 +261,14 @@ export default function SubjectDetailsPage() {
     const mappedIds = new Set(mappings.map(m => m.teacherId).filter(Boolean));
     const unassigned = totalTeachers - mappedIds.size;
     let overloaded = 0;
-    mappedIds.forEach(id => { if ((teacherRows.find(r => r.teacherId === id)?.weeklyLoad || 0) > 30) overloaded++; });
+    mappedIds.forEach(id => { if ((teacherRows.find(r => r.teacherId === id)?.weeklyLoad || 0) > displayMaxPeriods) overloaded++; });
     const seen = new Set<string>(); let conflicts = 0;
     mappings.forEach(m => {
       const k = `${m.teacherId}-${m.className}-${m.sectionName}-${m.subjectName}`;
       if (seen.has(k)) conflicts++; else seen.add(k);
     });
     return { totalTeachers, mapped: mappedIds.size, unassigned, overloaded, conflicts };
-  }, [teachers, mappings, teacherRows]);
+  }, [teachers, mappings, teacherRows, displayMaxPeriods]);
 
   // ── Filter teacher rows ───────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
@@ -262,8 +283,8 @@ export default function SubjectDetailsPage() {
       if (!matchSearch) return false;
 
       // load filter
-      if (filterLoad === 'balanced'   && row.weeklyLoad > 30) return false;
-      if (filterLoad === 'overloaded' && row.weeklyLoad <= 30) return false;
+      if (filterLoad === 'balanced'   && row.weeklyLoad > displayMaxPeriods) return false;
+      if (filterLoad === 'overloaded' && row.weeklyLoad <= displayMaxPeriods) return false;
       if (filterLoad === 'unassigned') return false; // unassigned teachers not in teacherRows
 
       // subject filter
@@ -274,7 +295,7 @@ export default function SubjectDetailsPage() {
 
       return true;
     });
-  }, [teacherRows, search, filterLoad, filterSubject, filterClass]);
+  }, [teacherRows, search, filterLoad, filterSubject, filterClass, displayMaxPeriods]);
 
   const paginatedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
@@ -296,9 +317,9 @@ export default function SubjectDetailsPage() {
     if (dup) return { type: 'error', message: `${teacherNameMap.get(form.teacherId)} is already assigned ${subject.subjectName} in ${section.className}–${section.sectionName}.` };
     const row = teacherRows.find(r => r.teacherId === form.teacherId);
     const projectedLoad = (row?.weeklyLoad || 0) + 6;
-    if (!editId && projectedLoad > 30) return { type: 'warning', message: `${teacherNameMap.get(form.teacherId)} will be overloaded (${projectedLoad} periods/week).` };
+    if (!editId && projectedLoad > displayMaxPeriods) return { type: 'warning', message: `${teacherNameMap.get(form.teacherId)} will be overloaded (${projectedLoad} periods/week).` };
     return null;
-  }, [form, editId, mappings, classSections, subjects, teacherNameMap, teacherRows]);
+  }, [form, editId, mappings, classSections, subjects, teacherNameMap, teacherRows, displayMaxPeriods]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const buildPayload = () => {
@@ -444,13 +465,13 @@ export default function SubjectDetailsPage() {
       {/* ── Quick Insights ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: 'Total Teachers', value: insights.totalTeachers, color: 'border-t-blue-500',    sub: 'Registered staff',       subColor: 'text-blue-600' },
-          { label: 'Mapped',         value: insights.mapped,        color: 'border-t-emerald-500', sub: `${Math.round((insights.mapped/(insights.totalTeachers||1))*100)}% assigned`, subColor: 'text-emerald-600' },
-          { label: 'Unassigned',     value: insights.unassigned,    color: 'border-t-amber-500',   sub: 'No active subjects',     subColor: 'text-amber-600' },
-          { label: 'Overloaded',     value: insights.overloaded,    color: 'border-t-red-500',     sub: '> 30 periods/week',      subColor: 'text-red-600' },
-          { label: 'Conflicts',      value: insights.conflicts,     color: 'border-t-purple-500',  sub: insights.conflicts > 0 ? 'Needs attention' : 'All clear', subColor: insights.conflicts > 0 ? 'text-red-500' : 'text-slate-500' },
+          { label: 'Total Teachers', value: insights.totalTeachers, hasAccent: false, color: '',    sub: 'Registered staff',       subColor: 'text-muted-foreground' },
+          { label: 'Mapped',         value: insights.mapped,        hasAccent: false, color: '', sub: `${Math.round((insights.mapped/(insights.totalTeachers||1))*100)}% assigned`, subColor: 'text-muted-foreground' },
+          { label: 'Unassigned',     value: insights.unassigned,    hasAccent: true,  color: 'border-t-amber-500',   sub: 'No active subjects',     subColor: 'text-amber-600' },
+          { label: 'Overloaded',     value: insights.overloaded,    hasAccent: true,  color: 'border-t-red-500',     sub: `> ${displayMaxPeriods} periods/week`,      subColor: 'text-red-600' },
+          { label: 'Conflicts',      value: insights.conflicts,     hasAccent: true,  color: 'border-t-purple-500',  sub: insights.conflicts > 0 ? 'Needs attention' : 'All clear', subColor: insights.conflicts > 0 ? 'text-red-500' : 'text-slate-500' },
         ].map(card => (
-          <Card key={card.label} className={`erp-card overflow-hidden border-t-4 ${card.color} shadow-xs`}>
+          <Card key={card.label} className={`erp-card overflow-hidden border-t ${card.hasAccent ? `border-t-4 ${card.color}` : 'border-t-border/50'} shadow-xs`}>
             <CardContent className="p-3.5">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{card.label}</p>
               <h3 className="text-2xl font-bold mt-0.5 text-slate-800">{card.value}</h3>
@@ -509,6 +530,22 @@ export default function SubjectDetailsPage() {
               {allSubjects.map(s => <option key={s} value={String(s)}>{s}</option>)}
             </select>
 
+            {/* Max Load input */}
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-2.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Max Load:</span>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={mounted ? maxPeriods : 30}
+                onChange={e => {
+                  const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                  setMaxPeriods(val);
+                }}
+                className="w-14 h-9 text-xs font-bold text-center rounded-xl border-slate-200 bg-white"
+              />
+            </div>
+
             {/* Result count */}
             <span className="text-xs text-slate-500 ml-auto">{filteredRows.length} teacher{filteredRows.length !== 1 ? 's' : ''}</span>
           </div>
@@ -544,7 +581,7 @@ export default function SubjectDetailsPage() {
           ) : (
             <div className="divide-y divide-slate-100">
               {paginatedRows.map(row => {
-                const load   = getLoadStatus(row.weeklyLoad);
+                const load   = getLoadStatus(row.weeklyLoad, displayMaxPeriods);
                 const isOpen = expandedTeacher === row.teacherId;
 
                 return (
@@ -559,7 +596,7 @@ export default function SubjectDetailsPage() {
                         {isOpen
                           ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
                           : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />}
-                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold shrink-0">
                           {row.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
