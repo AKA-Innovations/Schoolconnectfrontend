@@ -216,8 +216,8 @@ function ProfileImageSection({ teacher, teacherId, readOnly }: { teacher: Teache
   const busy = uploadMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div className={cn("shrink-0 relative group", !readOnly && "cursor-pointer")}>
-      <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50">
+    <div className="shrink-0 relative group cursor-pointer">
+      <div className="h-28 w-28 rounded-2xl bg-muted/10 flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] border border-border/50 relative">
         {teacher.profileImageUrl ? (
           <img src={teacher.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
         ) : (
@@ -225,23 +225,21 @@ function ProfileImageSection({ teacher, teacherId, readOnly }: { teacher: Teache
             {(teacher.firstName ?? '?').charAt(0)}{(teacher.lastName ?? '').charAt(0)}
           </div>
         )}
-        {!readOnly && (
-          <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-            <button type="button" onClick={() => fileRef.current?.click()}
-              className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
-              <Camera className="h-3 w-3" />
-              {busy ? 'Uploading…' : 'Upload'}
+        <div className="absolute inset-0 rounded-2xl bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-blue-300 transition-colors">
+            <Camera className="h-3 w-3" />
+            {busy ? 'Uploading…' : 'Upload'}
+          </button>
+          {teacher.profileImageUrl && (
+            <button type="button" onClick={handleDelete}
+              className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
+              <Trash2 className="h-3 w-3" />Remove
             </button>
-            {teacher.profileImageUrl && (
-              <button type="button" onClick={handleDelete}
-                className="text-red-300 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 hover:text-red-200 transition-colors">
-                <Trash2 className="h-3 w-3" />Remove
-              </button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
-      {!readOnly && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-green-500 border-2 border-card shadow-sm flex items-center justify-center">
         <ShieldCheck className="h-3 w-3 text-white" />
       </div>
