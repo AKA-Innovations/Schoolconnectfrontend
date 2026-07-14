@@ -34,10 +34,21 @@ export function middleware(request: NextRequest) {
     const targetBase = roleRoutes[role];
     
     if (targetBase && !pathname.startsWith(targetBase)) {
-      // Allow teachers to access the coordinator & principal dashboards (page contents have their own sub-role guards)
-      if (role === 'teacher' && (pathname.startsWith('/dashboard/coordinator') || pathname.startsWith('/dashboard/principal'))) {
+      const isPrincipal = request.cookies.get('is-principal')?.value === 'true';
+
+      // 1. Allow coordinators to access coordinator routes
+      if (role === 'teacher' && pathname.startsWith('/dashboard/coordinator')) {
         // Let it pass
-      } else {
+      }
+      // 2. Allow principals to access principal & admin routes
+      else if ((role === 'teacher' || role === 'principal') && isPrincipal && (pathname.startsWith('/dashboard/principal') || pathname.startsWith('/dashboard/admin'))) {
+        // Let it pass
+      }
+      // 3. Allow principals to access teacher pages
+      else if (role === 'principal' && pathname.startsWith('/dashboard/teacher')) {
+        // Let it pass
+      }
+      else {
         // Redirect to correct dashboard if trying to access unauthorized dashboard
         return NextResponse.redirect(new URL(targetBase, request.url));
       }

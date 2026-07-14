@@ -109,17 +109,17 @@ export function EditClassForm() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Edit Class</h1>
-          <p className="text-sm text-muted-foreground mt-1">Update class section details</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Edit Class Teacher Assignment</h1>
+          <p className="text-sm text-muted-foreground mt-1">Update teacher assignment or student limit for this class section</p>
         </div>
       </div>
 
       {/* Form Card */}
       <Card className="erp-card overflow-hidden">
         <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
-          <CardTitle className="text-lg font-bold tracking-tight">Class Information</CardTitle>
+          <CardTitle className="text-lg font-bold tracking-tight">Assignment Information</CardTitle>
           <CardDescription className="text-xs font-medium mt-1">
-            Update the class section details below
+            Update the class teacher assignment details below
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">

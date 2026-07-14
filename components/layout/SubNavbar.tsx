@@ -44,10 +44,19 @@ export function SubNavbar() {
             
             if (subQuery) {
               const params = new URLSearchParams(subQuery);
-              const allParamsMatch = Array.from(params.entries()).every(([key, value]) => 
-                searchParams.get(key) === value
-              );
+              const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+                const currentVal = searchParams.get(key);
+                if (key === 'tab' && value === 'profile' && !currentVal) {
+                  return true;
+                }
+                return currentVal === value;
+              });
               isActive = isActive && allParamsMatch;
+            } else {
+              const currentTab = searchParams.get('tab');
+              if (currentTab && currentTab !== 'profile') {
+                isActive = false;
+              }
             }
             
             return (

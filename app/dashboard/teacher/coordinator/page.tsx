@@ -41,7 +41,6 @@ export default function CoordinatorWorkspacePage() {
   const { data: allClassSections = [] } = useClassSectionLists();
   const { data: subjectDetails   = [] } = useSubjectDetails();
   const { data: periodSlots      = [] } = usePeriodSlots();
-  const { data: subjectOptions   = [] } = useSubjectOptions();
   const { data: schoolClasses    = [] } = useSchoolClasses();
   const { data: teachersData }          = useTeacherList({ schoolId, page: 1, pageSize: 500 });
   const allTeachers: any[] = (teachersData as any)?.items ?? (teachersData as any)?.data ?? [];
@@ -93,6 +92,8 @@ export default function CoordinatorWorkspacePage() {
     classId: resolvedClassId,
     classSectionId: selectedId || undefined,
   });
+
+  const { data: subjectOptions = [] } = useSubjectOptions(resolvedClassId);
 
   const sectionSubjects = useMemo(
     () => subjectDetails.filter((sd) => sd.className === className && sd.sectionName === sectionName),
@@ -223,8 +224,9 @@ export default function CoordinatorWorkspacePage() {
     const existingEntry = ttGrid[day]?.[periodId];
     if (!editingSubjectId) {
       if (existingEntry) {
+        const entryId = existingEntry.id ?? (existingEntry as any).timetableId ?? (existingEntry as any).timetable_id;
         try {
-          await deleteTimetable.mutateAsync(existingEntry.id);
+          await deleteTimetable.mutateAsync(entryId);
           toast.success('Slot cleared');
         } catch (e: any) {
           toast.error(e?.response?.data?.message ?? 'Failed — admin permission may be required');
@@ -235,7 +237,8 @@ export default function CoordinatorWorkspacePage() {
     }
     try {
       if (existingEntry) {
-        await updateTimetable.mutateAsync({ id: existingEntry.id, data: { classSubjectId: String(editingSubjectId) } });
+        const entryId = existingEntry.id ?? (existingEntry as any).timetableId ?? (existingEntry as any).timetable_id;
+        await updateTimetable.mutateAsync({ id: entryId, data: { classSubjectId: String(editingSubjectId) } });
       } else {
         await createTimetable.mutateAsync({
           classSubjectId: String(editingSubjectId),

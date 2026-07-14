@@ -130,6 +130,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               clearAuth();
               document.cookie = 'auth-token=; Max-Age=0; path=/';
               document.cookie = 'user-role=; Max-Age=0; path=/';
+              document.cookie = 'is-principal=; Max-Age=0; path=/';
               window.location.href = '/login';
               if (onClose) onClose();
             }}

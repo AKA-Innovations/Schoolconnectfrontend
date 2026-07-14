@@ -34,10 +34,15 @@ export function ClassesOverview() {
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Classes Management</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage all classes and their sections</p>
         </div>
-        <Button className="rounded-xl bg-primary hover:bg-primary/90 gap-2" onClick={() => router.push('/dashboard/admin/class/new')}>
-          <Plus className="h-4 w-4" />
-          New Class
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="rounded-xl gap-2 border-slate-200" onClick={() => router.push('/dashboard/admin/school?tab=structure')}>
+            Add Classes & Sections
+          </Button>
+          <Button className="rounded-xl bg-primary hover:bg-primary/90 gap-2" onClick={() => router.push('/dashboard/admin/class/new')}>
+            <Plus className="h-4 w-4" />
+            Assign Class Teacher
+          </Button>
+        </div>
       </div>
 
       {/* Search and Controls */}

@@ -23,6 +23,7 @@ function resolveApiBaseUrl() {
 
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
+  timeout: 30000, // 30 seconds request timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -39,6 +40,14 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+  
+  // If the request data is FormData, let browser/axios handle boundary setting
+  if (config.data instanceof FormData) {
+    if (config.headers) {
+      delete config.headers['Content-Type'];
+    }
+  }
+  
   return config;
 });
 
@@ -55,6 +64,7 @@ api.interceptors.response.use(
         useAuthStore.getState().clearAuth();
         document.cookie = 'auth-token=; Max-Age=0; path=/';
         document.cookie = 'user-role=; Max-Age=0; path=/';
+        document.cookie = 'is-principal=; Max-Age=0; path=/';
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';
       } else if (status === 403) {

@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClassSectionLists } from './useClasses';
 import {
   studentService,
   StudentListFilters,
@@ -32,16 +34,67 @@ function invalidateStudent(qc: ReturnType<typeof useQueryClient>, studentId: str
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useStudentList(filters: StudentListFilters, options?: { enabled?: boolean }) {
-  return useQuery({
+  const { data: allSections = [] } = useClassSectionLists();
+
+  const query = useQuery({
     queryKey: studentKeys.list(filters),
     queryFn: () => studentService.list(filters),
     placeholderData: (prev) => prev,
     enabled: options?.enabled !== false,
   });
+
+  const enrichedData = useMemo(() => {
+    if (!query.data) return query.data;
+
+    let items = (query.data.items ?? []).map((student) => {
+      const academics = (student.academics ?? []).map((acad) => {
+        const classSectionId = (acad as any).classSectionId || (acad as any).classSectionsId;
+        if (classSectionId && (!acad.className || !acad.sectionName) && allSections.length) {
+          const section = allSections.find(
+            (s) => s.id === classSectionId || s.masterSectionId === classSectionId || s.mappingId === classSectionId
+          );
+          if (section) {
+            return {
+              ...acad,
+              className: section.className,
+              sectionName: section.sectionName,
+            };
+          }
+        }
+        return acad;
+      });
+      return {
+        ...student,
+        academics,
+      };
+    });
+
+    if (filters.classSectionId) {
+      const targetId = Number(filters.classSectionId);
+      items = items.filter((student) => {
+        const acad = student.academics?.[0];
+        if (!acad) return false;
+        const studentSectionId = (acad as any).classSectionId || (acad as any).classSectionsId;
+        return studentSectionId === targetId;
+      });
+    }
+
+    return {
+      ...query.data,
+      items,
+    };
+  }, [query.data, allSections, filters.classSectionId]);
+
+  return {
+    ...query,
+    data: enrichedData,
+  };
 }
 
 export function useStudent(id: string) {
-  return useQuery({
+  const { data: allSections = [] } = useClassSectionLists();
+
+  const query = useQuery({
     queryKey: studentKeys.detail(id),
     queryFn: async () => {
       const res = await studentService.getById(id);
@@ -59,6 +112,37 @@ export function useStudent(id: string) {
     },
     enabled: !!id,
   });
+
+  const enrichedData = useMemo(() => {
+    if (!query.data) return query.data;
+
+    const academics = (query.data.academics ?? []).map((acad) => {
+      const classSectionId = (acad as any).classSectionId || (acad as any).classSectionsId;
+      if (classSectionId && (!acad.className || !acad.sectionName) && allSections.length) {
+        const section = allSections.find(
+          (s) => s.id === classSectionId || s.masterSectionId === classSectionId || s.mappingId === classSectionId
+        );
+        if (section) {
+          return {
+            ...acad,
+            className: section.className,
+            sectionName: section.sectionName,
+          };
+        }
+      }
+      return acad;
+    });
+
+    return {
+      ...query.data,
+      academics,
+    };
+  }, [query.data, allSections]);
+
+  return {
+    ...query,
+    data: enrichedData,
+  };
 }
 
 // ─── Registration ─────────────────────────────────────────────────────────────

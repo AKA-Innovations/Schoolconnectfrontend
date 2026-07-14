@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, BookOpen, Fingerprint } from 'lucide-react';
-import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
+import { useSchoolClasses, useSchoolSections, useClasses } from '@/hooks/useClasses';
 import { classService } from '@/services/class.service';
 import { teacherService } from '@/services/teacher.service';
 import { TeacherSelectDropdown } from '@/components/admin/class/TeacherSelectDropdown';
@@ -56,10 +56,26 @@ export default function NewClassPage() {
   const selectedClass = schoolClasses.find(c => c.className === selectedClassName);
   const { data: schoolSections = [] } = useSchoolSections(selectedClass?.id);
 
+  // Fetch all existing mappings to check for duplicate class + section combinations
+  const { data: existingClassesResponse } = useClasses({ limit: 1000 });
+  const existingClasses = existingClassesResponse?.items ?? [];
+
   const onSubmit = async (data: ClassFormValues) => {
     setIsLoading(true);
 
     try {
+      // Prevent duplicate class + section combinations
+      const isDuplicate = existingClasses.some(
+        (c) =>
+          c.className.toLowerCase() === data.className.toLowerCase() &&
+          c.sectionName.toLowerCase() === data.sectionName.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast.error(`Class ${data.className}-${data.sectionName} already exists in the system`);
+        setIsLoading(false);
+        return;
+      }
+
       const selectedSection = schoolSections.find(s => s.sectionName === data.sectionName);
       if (!selectedSection) {
         toast.error('Selected section not found in school structure');
@@ -82,16 +98,16 @@ export default function NewClassPage() {
       // Invalidate react-query cache to update dashboard stats immediately
       queryClient.invalidateQueries({ queryKey: ['classes'] });
 
-      toast.success(`Class ${data.className}-${data.sectionName} mapping created`);
+      toast.success(`Class teacher assigned successfully for Class ${data.className}-${data.sectionName}`);
       router.push(created?.id ? `/dashboard/admin/class/${created.id}` : '/dashboard/admin/class');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create class');
+      toast.error(err.response?.data?.message || 'Failed to assign class teacher');
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 animate-in fade-in duration-700 pb-20">
+    <div className="max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-700 pb-20">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button
@@ -103,8 +119,8 @@ export default function NewClassPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">Create Class Mapping</h2>
-          <p className="text-sm text-muted-foreground mt-1">Map a master class and section to create a functional unit</p>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Assign Class Teacher</h2>
+          <p className="text-sm text-muted-foreground mt-1">Assign a class teacher to a master class and section</p>
         </div>
       </div>
 
@@ -116,7 +132,7 @@ export default function NewClassPage() {
                  <BookOpen className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-lg font-bold tracking-tight">Mapping Information</CardTitle>
+                <CardTitle className="text-lg font-bold tracking-tight">Assignment Information</CardTitle>
                 <CardDescription className="text-xs font-medium opacity-70 mt-0.5">Select from the institution's master structure</CardDescription>
               </div>
             </div>
@@ -177,7 +193,7 @@ export default function NewClassPage() {
           <CardHeader className="border-b border-border/50 bg-muted/10 py-5 px-8 flex flex-row items-center gap-3">
              <Fingerprint className="text-primary h-6 w-6" />
              <div>
-                <CardTitle className="text-[14px] font-bold tracking-tight">Class Creation Guidelines</CardTitle>
+                <CardTitle className="text-[14px] font-bold tracking-tight">Teacher Assignment Guidelines</CardTitle>
              </div>
           </CardHeader>
           <CardContent className="p-6">
@@ -193,7 +209,7 @@ export default function NewClassPage() {
         <div className="flex items-center justify-end gap-4 pt-4">
             <Button type="button" variant="outline" onClick={() => router.back()} className="px-6 h-12 rounded-xl text-xs font-bold uppercase tracking-widest">Cancel</Button>
             <Button type="submit" disabled={isLoading} className="px-10 h-12 rounded-xl text-xs font-bold uppercase tracking-widest shadow-sm">
-                {isLoading ? 'Creating...' : 'Create Class'}
+                {isLoading ? 'Assigning...' : 'Assign Class Teacher'}
             </Button>
         </div>
       </form>

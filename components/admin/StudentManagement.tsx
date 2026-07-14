@@ -51,8 +51,17 @@ export function StudentManagement() {
     if (mobileFilter) {
       list = list.filter(s => s.mobileNumber?.includes(mobileFilter));
     }
+    if (selectedSectionId) {
+      const targetId = Number(selectedSectionId);
+      list = list.filter(s => {
+        const acad = s.academics?.[0];
+        if (!acad) return false;
+        const studentSectionId = (acad as any).classSectionId || (acad as any).classSectionsId;
+        return studentSectionId === targetId;
+      });
+    }
     return list;
-  }, [rawStudents, searchName, mobileFilter]);
+  }, [rawStudents, searchName, mobileFilter, selectedSectionId]);
   const pagination = data?.pagination;
   const totalPages = pagination?.totalPages ?? 1;
   const hasFilters = !!(searchName || mobileFilter || selectedSectionId);
@@ -96,11 +105,14 @@ export function StudentManagement() {
             <option value="">All Classes & Sections</option>
             {allSections
               .filter(s => s.id > 0) // Only mapped sections have students
-              .map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.className} — {s.sectionName}
-                </option>
-              ))
+              .map(s => {
+                const sectionVal = s.masterSectionId || s.id;
+                return (
+                  <option key={s.id} value={sectionVal}>
+                    {s.className} — {s.sectionName}
+                  </option>
+                );
+              })
             }
           </select>
           <div className="relative flex-[1_1_160px]">

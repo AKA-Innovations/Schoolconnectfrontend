@@ -13,6 +13,7 @@ export default function TeacherProfilePage() {
       <TeacherDetailsView
         teacherId={teacherId}
         onBack={() => router.push('/dashboard/admin?tab=teachers')}
+        readOnly={true}
       />
     </div>
   );

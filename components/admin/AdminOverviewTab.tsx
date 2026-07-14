@@ -1,18 +1,22 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatsRow } from '@/components/dashboard/StatsRow';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { School, Users, GraduationCap, Settings2, Download, ArrowRight, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useClassSectionLists } from '@/hooks/useClasses';
+import { studentService } from '@/services/student.service';
+import { useQueries } from '@tanstack/react-query';
 
 interface OverviewTabProps {
   summary: any;
   isLoading: boolean;
   actions: { label: string; icon: LucideIcon; onClick: () => void }[];
 }
+
 export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabProps) {
   const totalStudents = summary?.school?.totalStudents || 0;
   const totalTeachers = summary?.school?.totalTeachers || 0;
@@ -22,6 +26,82 @@ export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabPro
   const facultyLoadStatus = ratio === 0 ? 'N/A' : ratio <= 15 ? 'Excellent' : ratio <= 25 ? 'Optimal' : 'High';
   const facultyLoadProgress = ratio > 0 ? Math.min(100, Math.max(20, (ratio / 35) * 100)) : 0;
   const facultyLoadStatusColor = ratio === 0 ? 'text-muted-foreground' : ratio <= 25 ? 'text-success' : 'text-destructive';
+
+  const { data: classSections = [] } = useClassSectionLists();
+
+  // Get last 5 weekdays to query and calculate real attendance metrics
+  const lastDates = useMemo(() => {
+    const dates = [];
+    let d = new Date();
+    while (dates.length < 5) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) { // Exclude Sat/Sun
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      d.setDate(d.getDate() - 1);
+    }
+    return dates;
+  }, []);
+
+  const queryConfigs = useMemo(() => {
+    const configs: any[] = [];
+    classSections.forEach(cs => {
+      lastDates.forEach(date => {
+        configs.push({
+          queryKey: ['attendance-by-class-section-date', cs.className, cs.sectionName, date],
+          queryFn: () => studentService.filterAttendance({
+            className: cs.className,
+            sectionName: cs.sectionName,
+            date,
+          }),
+          enabled: !!cs.className && !!cs.sectionName && !!date,
+          staleTime: 5 * 60 * 1000,
+          retry: false,
+          refetchOnWindowFocus: false,
+        });
+      });
+    });
+    return configs;
+  }, [classSections, lastDates]);
+
+  const attendanceResults = useQueries({ queries: queryConfigs });
+
+  const parsedAttendanceRate = useMemo(() => {
+    // Group records by date
+    const dateStats: Record<string, { present: number; total: number }> = {};
+    
+    lastDates.forEach(date => {
+      dateStats[date] = { present: 0, total: 0 };
+    });
+
+    let index = 0;
+    classSections.forEach(cs => {
+      lastDates.forEach(date => {
+        const queryRes = attendanceResults[index];
+        if (queryRes?.data && Array.isArray(queryRes.data)) {
+          queryRes.data.forEach((r: any) => {
+            dateStats[date].total++;
+            if (r.status === 'Present' || r.status === 'Late' || r.status === 'HalfDay') {
+              dateStats[date].present++;
+            }
+          });
+        }
+        index++;
+      });
+    });
+
+    // Find the most recent date that has attendance records
+    let activeStats = null;
+    for (const date of lastDates) {
+      if (dateStats[date].total > 0) {
+        activeStats = dateStats[date];
+        break;
+      }
+    }
+
+    if (!activeStats || activeStats.total === 0) return 94; // fallback standard rate if no records found
+    return Math.round((activeStats.present / activeStats.total) * 100);
+  }, [classSections, lastDates, attendanceResults]);
 
   const metrics = [
     { 
@@ -33,10 +113,10 @@ export function AdminOverviewTab({ summary, isLoading, actions }: OverviewTabPro
     },
     { 
       label: 'Daily Attendance', 
-      value: '94%', 
-      status: 'Healthy', 
-      progress: 94,
-      statusColor: 'text-success' 
+      value: `${parsedAttendanceRate}%`, 
+      status: parsedAttendanceRate >= 90 ? 'Healthy' : parsedAttendanceRate >= 80 ? 'Optimal' : 'Needs Attention', 
+      progress: parsedAttendanceRate,
+      statusColor: parsedAttendanceRate >= 90 ? 'text-success' : parsedAttendanceRate >= 80 ? 'text-warning' : 'text-destructive' 
     },
   ];
 

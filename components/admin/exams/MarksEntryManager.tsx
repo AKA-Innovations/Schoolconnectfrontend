@@ -11,8 +11,9 @@ import { studentService } from '@/services/student/service';
 import { useExams, useExamSubjects, useMarks, useGradeConfig, useExamSchedules, useMarksCompletionStatus } from '@/services/exam/queries';
 import { useEnterMarks, useLockMarks, useUnlockMarks, useBulkMarkAbsent } from '@/services/exam/mutations';
 import { useSubjectDetails } from '@/hooks/useClasses';
+import { examService } from '@/services/exam/service';
 import { useAuthStore } from '@/store/authStore';
-import { Save, Lock, Unlock, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { Save, Lock, Unlock, AlertCircle, RefreshCw, Sparkles, ArrowLeft, CheckCircle2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { MarksEntryItemDto } from '@/types/exam.types';
 
@@ -25,10 +26,48 @@ export function MarksEntryManager({ session }: Props) {
   const isPowerUser = user?.role === 'principal' || user?.role === 'school_admin' || !!user?.isPrincipal;
   
   // Fetch teacher's assigned classes and subjects (or all if principal/admin)
-  const { data: mySubjectDetailsRaw, isLoading: loadingSubjectDetails } = useSubjectDetails(isPowerUser ? undefined : user?.id);
-  const mySubjectDetails = (mySubjectDetailsRaw as any[]) || [];
+  const { data: mySubjectDetailsRaw, isLoading: loadingMySubjects } = useSubjectDetails(isPowerUser ? undefined : user?.id);
+  
+  // If class teacher, also fetch all subjects for their assigned class section
+  const isClassTeacher = !!user?.isClassTeacher || !!user?.classTeacherClass;
+  const classTeacherSectionId = user?.classTeacherClass?.classDtlsId;
+  const { data: classWideSubjectDetailsRaw, isLoading: loadingClassWideSubjects } = useSubjectDetails(
+    undefined,
+    session,
+    isClassTeacher && classTeacherSectionId ? Number(classTeacherSectionId) : undefined
+  );
+
+  const loadingSubjectDetails = loadingMySubjects || (isClassTeacher && !!classTeacherSectionId && loadingClassWideSubjects);
+
+  const mySubjectDetails = React.useMemo(() => {
+    const list = [...((mySubjectDetailsRaw as any[]) || [])];
+    const classWide = (classWideSubjectDetailsRaw as any[]) || [];
+    
+    for (const item of classWide) {
+      const exists = list.some(
+        (x) =>
+          x.classDtlsId === item.classDtlsId &&
+          x.subjectDtlsId === item.subjectDtlsId
+      );
+      if (!exists) {
+        list.push(item);
+      }
+    }
+    return list;
+  }, [mySubjectDetailsRaw, classWideSubjectDetailsRaw]);
   
   const { data: exams = [] } = useExams(session);
+
+  // Fetch all schedules for the session to filter scheduled exams
+  const { data: allSessionSchedules = [] } = useQuery<any[]>({
+    queryKey: ['all-session-schedules', session],
+    queryFn: () => examService.getSchedules({ session }),
+  });
+
+  const scheduledExams = React.useMemo(() => {
+    const scheduledExamIds = new Set(allSessionSchedules.map((s: any) => s.examId));
+    return exams.filter((e: any) => scheduledExamIds.has(e.id));
+  }, [exams, allSessionSchedules]);
 
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedMappingIndex, setSelectedMappingIndex] = useState<number | ''>('');
@@ -144,16 +183,16 @@ export function MarksEntryManager({ session }: Props) {
     });
   }, [studentList]);
 
-  // Filter subject mapping list based on schedule and completion status
-  const filteredSubjectDetails = React.useMemo(() => {
-    if (!selectedExamId) return mySubjectDetails;
+  // Categorized teacher mappings for the selected exam
+  const categorizedMappings = React.useMemo(() => {
+    if (!selectedExamId) return { remaining: [], marked: [], upcoming: [] };
 
-    return mySubjectDetails.filter((sd: any) => {
-      // Apply class & section filters first
-      if (selectedClassFilter !== 'all' && sd.className !== selectedClassFilter) return false;
-      if (selectedSectionFilter !== 'all' && sd.sectionName !== selectedSectionFilter) return false;
+    const remaining: any[] = [];
+    const marked: any[] = [];
+    const upcoming: any[] = [];
 
-      // Find matching schedule
+    mySubjectDetails.forEach((sd: any, idx: number) => {
+      // Find schedule
       const sch = allSchedules.find(
         (s: any) =>
           s.classId === sd.classId &&
@@ -161,9 +200,11 @@ export function MarksEntryManager({ session }: Props) {
           s.classSectionId === sd.classSectionId
       );
 
-      // Check if future or past/today
+      // If no schedule exists, exclude from the lists
+      if (!sch) return;
+
+      // Check if future
       let isFuture = false;
-      let isPastOrToday = false;
       if (sch) {
         const examDate = new Date(sch.examDate);
         examDate.setHours(0, 0, 0, 0);
@@ -171,8 +212,6 @@ export function MarksEntryManager({ session }: Props) {
         today.setHours(0, 0, 0, 0);
         if (examDate > today) {
           isFuture = true;
-        } else {
-          isPastOrToday = true;
         }
       }
 
@@ -184,20 +223,38 @@ export function MarksEntryManager({ session }: Props) {
           c.classSectionId === sd.classSectionId
       );
 
-      const isMarked = comp && comp.enteredCount > 0;
-      const isRemaining = isPastOrToday && !isMarked;
+      const enteredCount = comp?.enteredCount || 0;
+      const totalCount = comp?.totalStudents || 0;
+      const isLocked = comp?.isLocked || false;
 
-      if (mappingFilter === 'marked') return isMarked;
-      if (mappingFilter === 'remaining') return isRemaining;
-      if (mappingFilter === 'future') return isFuture;
-      return true; // 'all'
+      const mappingItem = {
+        ...sd,
+        originalIndex: idx,
+        schedule: sch,
+        completion: comp,
+        enteredCount,
+        totalCount,
+        isLocked,
+      };
+
+      if (isFuture) {
+        upcoming.push(mappingItem);
+      } else if (isLocked) {
+        marked.push(mappingItem);
+      } else {
+        remaining.push(mappingItem);
+      }
     });
-  }, [mySubjectDetails, selectedExamId, allSchedules, completionStatus, mappingFilter, selectedClassFilter, selectedSectionFilter]);
 
-  // Reset selected mapping index when the filter changes or filtered list updates
+    return { remaining, marked, upcoming };
+  }, [mySubjectDetails, selectedExamId, allSchedules, completionStatus]);
+
+  const filteredSubjectDetails = mySubjectDetails;
+
+  // Reset selected mapping index when the exam changes
   useEffect(() => {
     setSelectedMappingIndex('');
-  }, [mappingFilter, selectedExamId, selectedClassFilter, selectedSectionFilter]);
+  }, [selectedExamId]);
 
   // Filter students based on showOnlyMarked state
   const displayedStudents = React.useMemo(() => {
@@ -356,88 +413,10 @@ export function MarksEntryManager({ session }: Props) {
             className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Select Exam</option>
-            {exams.map((e: any) => (
+            {scheduledExams.map((e: any) => (
               <option key={e.id} value={e.id}>{e.examName}</option>
             ))}
           </select>
-
-          {/* Class Filter (Only shown when Exam is selected) */}
-          {selectedExamId && classOptions.length > 1 && (
-            <select
-              value={selectedClassFilter}
-              onChange={(e) => setSelectedClassFilter(e.target.value)}
-              className="flex h-10 w-full sm:w-32 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="all">All Classes</option>
-              {classOptions.filter(c => c !== 'all').map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Section Filter (Only shown when Exam is selected) */}
-          {selectedExamId && sectionOptions.length > 1 && (
-            <select
-              value={selectedSectionFilter}
-              onChange={(e) => setSelectedSectionFilter(e.target.value)}
-              className="flex h-10 w-full sm:w-32 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="all">All Sections</option>
-              {sectionOptions.filter(s => s !== 'all').map((s) => (
-                <option key={s} value={s}>Section {s}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Mapping Filter Tabs (Only shown when Exam is selected) */}
-          {selectedExamId && (
-            <div className="flex rounded-xl bg-muted/40 p-1 border border-border/50 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setMappingFilter('all')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  mappingFilter === 'all'
-                    ? 'bg-white text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setMappingFilter('marked')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  mappingFilter === 'marked'
-                    ? 'bg-white text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Marked
-              </button>
-              <button
-                type="button"
-                onClick={() => setMappingFilter('remaining')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  mappingFilter === 'remaining'
-                    ? 'bg-white text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Remaining
-              </button>
-              <button
-                type="button"
-                onClick={() => setMappingFilter('future')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  mappingFilter === 'future'
-                    ? 'bg-white text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Future
-              </button>
-            </div>
-          )}
 
           {/* Class, Section, and Subject Selector */}
           <select
@@ -449,16 +428,15 @@ export function MarksEntryManager({ session }: Props) {
             <option value="">
               {loadingSubjectDetails ? 'Loading assigned classes...' : 'Select Class, Section & Subject'}
             </option>
-            {filteredSubjectDetails.map((sd: any) => {
-              const originalIdx = mySubjectDetails.findIndex((item: any) => item.id === sd.id);
+            {mySubjectDetails.map((sd: any, idx: number) => {
               return (
-                <option key={sd.id} value={originalIdx}>
+                <option key={sd.id} value={idx}>
                   {sd.className} - {sd.sectionName} - {sd.subjectName}
                 </option>
               );
             })}
           </select>
-
+ 
           <Button
             variant="outline"
             size="icon"
@@ -471,8 +449,181 @@ export function MarksEntryManager({ session }: Props) {
         </div>
       </div>
 
+      {selectedMapping && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground mb-4 pl-0 cursor-pointer"
+          onClick={() => setSelectedMappingIndex('')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Classes Overview
+        </Button>
+      )}
+
+      {/* Overview Dashboard for Mappings when Exam is selected but no class is opened */}
+      {selectedExamId && selectedMappingIndex === '' && (
+        <div className="space-y-6">
+          {/* Dashboard Summary Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="rounded-2xl border border-rose-100 bg-rose-50/10 p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg">
+                {categorizedMappings.remaining.length}
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-foreground">Remaining</h4>
+                <p className="text-xs text-muted-foreground">Classes to be marked</p>
+              </div>
+            </Card>
+
+            <Card className="rounded-2xl border border-emerald-100 bg-emerald-50/10 p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg">
+                {categorizedMappings.marked.length}
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-foreground">Completed</h4>
+                <p className="text-xs text-muted-foreground">Classes fully marked</p>
+              </div>
+            </Card>
+
+            <Card className="rounded-2xl border border-slate-100 bg-slate-50/10 p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-lg">
+                {categorizedMappings.upcoming.length}
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-foreground">Upcoming</h4>
+                <p className="text-xs text-muted-foreground">Future scheduled exams</p>
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Remaining / Pending */}
+            <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden bg-card">
+              <CardHeader className="border-b border-border/50 bg-rose-50/5 py-4 px-5 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-rose-800">Pending Marks Entry</CardTitle>
+                  <CardDescription className="text-[11px]">Exams that are conducted and require marks input</CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px]">
+                  Action Needed
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                {categorizedMappings.remaining.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-muted-foreground font-medium">🎉 All conducted exams are fully marked!</p>
+                ) : (
+                  categorizedMappings.remaining.map((item: any) => (
+                    <div key={item.id} className="p-3.5 rounded-xl border border-border/80 bg-white flex items-center justify-between gap-4 hover:border-rose-200 transition-colors">
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-foreground truncate">
+                          {item.className} - Section {item.sectionName}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5 font-semibold">
+                          Subject: {item.subjectName}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 font-medium">
+                          <span className="text-rose-600 font-bold">{item.enteredCount}/{item.totalCount || '?'}</span> students marked
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="rounded-lg text-[10px] font-bold h-8 px-3.5 bg-rose-600 hover:bg-rose-700 text-white shrink-0 shadow-sm cursor-pointer"
+                        onClick={() => setSelectedMappingIndex(item.originalIndex)}
+                      >
+                        Enter Marks
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Right: Completed / Marked */}
+            <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden bg-card">
+              <CardHeader className="border-b border-border/50 bg-emerald-50/5 py-4 px-5 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-emerald-800">Completed Marks Entry</CardTitle>
+                  <CardDescription className="text-[11px]">Exams fully marked and verified</CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px]">
+                  Completed
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                {categorizedMappings.marked.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-muted-foreground font-medium">No completed marks entry list yet.</p>
+                ) : (
+                  categorizedMappings.marked.map((item: any) => (
+                    <div key={item.id} className="p-3.5 rounded-xl border border-border/80 bg-white flex items-center justify-between gap-4 hover:border-emerald-200 transition-colors">
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-foreground truncate">
+                          {item.className} - Section {item.sectionName}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5 font-semibold">
+                          Subject: {item.subjectName}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                          <span className="text-emerald-700 font-bold">{item.enteredCount}/{item.totalCount || '?'}</span> students marked
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg text-[10px] font-bold h-8 px-3.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 shrink-0 cursor-pointer"
+                        onClick={() => setSelectedMappingIndex(item.originalIndex)}
+                      >
+                        Edit Marks
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Upcoming scheduled exams if any */}
+          {categorizedMappings.upcoming.length > 0 && (
+            <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden bg-card">
+              <CardHeader className="border-b border-border/50 bg-slate-50/5 py-4 px-5">
+                <CardTitle className="text-sm font-bold text-slate-700">Upcoming Scheduled Exams</CardTitle>
+                <CardDescription className="text-[11px]">Future exams scheduled for your classes (marks entry unlocks on exam date)</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categorizedMappings.upcoming.map((item: any) => (
+                  <div key={item.id} className="p-3.5 rounded-xl border border-border bg-white flex flex-col gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-foreground truncate">
+                        {item.className} - Section {item.sectionName}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 font-semibold">
+                        Subject: {item.subjectName}
+                      </div>
+                    </div>
+                    {item.schedule && (
+                      <div className="mt-1 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 font-medium flex items-center gap-1.5 border border-slate-100">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span>Date: {new Date(item.schedule.examDate).toLocaleDateString()} ({item.schedule.startTime} - {item.schedule.endTime})</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Conditional Renders based on Exam Schedule Verification */}
-      {scheduleStatus === 'pending_selection' && (
+      {!selectedExamId && (
+        <Card className="rounded-2xl border border-dashed border-border/80 shadow-sm p-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
+          <p className="text-muted-foreground font-medium">Please select an Exam to view and enter marks.</p>
+        </Card>
+      )}
+
+      {selectedExamId && selectedMapping && scheduleStatus === 'pending_selection' && (
         <Card className="rounded-2xl border border-dashed border-border/80 shadow-sm p-12 text-center">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
           <p className="text-muted-foreground font-medium">Please specify both the Exam and your Class & Subject mapping to enter marks.</p>
@@ -543,19 +694,25 @@ export function MarksEntryManager({ session }: Props) {
                 Show Only Marked
               </label>
 
-              {selectedStudents.length > 0 && (
+              {selectedStudents.length > 0 && !isMarksLocked && (
                 <Button variant="outline" size="sm" onClick={handleBulkAbsent} className="rounded-lg text-xs hover:bg-rose-50 text-rose-600 border-rose-200">
                   Mark Selected Absent ({selectedStudents.length})
                 </Button>
               )}
               {isMarksLocked ? (
-                <Button variant="outline" size="sm" onClick={() => handleLockUnlock('unlock')} className="rounded-lg text-xs gap-1">
-                  <Unlock className="h-3.5 w-3.5" /> Unlock Marks
-                </Button>
+                // Unlock can only be done by coordinator, principal, school_admin
+                (isPowerUser || user?.role === 'subject_coordinator') && (
+                  <Button variant="outline" size="sm" onClick={() => handleLockUnlock('unlock')} className="rounded-lg text-xs gap-1">
+                    <Unlock className="h-3.5 w-3.5" /> Unlock Marks
+                  </Button>
+                )
               ) : (
-                <Button variant="outline" size="sm" onClick={() => handleLockUnlock('lock')} className="rounded-lg text-xs gap-1">
-                  <Lock className="h-3.5 w-3.5" /> Lock Marks
-                </Button>
+                // Lock can be done by teacher or class teacher
+                (user?.role === 'teacher' || isClassTeacher) && (
+                  <Button variant="outline" size="sm" onClick={() => handleLockUnlock('lock')} className="rounded-lg text-xs gap-1">
+                    <Lock className="h-3.5 w-3.5" /> Lock Marks
+                  </Button>
+                )
               )}
             </div>
           </CardHeader>

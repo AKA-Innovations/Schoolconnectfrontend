@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { SubjectDetail, PeriodSlot, TimetableEntry, CreateTimetablePayload, ClassSectionItem } from '@/types/class.types';
 import { Plus, Trash2, Calendar, Save, AlertTriangle, Check, X } from 'lucide-react';
 import { eventService } from '@/services/event/service';
+import { classService } from '@/services/class.service';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -127,6 +128,76 @@ export default function TimetablePage() {
     (subjectDetails as SubjectDetail[]).forEach((sd) => m.set(String(sd.id), sd));
     return m;
   }, [subjectDetails]);
+
+  const [apiConflicts, setApiConflicts] = useState<Record<string, string>>({});
+  const [checkingClash, setCheckingClash] = useState<Record<string, boolean>>({});
+  const checkedDraftsRef = useRef<Map<string, string>>(new Map());
+
+  // Clear checked cache on section change or edit mode toggled
+  React.useEffect(() => {
+    checkedDraftsRef.current.clear();
+    setApiConflicts({});
+  }, [editMode, selectedClassName, selectedSectionName]);
+
+  React.useEffect(() => {
+    const draftKeys = Object.keys(drafts);
+
+    // Clean up conflicts for discarded drafts
+    setApiConflicts((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!drafts[k]) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    draftKeys.forEach(async (key) => {
+      const draft = drafts[key];
+      const [day, periodIdStr] = key.split('|');
+      const periodId = Number(periodIdStr);
+
+      const sd = sdMap.get(draft.classSubjectId);
+      if (!sd || !sd.teacherId) return;
+
+      // Skip checking if we have already validated this cell with this specific classSubjectId
+      if (checkedDraftsRef.current.get(key) === draft.classSubjectId) {
+        return;
+      }
+
+      setCheckingClash(p => ({ ...p, [key]: true }));
+
+      try {
+        const res = await classService.checkTimetableClash({
+          teacherId: sd.teacherId,
+          dayOfWeek: day,
+          periodId: periodId,
+          session: CURRENT_SESSION,
+        });
+
+        const clashData = res?.data ?? res;
+        if (clashData?.isClashing) {
+          const slot = clashData.clashingSlot;
+          const msg = `${sd.teacherName || 'Teacher'} already assigned in Class ${slot.className} Section ${slot.sectionName} for ${slot.subjectName}`;
+          setApiConflicts(prev => ({ ...prev, [key]: msg }));
+        } else {
+          setApiConflicts(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
+        checkedDraftsRef.current.set(key, draft.classSubjectId);
+      } catch (err) {
+        console.error('Failed checking timetable slot clash:', err);
+      } finally {
+        setCheckingClash(p => ({ ...p, [key]: false }));
+      }
+    });
+  }, [drafts, sdMap]);
 
   const allEntriesArr: TimetableEntry[] = useMemo(
     () => (Array.isArray(allEntries) ? allEntries : []),
@@ -269,7 +340,7 @@ export default function TimetablePage() {
         if (String(existing.classSubjectId) === draft.classSubjectId) continue;
 
         toUpdate.push({
-          id: existing.id,
+          id: existing.id ?? (existing as any).timetableId ?? (existing as any).timetable_id,
           data: { 
             session: CURRENT_SESSION,
             classSubjectId: draft.classSubjectId,
@@ -329,10 +400,15 @@ export default function TimetablePage() {
     for (const [key, draft] of Object.entries(drafts)) {
       const [day, periodId] = key.split('|');
       const c = teacherConflict(draft.classSubjectId, day, Number(periodId));
-      if (c) m[key] = c;
+      if (c) {
+        m[key] = c;
+      }
+    }
+    for (const [key, msg] of Object.entries(apiConflicts)) {
+      m[key] = msg;
     }
     return m;
-  }, [drafts, teacherConflict]);
+  }, [drafts, teacherConflict, apiConflicts]);
 
   return (
     <div className="max-w-[1600px] mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
@@ -642,7 +718,7 @@ function ExistingCell({
       )}
       <Button
         variant="ghost" size="icon"
-        onClick={() => onDelete(entry.id)}
+        onClick={() => onDelete(entry.id ?? (entry as any).timetableId ?? (entry as any).timetable_id)}
         disabled={isDeleting}
         className="h-5 w-5 absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
       >

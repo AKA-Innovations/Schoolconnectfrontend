@@ -314,20 +314,19 @@ export default function ClassRoomPage() {
     if (!assignedClass) return null;
     
     // Find matching section in allSections to resolve classId, className, sectionName
-    const match = allSections.find(s =>
-      s.id === assignedClass.classDtlsId ||
-      s.id === assignedClass.id ||
-      s.mappingId === assignedClass.id ||
-      s.mappingId === assignedClass.classDtlsId ||
-      (s.className === assignedClass.className && s.sectionName === assignedClass.sectionName)
-    );
+    const match = allSections.find(s => {
+      if (assignedClass.classDtlsId && (s.mappingId === assignedClass.classDtlsId || s.id === assignedClass.classDtlsId || s.masterSectionId === assignedClass.classDtlsId)) return true;
+      if (assignedClass.id && (s.mappingId === assignedClass.id || s.id === assignedClass.id || s.masterSectionId === assignedClass.id)) return true;
+      if (assignedClass.className && assignedClass.sectionName && s.className === assignedClass.className && s.sectionName === assignedClass.sectionName) return true;
+      return false;
+    });
 
     if (match) {
       return {
         ...assignedClass,
         className: match.className,
         sectionName: match.sectionName,
-        classDtlsId: match.mappingId || match.id,
+        classDtlsId: (assignedClass.classDtlsId && assignedClass.classDtlsId > 0) ? assignedClass.classDtlsId : (match.mappingId || match.id),
         classId: match.classId,
       };
     }

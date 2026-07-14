@@ -9,13 +9,16 @@ import { Badge } from '../../../components/ui/badge';
 import { cn } from '../../../lib/utils';
 import { BookOpen, FileText, Calendar, CheckCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 
+import { useRouter } from 'next/navigation';
+
 export default function StudentDashboard() {
   const { data: summary, isLoading, refetch } = useStudentDashboard();
+  const router = useRouter();
 
   const actions = [
-    { label: 'View Schedule', icon: Calendar, onClick: () => { }, variant: 'default' as const },
-    { label: 'Submit Assignment', icon: FileText, onClick: () => { } },
-    { label: 'Check Grades', icon: BookOpen, onClick: () => { } },
+    { label: 'View Schedule', icon: Calendar, onClick: () => router.push('/dashboard/student/announcements?tab=calendar'), variant: 'default' as const },
+    { label: 'Submit Assignment', icon: FileText, onClick: () => router.push('/dashboard/student/homework') },
+    { label: 'Check Grades', icon: BookOpen, onClick: () => router.push('/dashboard/student/exams/marks') },
   ];
 
   const getStatusIcon = (status: string) => {

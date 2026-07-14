@@ -8,6 +8,7 @@ import { TeacherManagement } from '@/components/admin/TeacherManagement';
 import { StudentManagement } from '@/components/admin/StudentManagement';
 import { SchoolManagement } from '@/components/admin/SchoolManagement';
 import { AdminOverviewTab } from '@/components/admin/AdminOverviewTab';
+import { AdminStatsTab } from '@/components/admin/AdminStatsTab';
 import { Users, GraduationCap, Building2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -42,6 +43,14 @@ function AdminDashboardContent() {
               <TabsContent key="overview" value="overview" className="space-y-8 outline-none">
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   <AdminOverviewTab summary={summary} isLoading={isLoading} actions={actions} />
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {activeTab === 'stats' && (
+              <TabsContent key="stats" value="stats" className="outline-none">
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                  <AdminStatsTab summary={summary} isLoading={isLoading} />
                 </motion.div>
               </TabsContent>
             )}

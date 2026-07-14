@@ -174,10 +174,19 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
           
           if (subQuery) {
             const params = new URLSearchParams(subQuery);
-            const allParamsMatch = Array.from(params.entries()).every(([key, value]) => 
-              searchParams.get(key) === value
-            );
+            const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+              const currentVal = searchParams?.get(key);
+              if (key === 'tab' && value === 'profile' && !currentVal) {
+                return true;
+              }
+              return currentVal === value;
+            });
             isActive = isActive && allParamsMatch;
+          } else {
+            const currentTab = searchParams?.get('tab');
+            if (currentTab && currentTab !== 'profile') {
+              isActive = false;
+            }
           }
           
           return (
@@ -335,6 +344,10 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
               className="w-full hover:bg-primary/10 flex items-center gap-3 px-4 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
               onClick={() => {
                 clearAuth();
+                document.cookie = 'auth-token=; Max-Age=0; path=/';
+                document.cookie = 'user-role=; Max-Age=0; path=/';
+                document.cookie = 'is-principal=; Max-Age=0; path=/';
+                localStorage.removeItem('auth-storage');
                 window.location.href = '/login';
               }}
             >

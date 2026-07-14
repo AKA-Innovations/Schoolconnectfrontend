@@ -238,7 +238,7 @@ export default function PrincipalDashboard() {
       )}
 
       {/* Dynamic Tab Render */}
-      <div className="space-y-6 mt-6">
+      <div className={cn("space-y-6", activeTab === 'overview' && "mt-6")}>
         {activeTab === 'overview' && (
           <OverviewTab
             isLoading={isLoading}

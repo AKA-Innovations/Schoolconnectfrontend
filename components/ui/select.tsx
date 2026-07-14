@@ -26,11 +26,12 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedLabel, setSelectedLabel] = React.useState("")
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
 
-  // Close when clicking outside
+  // Close when clicking outside the entire select container (trigger + dropdown)
   React.useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
@@ -44,7 +45,7 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
 
   return (
     <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, selectedLabel, setSelectedLabel, triggerRef }}>
-      <div className="relative inline-block w-full">{children}</div>
+      <div ref={containerRef} className="relative inline-block w-full">{children}</div>
     </SelectContext.Provider>
   )
 }

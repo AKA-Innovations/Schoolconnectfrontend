@@ -10,7 +10,7 @@ import {
   useSubjectDetails, useCreateSubjectDetail,
   useUpdateSubjectDetail, useDeleteSubjectDetail,
   useSubjectOptions, useClassSectionLists,
-  useSchoolClasses, useTimetable, timetableKeys,
+  useSchoolClasses, useTimetable, timetableKeys, usePeriodSlots,
 } from '@/hooks/useClasses';
 import { useTeacherList } from '@/hooks/useTeachers';
 import { useAuthStore } from '@/store/authStore';
@@ -24,27 +24,26 @@ import {
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
 
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
 const EMPTY_FORM = { teacherId: '', classSectionId: 0, subjectId: 0 };
 
 // Deterministic pastel chip color for subjects
 const getSubjectColor = (name: string) => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const h = Math.abs(hash) % 360;
-  return { bg: `hsl(${h},80%,96%)`, text: `hsl(${h},85%,28%)`, border: `hsl(${h},45%,83%)` };
+  return { bg: 'rgba(16, 185, 129, 0.1)', text: '#10b981', border: 'rgba(16, 185, 129, 0.2)' };
 };
 
 // Load status helpers
-const getLoadStatus = (periods: number) => {
-  if (periods > 30) return { label: 'Overallocated', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
-  if (periods > 20) return { label: 'Near Limit',    color: 'text-amber-700 bg-amber-50 border-amber-200', dot: 'bg-amber-400' };
+const getLoadStatus = (periods: number, maxLoad: number) => {
+  const nearLimit = Math.max(1, maxLoad - 10);
+  if (periods > maxLoad) return { label: 'Overallocated', color: 'text-red-700 bg-red-50 border-red-200', dot: 'bg-red-500' };
+  if (periods > nearLimit) return { label: 'Near Limit',    color: 'text-amber-700 bg-amber-50 border-amber-200', dot: 'bg-amber-400' };
   if (periods > 0)  return { label: 'Balanced',      color: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' };
   return { label: 'Unassigned', color: 'text-slate-500 bg-slate-50 border-slate-200', dot: 'bg-slate-300' };
 };
 
 export default function SubjectDetailsPage() {
   const { data: mappings = [], isLoading } = useSubjectDetails();
-  const { data: subjects = [] } = useSubjectOptions();
   const { data: classSections = [] } = useClassSectionLists();
   const { data: schoolClasses = [] } = useSchoolClasses();
 
@@ -81,13 +80,41 @@ export default function SubjectDetailsPage() {
   const [editId, setEditId]               = useState<string | number | null>(null);
   const [form, setForm]                   = useState(EMPTY_FORM);
   const [activeMenuId, setActiveMenuId]   = useState<string | number | null>(null);
+  const [selectedClass, setSelectedClass] = useState<string>('');
 
   // Drawer for pre-selecting a teacher
   const [drawerTeacherId, setDrawerTeacherId] = useState<string>('');
 
+  // Overload threshold
+  const [maxPeriods, setMaxPeriods] = useState<number>(30);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('schoolconnect_overload_threshold');
+    if (saved) {
+      const val = parseInt(saved, 10);
+      if (!isNaN(val) && val > 0) {
+        setMaxPeriods(val);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('schoolconnect_overload_threshold', String(maxPeriods));
+    }
+  }, [maxPeriods, mounted]);
+
+  const displayMaxPeriods = mounted ? maxPeriods : 30;
+
   // Bulk Assign
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkForm, setBulkForm] = useState({ teacherId: '', subjectId: 0, classIds: [] as number[] });
+
+  // Timetable modal state
+  const [timetableModalTeacher, setTimetableModalTeacher] = useState<{ id: string; name: string } | null>(null);
+  const { data: periodSlots = [] } = usePeriodSlots();
 
   // CSV import
   const [showImportCsv, setShowImportCsv] = useState(false);
@@ -95,11 +122,56 @@ export default function SubjectDetailsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
+
+  // Filter unique classes and available sections for separate dropdown selectors
+  const uniqueClasses = useMemo(() => {
+    const list: string[] = [];
+    classSections.forEach(cs => {
+      if (cs.className && !list.includes(cs.className)) {
+        list.push(cs.className);
+      }
+    });
+    return list.sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+  }, [classSections]);
+
+  const availableSections = useMemo(() => {
+    if (!selectedClass) return [];
+    return classSections.filter(cs => cs.className === selectedClass);
+  }, [classSections, selectedClass]);
 
   const createMutation = useCreateSubjectDetail();
   const updateMutation = useUpdateSubjectDetail();
   const deleteMutation = useDeleteSubjectDetail();
+
+  // Drawer Subject Fetch
+  const formClassId = useMemo(() => {
+    const selectedSection = classSections.find(cs => cs.id === form.classSectionId);
+    if (!selectedSection) return undefined;
+    if (selectedSection.classId) return selectedSection.classId;
+    const sc = schoolClasses.find(c => c.className === selectedSection.className);
+    return sc?.id;
+  }, [form.classSectionId, classSections, schoolClasses]);
+
+  const { data: subjects = [] } = useSubjectOptions(formClassId);
+
+  // Bulk Subject Fetch
+  const bulkClassId = useMemo(() => {
+    if (bulkForm.classIds.length === 0) return undefined;
+    const firstSectionId = bulkForm.classIds[0];
+    const section = classSections.find(cs => cs.id === firstSectionId);
+    if (!section) return undefined;
+    if (section.classId) return section.classId;
+    const sc = schoolClasses.find(c => c.className === section.className);
+    return sc?.id;
+  }, [bulkForm.classIds, classSections, schoolClasses]);
+
+  const { data: bulkSubjects = [] } = useSubjectOptions(bulkClassId);
 
   // ── Maps ──────────────────────────────────────────────────────────────────
   const teacherNameMap = useMemo(() => {
@@ -189,14 +261,14 @@ export default function SubjectDetailsPage() {
     const mappedIds = new Set(mappings.map(m => m.teacherId).filter(Boolean));
     const unassigned = totalTeachers - mappedIds.size;
     let overloaded = 0;
-    mappedIds.forEach(id => { if ((teacherRows.find(r => r.teacherId === id)?.weeklyLoad || 0) > 30) overloaded++; });
+    mappedIds.forEach(id => { if ((teacherRows.find(r => r.teacherId === id)?.weeklyLoad || 0) > displayMaxPeriods) overloaded++; });
     const seen = new Set<string>(); let conflicts = 0;
     mappings.forEach(m => {
       const k = `${m.teacherId}-${m.className}-${m.sectionName}-${m.subjectName}`;
       if (seen.has(k)) conflicts++; else seen.add(k);
     });
     return { totalTeachers, mapped: mappedIds.size, unassigned, overloaded, conflicts };
-  }, [teachers, mappings, teacherRows]);
+  }, [teachers, mappings, teacherRows, displayMaxPeriods]);
 
   // ── Filter teacher rows ───────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
@@ -211,8 +283,8 @@ export default function SubjectDetailsPage() {
       if (!matchSearch) return false;
 
       // load filter
-      if (filterLoad === 'balanced'   && row.weeklyLoad > 30) return false;
-      if (filterLoad === 'overloaded' && row.weeklyLoad <= 30) return false;
+      if (filterLoad === 'balanced'   && row.weeklyLoad > displayMaxPeriods) return false;
+      if (filterLoad === 'overloaded' && row.weeklyLoad <= displayMaxPeriods) return false;
       if (filterLoad === 'unassigned') return false; // unassigned teachers not in teacherRows
 
       // subject filter
@@ -223,7 +295,7 @@ export default function SubjectDetailsPage() {
 
       return true;
     });
-  }, [teacherRows, search, filterLoad, filterSubject, filterClass]);
+  }, [teacherRows, search, filterLoad, filterSubject, filterClass, displayMaxPeriods]);
 
   const paginatedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const totalPages = Math.ceil(filteredRows.length / PAGE_SIZE);
@@ -245,9 +317,9 @@ export default function SubjectDetailsPage() {
     if (dup) return { type: 'error', message: `${teacherNameMap.get(form.teacherId)} is already assigned ${subject.subjectName} in ${section.className}–${section.sectionName}.` };
     const row = teacherRows.find(r => r.teacherId === form.teacherId);
     const projectedLoad = (row?.weeklyLoad || 0) + 6;
-    if (!editId && projectedLoad > 30) return { type: 'warning', message: `${teacherNameMap.get(form.teacherId)} will be overloaded (${projectedLoad} periods/week).` };
+    if (!editId && projectedLoad > displayMaxPeriods) return { type: 'warning', message: `${teacherNameMap.get(form.teacherId)} will be overloaded (${projectedLoad} periods/week).` };
     return null;
-  }, [form, editId, mappings, classSections, subjects, teacherNameMap, teacherRows]);
+  }, [form, editId, mappings, classSections, subjects, teacherNameMap, teacherRows, displayMaxPeriods]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const buildPayload = () => {
@@ -263,10 +335,63 @@ export default function SubjectDetailsPage() {
     if (!payload || !form.teacherId || !form.subjectId) { toast.error('All fields are required'); return; }
     if (drawerConflict?.type === 'error') { toast.error('Cannot save — conflict detected'); return; }
     try {
-      if (editId) { await updateMutation.mutateAsync({ id: editId as any, data: payload }); toast.success('Mapping updated'); }
-      else        { await createMutation.mutateAsync(payload); toast.success('Mapping created'); }
+      if (editId) {
+        const entry = payload.entries[0];
+        await updateMutation.mutateAsync({
+          id: editId as any,
+          data: {
+            teacherId: entry.teacherId,
+            classId: entry.classId,
+            classSectionId: entry.classSectionId,
+            subjectId: entry.subjectId,
+          }
+        });
+        toast.success('Mapping updated');
+      }
+      else { await createMutation.mutateAsync(payload); toast.success('Mapping created'); }
       resetForm();
     } catch (err: any) { toast.error(err.response?.data?.message || 'Failed to save mapping'); }
+  };
+
+  const handleBulkSave = async () => {
+    if (!bulkForm.teacherId || !bulkForm.subjectId || bulkForm.classIds.length === 0) {
+      toast.error('All fields and at least one class are required');
+      return;
+    }
+
+    const selectedSubject = bulkSubjects.find(s => s.id === bulkForm.subjectId);
+    if (!selectedSubject) {
+      toast.error('Selected subject not found');
+      return;
+    }
+
+    const entries = [];
+    for (const classSectionId of bulkForm.classIds) {
+      const section = classSections.find(cs => cs.id === classSectionId);
+      if (section) {
+        let classId = section.classId;
+        if (!classId) {
+          const sc = schoolClasses.find(c => c.className === section.className);
+          classId = sc?.id || 0;
+        }
+        entries.push({
+          session: CURRENT_SESSION,
+          teacherId: bulkForm.teacherId,
+          classId,
+          classSectionId: section.masterSectionId,
+          subjectId: selectedSubject.id,
+        });
+      }
+    }
+
+    try {
+      await createMutation.mutateAsync({ entries });
+      toast.success(`Successfully assigned to ${entries.length} classes`);
+      setShowBulkAssign(false);
+      setBulkForm({ teacherId: '', subjectId: 0, classIds: [] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save assignments');
+    }
   };
 
   const handleDelete = async (id: string | number) => {
@@ -277,6 +402,7 @@ export default function SubjectDetailsPage() {
   const startEdit = (m: any) => {
     setEditId(m.id);
     const cs = classSections.find(c => c.className === m.className && c.sectionName === m.sectionName);
+    setSelectedClass(cs?.className || '');
     setForm({ teacherId: m.teacherId, classSectionId: cs?.id || 0, subjectId: m.subjectDtlsId || m.subjectId || 0 });
     setShowDrawer(true);
     setActiveMenuId(null);
@@ -284,6 +410,7 @@ export default function SubjectDetailsPage() {
 
   const handleDuplicate = (m: any) => {
     const cs = classSections.find(c => c.className === m.className && c.sectionName === m.sectionName);
+    setSelectedClass(cs?.className || '');
     setForm({ teacherId: m.teacherId, classSectionId: cs?.id || 0, subjectId: m.subjectDtlsId || m.subjectId || 0 });
     setEditId(null);
     setShowDrawer(true);
@@ -291,12 +418,19 @@ export default function SubjectDetailsPage() {
     toast.info('Duplicated — update if needed and save.');
   };
 
-  const resetForm = () => { setShowDrawer(false); setEditId(null); setForm(EMPTY_FORM); setDrawerTeacherId(''); };
+  const resetForm = () => {
+    setShowDrawer(false);
+    setEditId(null);
+    setForm(EMPTY_FORM);
+    setDrawerTeacherId('');
+    setSelectedClass('');
+  };
 
   const openAddForTeacher = (teacherId: string) => {
     setForm({ ...EMPTY_FORM, teacherId });
     setDrawerTeacherId(teacherId);
     setEditId(null);
+    setSelectedClass('');
     setShowDrawer(true);
   };
 
@@ -331,13 +465,13 @@ export default function SubjectDetailsPage() {
       {/* ── Quick Insights ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: 'Total Teachers', value: insights.totalTeachers, color: 'border-t-blue-500',    sub: 'Registered staff',       subColor: 'text-blue-600' },
-          { label: 'Mapped',         value: insights.mapped,        color: 'border-t-emerald-500', sub: `${Math.round((insights.mapped/(insights.totalTeachers||1))*100)}% assigned`, subColor: 'text-emerald-600' },
-          { label: 'Unassigned',     value: insights.unassigned,    color: 'border-t-amber-500',   sub: 'No active subjects',     subColor: 'text-amber-600' },
-          { label: 'Overloaded',     value: insights.overloaded,    color: 'border-t-red-500',     sub: '> 30 periods/week',      subColor: 'text-red-600' },
-          { label: 'Conflicts',      value: insights.conflicts,     color: 'border-t-purple-500',  sub: insights.conflicts > 0 ? 'Needs attention' : 'All clear', subColor: insights.conflicts > 0 ? 'text-red-500' : 'text-slate-500' },
+          { label: 'Total Teachers', value: insights.totalTeachers, hasAccent: false, color: '',    sub: 'Registered staff',       subColor: 'text-muted-foreground' },
+          { label: 'Mapped',         value: insights.mapped,        hasAccent: false, color: '', sub: `${Math.round((insights.mapped/(insights.totalTeachers||1))*100)}% assigned`, subColor: 'text-muted-foreground' },
+          { label: 'Unassigned',     value: insights.unassigned,    hasAccent: true,  color: 'border-t-amber-500',   sub: 'No active subjects',     subColor: 'text-amber-600' },
+          { label: 'Overloaded',     value: insights.overloaded,    hasAccent: true,  color: 'border-t-red-500',     sub: `> ${displayMaxPeriods} periods/week`,      subColor: 'text-red-600' },
+          { label: 'Conflicts',      value: insights.conflicts,     hasAccent: true,  color: 'border-t-purple-500',  sub: insights.conflicts > 0 ? 'Needs attention' : 'All clear', subColor: insights.conflicts > 0 ? 'text-red-500' : 'text-slate-500' },
         ].map(card => (
-          <Card key={card.label} className={`erp-card overflow-hidden border-t-4 ${card.color} shadow-xs`}>
+          <Card key={card.label} className={`erp-card overflow-hidden border-t ${card.hasAccent ? `border-t-4 ${card.color}` : 'border-t-border/50'} shadow-xs`}>
             <CardContent className="p-3.5">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{card.label}</p>
               <h3 className="text-2xl font-bold mt-0.5 text-slate-800">{card.value}</h3>
@@ -396,6 +530,22 @@ export default function SubjectDetailsPage() {
               {allSubjects.map(s => <option key={s} value={String(s)}>{s}</option>)}
             </select>
 
+            {/* Max Load input */}
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-2.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Max Load:</span>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={mounted ? maxPeriods : 30}
+                onChange={e => {
+                  const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                  setMaxPeriods(val);
+                }}
+                className="w-14 h-9 text-xs font-bold text-center rounded-xl border-slate-200 bg-white"
+              />
+            </div>
+
             {/* Result count */}
             <span className="text-xs text-slate-500 ml-auto">{filteredRows.length} teacher{filteredRows.length !== 1 ? 's' : ''}</span>
           </div>
@@ -403,10 +553,10 @@ export default function SubjectDetailsPage() {
       </Card>
 
       {/* ── Teacher-centric Table ── */}
-      <Card className="erp-card overflow-hidden shadow-xs border border-slate-100">
+      <Card className="erp-card overflow-visible shadow-xs border border-slate-100">
         <CardContent className="p-0">
           {/* Table header */}
-          <div className="grid grid-cols-[2fr_3fr_1fr_1fr_80px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
+          <div className="grid grid-cols-[2fr_3fr_1fr_1fr_80px] border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 rounded-t-2xl">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Teacher</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Assignments (Class → Subject)</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center">Weekly Periods</span>
@@ -431,7 +581,7 @@ export default function SubjectDetailsPage() {
           ) : (
             <div className="divide-y divide-slate-100">
               {paginatedRows.map(row => {
-                const load   = getLoadStatus(row.weeklyLoad);
+                const load   = getLoadStatus(row.weeklyLoad, displayMaxPeriods);
                 const isOpen = expandedTeacher === row.teacherId;
 
                 return (
@@ -446,7 +596,7 @@ export default function SubjectDetailsPage() {
                         {isOpen
                           ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
                           : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />}
-                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold shrink-0">
                           {row.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
@@ -509,7 +659,7 @@ export default function SubjectDetailsPage() {
                               <Plus className="h-3 w-3 text-slate-400" /> Add Assignment
                             </button>
                             <div className="border-t border-slate-100 my-0.5" />
-                            <button onClick={() => { setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                            <button onClick={() => { setTimetableModalTeacher({ id: row.teacherId, name: row.name }); setActiveMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
                               <Calendar className="h-3 w-3 text-slate-400" /> View Timetable
                             </button>
                           </div>
@@ -520,7 +670,7 @@ export default function SubjectDetailsPage() {
                     {/* ── Expanded detail rows ── */}
                     {isOpen && (
                       <div className="border-t border-slate-100 bg-slate-50/30">
-                        <div className="overflow-x-auto pl-12">
+                        <div className="overflow-visible pl-12">
                           <table className="w-full">
                             <thead>
                               <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
@@ -696,18 +846,42 @@ export default function SubjectDetailsPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class / Section *</Label>
-                  <select
-                    value={form.classSectionId ? String(form.classSectionId) : ''}
-                    onChange={e => setForm(f => ({ ...f, classSectionId: Number(e.target.value) }))}
-                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  >
-                    <option value="">Select class section</option>
-                    {classSections.map(cs => (
-                      <option key={cs.id} value={String(cs.id)}>{cs.className} — {cs.sectionName}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Class *</Label>
+                    <select
+                      value={selectedClass}
+                      onChange={e => {
+                        const nextClass = e.target.value;
+                        setSelectedClass(nextClass);
+                        setForm(f => ({ ...f, classSectionId: 0, subjectId: 0 }));
+                      }}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option value="">Select class</option>
+                      {uniqueClasses.map(c => (
+                        <option key={c} value={c}>Class {c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Section *</Label>
+                    <select
+                      value={form.classSectionId ? String(form.classSectionId) : ''}
+                      onChange={e => {
+                        const nextSectionId = Number(e.target.value);
+                        setForm(f => ({ ...f, classSectionId: nextSectionId, subjectId: 0 }));
+                      }}
+                      disabled={!selectedClass}
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">{selectedClass ? 'Select section' : 'Select class first'}</option>
+                      {availableSections.map(cs => (
+                        <option key={cs.id} value={String(cs.id)}>{cs.sectionName}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -773,17 +947,6 @@ export default function SubjectDetailsPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-xs font-bold text-slate-500">Subject</Label>
-                <select
-                  value={bulkForm.subjectId ? String(bulkForm.subjectId) : ''}
-                  onChange={e => setBulkForm(f => ({ ...f, subjectId: Number(e.target.value) }))}
-                  className="mt-1 w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="">Select subject</option>
-                  {subjects.map(s => <option key={s.id} value={String(s.id)}>{s.subjectName}</option>)}
-                </select>
-              </div>
-              <div>
                 <Label className="text-xs font-bold text-slate-500">Classes (multi-select)</Label>
                 <div className="mt-1 grid grid-cols-2 gap-1.5 border border-slate-200 rounded-xl p-3 max-h-36 overflow-y-auto">
                   {classSections.map(cs => {
@@ -799,11 +962,27 @@ export default function SubjectDetailsPage() {
                   })}
                 </div>
               </div>
+              <div>
+                <Label className="text-xs font-bold text-slate-500">Subject</Label>
+                <select
+                  value={bulkForm.subjectId ? String(bulkForm.subjectId) : ''}
+                  onChange={e => setBulkForm(f => ({ ...f, subjectId: Number(e.target.value) }))}
+                  disabled={bulkForm.classIds.length === 0}
+                  className="mt-1 w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">{bulkForm.classIds.length > 0 ? 'Select subject' : 'Select class section(s) first'}</option>
+                  {bulkSubjects.map(s => <option key={s.id} value={String(s.id)}>{s.subjectName}</option>)}
+                </select>
+              </div>
             </div>
             <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
               <Button variant="outline" onClick={() => setShowBulkAssign(false)} className="rounded-xl">Cancel</Button>
-              <Button onClick={() => { toast.success(`Assigned to ${bulkForm.classIds.length} classes`); setShowBulkAssign(false); setBulkForm({ teacherId: '', subjectId: 0, classIds: [] }); }} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white">
-                Assign to Selected
+              <Button
+                onClick={handleBulkSave}
+                disabled={createMutation.isPending || bulkForm.classIds.length === 0}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+              >
+                {createMutation.isPending ? 'Assigning...' : 'Assign to Selected'}
               </Button>
             </div>
           </div>
@@ -825,13 +1004,82 @@ export default function SubjectDetailsPage() {
               <FileText className="h-10 w-10 text-slate-300" />
               <span className="text-sm font-semibold text-slate-600">Drop CSV here or click to browse</span>
               {csvFile && <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />{csvFile.name}</span>}
-              <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={e => setCsvFile(e.target.files?.[0] || null)} />
             </label>
             <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
               <Button variant="outline" onClick={() => setShowImportCsv(false)} className="rounded-xl">Cancel</Button>
               <Button onClick={() => { if (!csvFile) { toast.error('Select a file first'); return; } toast.success('Import complete'); setShowImportCsv(false); setCsvFile(null); }} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white">
                 Upload & Import
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TEACHER TIMETABLE MODAL
+      ══════════════════════════════════════════════════════════════════════ */}
+      {timetableModalTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setTimetableModalTeacher(null)} />
+          <div className="relative z-10 w-full max-w-5xl bg-white p-6 rounded-2xl shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Weekly Timetable</h3>
+                <p className="text-xs text-slate-500">Scheduled classes for {timetableModalTeacher.name}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setTimetableModalTeacher(null)} className="h-7 w-7 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Timetable Grid */}
+            <div className="overflow-x-auto max-h-[60vh]">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="p-3 text-left font-bold text-slate-600 border border-slate-200">Day</th>
+                    {[...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber).map(slot => (
+                      <th key={slot.id} className="p-3 text-center font-bold text-slate-600 border border-slate-200 min-w-[120px]">
+                        Period {slot.periodNumber}
+                        <div className="text-[9px] font-normal text-slate-400 mt-0.5">{slot.startTime} - {slot.endTime}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {DAYS.map(day => {
+                    const dayEntries = timetableEntries.filter(e => {
+                      const isTeacherMatch = (e.teacherId === timetableModalTeacher.id) ||
+                        (e.teacherName && e.teacherName.toLowerCase() === timetableModalTeacher.name.toLowerCase());
+                      return isTeacherMatch && e.dayOfWeek === day;
+                    });
+
+                    return (
+                      <tr key={day} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-bold text-slate-700 bg-slate-50/30 border border-slate-200">{day}</td>
+                        {[...periodSlots].sort((a, b) => a.periodNumber - b.periodNumber).map(slot => {
+                          const entry = dayEntries.find(e => Number(e.periodId) === Number(slot.id) || Number(e.periodNumber) === Number(slot.periodNumber));
+
+                          return (
+                            <td key={slot.id} className="p-3 text-center border border-slate-200">
+                              {entry ? (
+                                <div className="space-y-1">
+                                  <div className="font-bold text-emerald-600">{entry.subjectName}</div>
+                                  <div className="text-[10px] text-slate-500 font-semibold">
+                                    Class {entry.className} - {entry.sectionName}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300 font-normal">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

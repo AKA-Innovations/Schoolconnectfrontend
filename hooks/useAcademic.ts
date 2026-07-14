@@ -180,10 +180,16 @@ export function useChapterProgress(chapterId?: number | string, classSectionId?:
 // ─── Homework ─────────────────────────────────────────────────────────────────
 
 export function useHomeworks(classNameOrParams?: string | any) {
+  const queryKey = typeof classNameOrParams === 'string'
+    ? academicKeys.homeworks(classNameOrParams)
+    : classNameOrParams
+      ? ['academic', 'homeworks', classNameOrParams]
+      : ['academic', 'homeworks'];
   return useQuery({
-    queryKey: academicKeys.homeworks(typeof classNameOrParams === 'string' ? classNameOrParams : classNameOrParams?.className),
+    queryKey,
     queryFn: () => academicService.getHomeworks(classNameOrParams),
     placeholderData: (prev) => prev,
+    enabled: classNameOrParams === undefined || !!classNameOrParams,
   });
 }
 
@@ -307,10 +313,16 @@ export function useDeleteSubmission(homeworkId: number) {
 // ─── Classwork ────────────────────────────────────────────────────────────────
 
 export function useClassworks(classIdOrParams?: string | any) {
+  const queryKey = typeof classIdOrParams === 'string'
+    ? academicKeys.classworks(classIdOrParams)
+    : classIdOrParams
+      ? ['academic', 'classworks', classIdOrParams]
+      : ['academic', 'classworks'];
   return useQuery({
-    queryKey: academicKeys.classworks(typeof classIdOrParams === 'string' ? classIdOrParams : classIdOrParams?.classId),
+    queryKey,
     queryFn: () => academicService.getClassworks(classIdOrParams),
     placeholderData: (prev) => prev,
+    enabled: classIdOrParams === undefined || !!classIdOrParams,
   });
 }
 

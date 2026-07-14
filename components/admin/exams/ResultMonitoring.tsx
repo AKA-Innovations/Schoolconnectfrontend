@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
 import { useExams, useClassResults } from '@/services/exam/queries';
+import { useQuery } from '@tanstack/react-query';
+import { examService } from '@/services/exam/service';
 import {
   useGenerateResults,
   usePublishResults,
@@ -14,7 +16,7 @@ import {
   useUpdateTeacherRemarks,
   useUpdatePrincipalRemarks,
 } from '@/services/exam/mutations';
-import { useSchoolClasses, useSchoolSections, useSubjectDetails } from '@/hooks/useClasses';
+import { useSchoolClasses, useSchoolSections, useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { Eye, CheckCircle2, AlertCircle, RefreshCw, Send, Check, Play, Globe, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -29,7 +31,21 @@ export function ResultMonitoring({ session }: Props) {
   const isPowerUser = userRole === 'principal' || userRole === 'school_admin' || !!user?.isPrincipal;
 
   const { data: exams = [] } = useExams(session);
+
+  // Fetch all schedules for the session to filter scheduled exams
+  const { data: allSessionSchedules = [] } = useQuery<any[]>({
+    queryKey: ['all-session-schedules', session],
+    queryFn: () => examService.getSchedules({ session }),
+  });
+
+  const scheduledExams = useMemo(() => {
+    const scheduledExamIds = new Set(allSessionSchedules.map((s: any) => s.examId));
+    return exams.filter((e: any) => scheduledExamIds.has(e.id));
+  }, [exams, allSessionSchedules]);
   const { data: schoolClasses = [] } = useSchoolClasses();
+  const { data: classSectionLists = [] } = useClassSectionLists();
+
+  const isClassTeacherOnly = !isPowerUser && (!!user?.isClassTeacher || !!user?.classTeacherClass);
 
   // Fetch teacher's assigned classes and subjects (or all if principal/admin)
   const { data: mySubjectDetailsRaw } = useSubjectDetails(
@@ -41,6 +57,22 @@ export function ResultMonitoring({ session }: Props) {
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
   const [selectedSectionId, setSelectedSectionId] = useState<number | ''>('');
+
+  // Auto-configure class & section for class teacher
+  React.useEffect(() => {
+    if (isClassTeacherOnly && user?.classTeacherClass && classSectionLists.length > 0) {
+      const assigned = user.classTeacherClass as any;
+      const match = classSectionLists.find(
+        (s: any) =>
+          s.className === assigned.className &&
+          s.sectionName === assigned.sectionName
+      );
+      if (match) {
+        setSelectedClassId(match.classId);
+        setSelectedSectionId(match.id);
+      }
+    }
+  }, [isClassTeacherOnly, user, classSectionLists]);
 
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
@@ -125,10 +157,45 @@ export function ResultMonitoring({ session }: Props) {
   const handleGenerateResults = async () => {
     if (!selectedExamId || !selectedClassId || !selectedSectionId) return;
 
+    // Find the currently selected exam detail
+    const currentExam = exams.find((e: any) => e.id === Number(selectedExamId));
+    let examIdsPayload = [Number(selectedExamId)];
+
+    if (currentExam) {
+      const nameLower = currentExam.examName.toLowerCase();
+      
+      // Auto-aggregation logic matching Step 3 of Backend Academic Structure:
+      if (nameLower.includes('half yearly') || nameLower.includes('semester 1') || nameLower.includes('sem 1') || nameLower.includes('hy')) {
+        // Semester 1 aggregates: Half Yearly (Primary, first) + UT1 + UT2
+        const ut1 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 1') || e.examName.toLowerCase().includes('ut1') || e.examName.toLowerCase().includes('ut 1'));
+        const ut2 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 2') || e.examName.toLowerCase().includes('ut2') || e.examName.toLowerCase().includes('ut 2'));
+        
+        const list = [Number(selectedExamId)];
+        if (ut1) list.push(ut1.id);
+        if (ut2) list.push(ut2.id);
+        examIdsPayload = list;
+      } else if (nameLower.includes('final') || nameLower.includes('semester 2') || nameLower.includes('sem 2') || nameLower.includes('fi') || nameLower.includes('annual')) {
+        // Semester 2 & Overall Academic Year aggregates: Final Exam (Primary) + UT1 + UT2 + HY + UT3 + UT4
+        const ut1 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 1') || e.examName.toLowerCase().includes('ut1') || e.examName.toLowerCase().includes('ut 1'));
+        const ut2 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 2') || e.examName.toLowerCase().includes('ut2') || e.examName.toLowerCase().includes('ut 2'));
+        const hy = exams.find((e: any) => e.examName.toLowerCase().includes('half yearly') || e.examName.toLowerCase().includes('hy') || e.examName.toLowerCase().includes('semester 1') || e.examName.toLowerCase().includes('sem 1'));
+        const ut3 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 3') || e.examName.toLowerCase().includes('ut3') || e.examName.toLowerCase().includes('ut 3'));
+        const ut4 = exams.find((e: any) => e.examName.toLowerCase().includes('unit test 4') || e.examName.toLowerCase().includes('ut4') || e.examName.toLowerCase().includes('ut 4'));
+
+        const list = [Number(selectedExamId)];
+        if (ut1) list.push(ut1.id);
+        if (ut2) list.push(ut2.id);
+        if (hy) list.push(hy.id);
+        if (ut3) list.push(ut3.id);
+        if (ut4) list.push(ut4.id);
+        examIdsPayload = list;
+      }
+    }
+
     try {
       await generateMutation.mutateAsync({
         session,
-        examIds: [Number(selectedExamId)],
+        examIds: examIdsPayload,
         classId: Number(selectedClassId),
         classSectionId: Number(selectedSectionId),
       });
@@ -183,36 +250,46 @@ export function ResultMonitoring({ session }: Props) {
             className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Select Exam</option>
-            {exams.map((e: any) => (
+            {scheduledExams.map((e: any) => (
               <option key={e.id} value={e.id}>{e.examName}</option>
             ))}
           </select>
 
-          <select
-            value={selectedClassId}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value ? Number(e.target.value) : '');
-              setSelectedSectionId('');
-            }}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="">Select Class</option>
-            {filteredClasses.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.className}</option>
-            ))}
-          </select>
+          {!isClassTeacherOnly ? (
+            <>
+              <select
+                value={selectedClassId}
+                onChange={(e) => {
+                  setSelectedClassId(e.target.value ? Number(e.target.value) : '');
+                  setSelectedSectionId('');
+                }}
+                className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">Select Class</option>
+                {filteredClasses.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.className}</option>
+                ))}
+              </select>
 
-          <select
-            value={selectedSectionId}
-            onChange={(e) => setSelectedSectionId(e.target.value ? Number(e.target.value) : '')}
-            disabled={!selectedClassId}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="">Select Section</option>
-            {filteredSections.map((s: any) => (
-              <option key={s.id} value={s.id}>{s.sectionName}</option>
-            ))}
-          </select>
+              <select
+                value={selectedSectionId}
+                onChange={(e) => setSelectedSectionId(e.target.value ? Number(e.target.value) : '')}
+                disabled={!selectedClassId}
+                className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">Select Section</option>
+                {filteredSections.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.sectionName}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            user?.classTeacherClass && (
+              <Badge variant="outline" className="h-10 px-4 rounded-xl border-dashed border-primary/30 bg-primary/5 text-primary text-xs font-bold flex items-center gap-1.5 shrink-0">
+                My Class: {user.classTeacherClass.className} - {user.classTeacherClass.sectionName}
+              </Badge>
+            )
+          )}
 
           <Button
             variant="outline"

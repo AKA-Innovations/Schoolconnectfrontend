@@ -132,11 +132,12 @@ export interface SubjectOption {
   subjectName: string;
   subjectCode: string;
   session?: string;
+  classId?: number;
 }
 
 export interface CreateSubjectBulkPayload {
   session: string;
-  subjects: { subjectName: string; subjectCode: string }[];
+  subjects: { subjectName: string; subjectCode: string; classId: number }[];
 }
 
 // ─── Legacy/Old mappings (keep for compatibility if needed) ──────────────────

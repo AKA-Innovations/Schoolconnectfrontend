@@ -18,12 +18,17 @@ import {
   Save, RefreshCw, Award, User, BookOpen, Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
+import { StructureManagement } from '@/components/admin/school/StructureManagement';
+import PeriodSlotsPage from '@/app/dashboard/admin/class/period-slots/page';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SchoolProfilePage() {
   const { schoolId } = useAuthStore();
   const { data: school, isLoading, isFetching, refetch } = useSchool(schoolId);
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'profile';
 
   if (isLoading) return <PageSkeleton />;
 
@@ -36,6 +41,26 @@ export default function SchoolProfilePage() {
         <Button onClick={() => refetch()} variant="outline" className="rounded-xl">
           <RefreshCw className="mr-2 h-4 w-4" /> Retry
         </Button>
+      </div>
+    );
+  }
+
+  if (activeTab === 'structure') {
+    return (
+      <div className="bg-transparent py-2">
+        <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
+          <StructureManagement />
+        </div>
+      </div>
+    );
+  }
+
+  if (activeTab === 'periods') {
+    return (
+      <div className="bg-transparent py-2">
+        <div className="max-w-7xl mx-auto px-6 py-8 space-y-8 animate-in fade-in duration-500">
+          <PeriodSlotsPage />
+        </div>
       </div>
     );
   }

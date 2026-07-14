@@ -110,19 +110,9 @@ export function ClassSectionExplorer() {
                               Section {section.sectionName}
                             </h4>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {section.className} – {section.sectionName}
+                              Class {section.className} &mdash; Section {section.sectionName}
                             </p>
                           </div>
-                          <Badge className="bg-blue-500/10 text-blue-600 border-0">
-                            Master
-                          </Badge>
-                        </div>
-
-                        {/* Section Details */}
-                        <div className="space-y-3 pt-2 border-t border-border/50">
-                          <p className="text-xs text-muted-foreground italic">
-                            This is a master section. Use Classes Overview to configure limits and teachers.
-                          </p>
                         </div>
                       </div>
                     </CardContent>

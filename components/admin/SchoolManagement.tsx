@@ -8,6 +8,7 @@ import { useSchool } from '@/hooks/useSchool';
 import { useAuthStore } from '@/store/authStore';
 import { Building2, MapPin, Mail, Phone, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { SchoolImageSection } from '@/components/admin/school/SchoolImageSection';
 import { SchoolDetailsForm } from '@/components/admin/school/SchoolDetailsForm';
 import { ContactForm } from '@/components/admin/school/ContactForm';
@@ -18,7 +19,22 @@ import { StructureManagement } from '@/components/admin/school/StructureManageme
 export function SchoolManagement() {
   const { schoolId, user } = useAuthStore();
   const { data: school, isLoading, isFetching, refetch } = useSchool(schoolId);
-  const [activeTab, setActiveTab] = useState('school');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'school');
+
+  React.useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    router.push(`/dashboard/admin/school?tab=${val}`);
+  };
 
   if (isLoading) {
     return (
@@ -81,7 +97,7 @@ export function SchoolManagement() {
       </Card>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
           {[
             { id: 'school',  label: 'School Details' },

@@ -4,7 +4,7 @@ import {
   BookOpen, FileText, LayoutDashboard, Layers,
   ClipboardList, ChevronLeft, ChevronRight, LogOut,
   Sparkles, Building2, UserCog, Grid3X3, Users2, Menu,
-  Clock, Compass, Shield, LucideIcon, Megaphone
+  Clock, Compass, Shield, LucideIcon, Megaphone, CalendarClock
 } from 'lucide-react';
 import { Role } from '../types/roles';
 
@@ -56,18 +56,29 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       href: '/dashboard/admin/class/dashboard', 
       icon: BookOpen,
       subLinks: [
-        { name: 'Dashboard', href: '/dashboard/admin/class/dashboard' },
+        { name: 'Capacity Management', href: '/dashboard/admin/class/dashboard' },
         { name: 'Subjects', href: '/dashboard/admin/class/subjects' },
         { name: 'Mapping', href: '/dashboard/admin/class/subject-mapping' },
-        { name: 'Periods', href: '/dashboard/admin/class/period-slots' },
         { name: 'Timetable', href: '/dashboard/admin/class/timetable' },
         { name: 'Class Teachers', href: '/dashboard/admin/class/teachers' },
+        { name: 'Student Roster', href: '/dashboard/admin/class/students' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/class/teacher-attendance' },
       ]
     },
     { 
       name: 'Attendance', 
       href: '/dashboard/admin/attendance', 
       icon: ClipboardCheck,
+    },
+    {
+      name: 'Leave & Subs',
+      href: '/dashboard/admin/teacher-leave?tab=requests',
+      icon: CalendarClock,
+      subLinks: [
+        { name: 'Leave Requests', href: '/dashboard/admin/teacher-leave?tab=requests' },
+        { name: 'Substitutions', href: '/dashboard/admin/teacher-leave?tab=substitutes' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/teacher-leave?tab=attendance' },
+      ]
     },
     { 
       name: 'Academic Module', 
@@ -101,6 +112,8 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       icon: Building2,
       subLinks: [
         { name: 'Profile', href: '/dashboard/admin/school' },
+        { name: 'School Structure', href: '/dashboard/admin/school?tab=structure' },
+        { name: 'Periods', href: '/dashboard/admin/school?tab=periods' },
         { name: 'Onboard Student', href: '/dashboard/admin/student/register' },
       ]
     },
@@ -167,6 +180,16 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       ]
     },
     {
+      name: 'Leave & Subs',
+      href: '/dashboard/admin/teacher-leave?tab=requests',
+      icon: CalendarClock,
+      subLinks: [
+        { name: 'Leave Requests', href: '/dashboard/admin/teacher-leave?tab=requests' },
+        { name: 'Substitutions', href: '/dashboard/admin/teacher-leave?tab=substitutes' },
+        { name: 'Teacher Attendance', href: '/dashboard/admin/teacher-leave?tab=attendance' },
+      ]
+    },
+    {
       name: 'Announcements',
       href: '/dashboard/principal/announcements?tab=notices',
       icon: Megaphone,
@@ -223,7 +246,7 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
       subLinks: [
         { name: 'Marks Entry',   href: '/dashboard/teacher/exams/result-entry' },
         { name: 'My Schedules',  href: '/dashboard/teacher/exams/schedules' },
-        { name: 'Class Results', href: '/dashboard/teacher/exams/results' },
+        { name: 'Class Results', href: '/dashboard/teacher/exams/results', requiresTeacherRole: 'isClassTeacher' },
       ]
     },
     { 
@@ -236,6 +259,11 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
         { name: 'Progress', href: '/dashboard/teacher/academic?tab=progress' },
         { name: 'Materials', href: '/dashboard/teacher/academic?tab=materials' },
       ]
+    },
+    {
+      name: 'Leave',
+      href: '/dashboard/teacher/leave',
+      icon: CalendarClock,
     },
     { name: 'Profile', href: '/dashboard/teacher/profile', icon: UserCog },
     {
@@ -285,6 +313,19 @@ export const baseSidebarLinks: Record<Role, SidebarLink[]> = {
     },
   ],
   student: [
+    {
+      name: 'Dashboard',
+      href: '/dashboard/student',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Academics',
+      href: '/dashboard/student/homework',
+      icon: BookOpen,
+      subLinks: [
+        { name: 'Homework', href: '/dashboard/student/homework' },
+      ]
+    },
     { 
       name: 'Exams', 
       href: '/dashboard/student/exams/schedule', 
@@ -353,8 +394,19 @@ export const getSidebarLinks = (role: Role | null, teacherRoles: any): SidebarLi
   }
   
   const base = baseSidebarLinks[role] || [];
-  return base.filter((link) => {
-    if (!link.requiresTeacherRole) return true;
-    return teacherRoles[link.requiresTeacherRole];
-  });
+  return base
+    .filter((link) => {
+      if (!link.requiresTeacherRole) return true;
+      return teacherRoles[link.requiresTeacherRole];
+    })
+    .map((link) => {
+      if (!link.subLinks) return link;
+      return {
+        ...link,
+        subLinks: link.subLinks.filter(sub => {
+          if (!sub.requiresTeacherRole) return true;
+          return teacherRoles[sub.requiresTeacherRole];
+        })
+      };
+    });
 };

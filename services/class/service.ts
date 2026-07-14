@@ -223,10 +223,15 @@ export const classService = {
 
   // ─── Subject Master (subject-dtls) ─────────────────────────────────────────
 
-  /** Returns all subjects (session-global, not class-scoped) */
-  getSubjectOptions: async (schoolId?: string, searchText?: string): Promise<SubjectOption[]> => {
+  /** Returns all subjects filtered by class & session */
+  getSubjectOptions: async (schoolId?: string, classId?: number, session?: string, searchText?: string): Promise<SubjectOption[]> => {
     const res = await api.get(API_ENDPOINTS.CLASS.SUBJECT_DTLS, {
-      params: { schoolId, searchText },
+      params: { 
+        schoolId, 
+        classId, 
+        session, 
+        searchText: searchText || '' 
+      },
     });
     const raw = res.data;
     if (Array.isArray(raw)) return raw;
@@ -290,7 +295,7 @@ export const classService = {
   },
 
   deleteSubjectDetail: async (id: number): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.CLASS_SUBJECT_DTLS_BY_ID(id));
+    await api.delete(API_ENDPOINTS.CLASS.SUBJECT_DTLS_BY_ID(id));
   },
 
   getStudentSubjectDetails: async (): Promise<SubjectDetail[]> => {
@@ -312,7 +317,7 @@ export const classService = {
   },
 
   createPeriodSlot: async (data: CreatePeriodSlotPayload): Promise<PeriodSlot> => {
-    const res = await api.post(API_ENDPOINTS.CLASS.PERIOD_SLOTS, data);
+    const res = await api.post(API_ENDPOINTS.CLASS.PERIOD_SLOTS, [data]);
     return res.data;
   },
 
@@ -354,7 +359,8 @@ export const classService = {
   },
 
   deleteTimetableEntry: async (id: number | string): Promise<void> => {
-    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(id as any));
+    const numericId = Number(id);
+    await api.delete(API_ENDPOINTS.CLASS.TIMETABLE_BY_ID(numericId));
   },
 
   fetchTimetable: async (params: any): Promise<TimetableEntry[]> => {
@@ -417,5 +423,17 @@ export const classService = {
 
   deleteSchoolClass: async (id: number): Promise<void> => {
     await api.delete(API_ENDPOINTS.SCHOOL.CLASS_DELETE(id));
+  },
+
+  checkTimetableClash: async (params: {
+    teacherId: string;
+    dayOfWeek: string;
+    periodId: number;
+    session?: string;
+    schoolId?: string;
+    excludeTimetableId?: number;
+  }): Promise<any> => {
+    const res = await api.get(API_ENDPOINTS.CLASS.TIMETABLE_CHECK_CLASH, { params });
+    return res.data;
   },
 };

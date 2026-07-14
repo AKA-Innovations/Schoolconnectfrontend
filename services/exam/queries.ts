@@ -165,7 +165,7 @@ export const useClassOverview = (query: AnalyticsQueryDto) => {
   return useQuery({
     queryKey: examKeys.classOverview(query),
     queryFn: () => examService.getClassOverview(query),
-    enabled: !!query.session,
+    enabled: !!query.session && !!query.examId && !!query.classId && !!query.classSectionId,
   });
 };
 
@@ -173,7 +173,7 @@ export const useSubjectAnalysis = (query: AnalyticsQueryDto) => {
   return useQuery({
     queryKey: examKeys.subjectAnalysis(query),
     queryFn: () => examService.getSubjectAnalysis(query),
-    enabled: !!query.session,
+    enabled: !!query.session && !!query.examId && !!query.classId && !!query.classSectionId && !!query.subjectId,
   });
 };
 
@@ -181,6 +181,6 @@ export const useToppers = (query: AnalyticsQueryDto) => {
   return useQuery({
     queryKey: examKeys.toppers(query),
     queryFn: () => examService.getToppers(query),
-    enabled: !!query.session,
+    enabled: !!query.session && !!query.examId && !!query.classId && !!query.classSectionId,
   });
 };

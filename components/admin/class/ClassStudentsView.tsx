@@ -53,17 +53,20 @@ export function ClassStudentsView() {
     (s: any) => s.className === selectedClass && s.sectionName === selectedSection
   );
 
-  // Fetch students for selected section, up to 200
-  const { data: studentData, isLoading: loadingStudents } = useStudentList({
-    classSectionId: selSectionRecord?.id,
-    limit: 200,
-  });
+  // Only fetch when BOTH class AND section are selected.
+  // The backend student/attendance APIs reject className as a query param (400).
+  const canFetch = !!selectedClass && !!selectedSection && !!selSectionRecord?.masterSectionId;
 
-  // Fetch today's attendance for the selected section
-  const { data: rawAttendance, isLoading: loadingAttendance } = useFilterAttendance({
-    classSectionId: selSectionRecord?.id,
-    date: selectedClass ? today : undefined,
-  });
+  // Student fetch — filtered by masterSectionId only
+  const { data: studentData, isLoading: loadingStudents } = useStudentList(
+    { classSectionId: selSectionRecord?.masterSectionId, limit: 200 },
+    { enabled: canFetch }
+  );
+
+  // Attendance fetch — filtered by masterSectionId + today
+  const { data: rawAttendance, isLoading: loadingAttendance } = useFilterAttendance(
+    { classSectionId: selSectionRecord?.masterSectionId, date: today },
+  );
 
   const attendanceRecords: AttendanceRecord[] = Array.isArray(rawAttendance) ? rawAttendance : [];
 
@@ -121,18 +124,11 @@ export function ClassStudentsView() {
   const clearFilters = () => { setSearch(''); setAttendanceFilter('All'); setGenderFilter(''); };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Class Students</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Section-wise student list with today&apos;s attendance ({today})
-        </p>
-      </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
 
       {/* Class / Section pickers */}
       <Card className="erp-card">
-        <CardContent className="p-6 flex flex-wrap gap-4 items-end">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-end">
           <div className="flex flex-col gap-1.5 min-w-45">
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Class</label>
             <select
@@ -146,7 +142,7 @@ export function ClassStudentsView() {
             </select>
           </div>
           <div className="flex flex-col gap-1.5 min-w-40">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section (optional)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section</label>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
@@ -158,7 +154,7 @@ export function ClassStudentsView() {
             </select>
           </div>
           {selectedClass && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold mt-5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold h-10">
               <CalendarCheck2 className="h-4 w-4 opacity-60" />
               Attendance date: {today}
             </div>
@@ -250,9 +246,15 @@ export function ClassStudentsView() {
 
       {/* Content */}
       {!selectedClass ? (
-        <div className="py-24 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+        <div className="py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
           <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-20" />
           <p className="text-[11px] font-bold uppercase tracking-widest">Select a class to view students</p>
+        </div>
+      ) : !selectedSection ? (
+        <div className="py-12 text-center text-muted-foreground/40 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+          <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-[11px] font-bold uppercase tracking-widest">Select a section to load students</p>
+          <p className="text-xs text-muted-foreground/30 mt-2">{sectionsForClass.length} section{sectionsForClass.length !== 1 ? 's' : ''} available for Class {selectedClass}</p>
         </div>
       ) : isLoading ? (
         <div className="grid grid-cols-1 gap-6">

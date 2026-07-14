@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTeacherDashboard } from '../../../hooks/useTeacherDashboard';
-import { useFetchTimetable, useSubjectDetails, usePeriodSlots } from '../../../hooks/useClasses';
+import { useFetchTimetable, useSubjectDetails, usePeriodSlots, useClassSectionLists } from '../../../hooks/useClasses';
+import { useSubstitutePeriods, useTeacherAttendance, useLeaveList } from '../../../hooks/useTeacherLeave';
 import { StatsRow } from '../../../components/dashboard/StatsRow';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../components/ui/card';
@@ -50,6 +51,22 @@ export default function TeacherDashboard() {
   });
 
   const { data: periodSlots = [] } = usePeriodSlots();
+
+  // Fetch today's substitute periods, classes and subjects
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const { data: substitutePeriods = [] } = useSubstitutePeriods(todayStr);
+  const { data: classSections = [] } = useClassSectionLists();
+
+  // Fetch teacher's monthly attendance and leave lists for the leave prompts
+  const now = useMemo(() => new Date(), []);
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const { data: attendanceRecords = [] } = useTeacherAttendance(user?.id, currentYear, currentMonth);
+  const { data: myLeaves = [] } = useLeaveList({ teacherId: user?.id });
 
   // Fetch today's events
   const [todayEvents, setTodayEvents] = useState<any[]>([]);
@@ -105,9 +122,35 @@ export default function TeacherDashboard() {
     return m;
   }, [periodSlots]);
 
+  // Map substitute periods to timetable entry structure
+  const mappedSubstitutes = useMemo(() => {
+    return substitutePeriods
+      .filter((p) => p.substituteTeacherId === user?.id && p.status === 'ASSIGNED')
+      .map((p) => {
+        const csMatch = classSections.find(cs => (cs.masterSectionId || cs.id) === p.classSectionId);
+        const subjMatch = subjectDetails.find(sd => Number(sd.subjectDtlsId) === p.subjectId);
+        const slot = periodSlots.find(ps => ps.id === p.periodId);
+        
+        return {
+          id: `sub-${p.id}`,
+          classSubjectId: String(p.subjectId),
+          classSectionId: p.classSectionId,
+          subjectDtlsId: p.subjectId,
+          periodId: p.periodId,
+          periodNumber: slot?.periodNumber || p.periodId,
+          startTime: slot?.startTime || '00:00 AM',
+          endTime: slot?.endTime || '00:00 AM',
+          className: csMatch?.className || 'Class',
+          sectionName: csMatch?.sectionName || '',
+          subjectName: subjMatch?.subjectName || `Subject #${p.subjectId}`,
+          isSubstitute: true,
+        };
+      });
+  }, [substitutePeriods, user, classSections, subjectDetails, periodSlots]);
+
   const timetable = useMemo(() => {
     const entries = Array.isArray(rawTimetable) ? rawTimetable : [];
-    return entries.map(e => {
+    const normalizedRegular = entries.map(e => {
       let classSubjectId = e.classSubjectId;
       let classSectionId = 0;
       let subjectDtlsId = 0;
@@ -149,8 +192,10 @@ export default function TeacherDashboard() {
       }
 
       return { ...e, classSubjectId, classSectionId, subjectDtlsId, periodNumber, startTime, endTime };
-    }).sort((a, b) => (a.periodNumber || 0) - (b.periodNumber || 0));
-  }, [rawTimetable, subjectDetails, periodSlotMap, periodSlots]);
+    });
+
+    return [...normalizedRegular, ...mappedSubstitutes].sort((a, b) => (a.periodNumber || 0) - (b.periodNumber || 0));
+  }, [rawTimetable, subjectDetails, periodSlotMap, periodSlots, mappedSubstitutes]);
 
   // Combine timetable entries with timed events
   const combinedTimeline = useMemo(() => {
@@ -230,7 +275,7 @@ export default function TeacherDashboard() {
       return hours * 60 + minutes;
     };
 
-    const upcoming = timetable.find((item) => parseTimeToMinutes(item.startTime) > currentMinutes);
+    const upcoming = timetable.find((item) => parseTimeToMinutes(item.startTime || '') > currentMinutes);
     return upcoming || null;
   }, [timetable]);
 
@@ -245,6 +290,32 @@ export default function TeacherDashboard() {
       { label: "Assignments Pending", value: assignmentsPending, trend: 3, trendType: 'up' as const, iconName: "FileText" },
     ];
   }, [timetable]);
+
+  const promptLeaves = useMemo(() => {
+    const unresolved: { date: string; status: string }[] = [];
+    
+    attendanceRecords.forEach((rec) => {
+      if (rec.status === 'ABSENT' || rec.status === 'HALF_DAY') {
+        const recDateStr = rec.date.split('T')[0];
+        
+        // Check if there is a leave that covers this date
+        const hasLeave = myLeaves.some((leave) => {
+          const start = leave.startDate.split('T')[0];
+          const end = leave.endDate.split('T')[0];
+          return recDateStr >= start && recDateStr <= end && leave.status !== 'CANCELLED' && leave.status !== 'REJECTED';
+        });
+        
+        if (!hasLeave) {
+          unresolved.push({
+            date: recDateStr,
+            status: rec.status,
+          });
+        }
+      }
+    });
+    
+    return unresolved;
+  }, [attendanceRecords, myLeaves]);
 
   const [isHomeworkModalOpen, setHomeworkModalOpen] = useState(false);
   const [isClassworkModalOpen, setClassworkModalOpen] = useState(false);
@@ -307,6 +378,27 @@ export default function TeacherDashboard() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-4 lg:p-8 animate-in fade-in duration-500">
       {/* Left Column */}
       <div className="lg:col-span-2 space-y-8">
+        {promptLeaves.map((pl) => (
+          <div 
+            key={pl.date} 
+            className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 text-amber-800 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+              <span>
+                You were marked <strong className="text-amber-950 font-bold capitalize">{pl.status.toLowerCase().replace('_', ' ')}</strong> on <strong className="text-slate-800 font-bold">{new Date(pl.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>. Please apply for a leave request to cover this date.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-bold h-8 px-4 w-fit shrink-0 shadow-sm transition-all"
+              onClick={() => router.push(`/dashboard/teacher/leave?apply=true&date=${pl.date}&type=${pl.status === 'HALF_DAY' ? 'HALF_DAY' : 'CASUAL'}`)}
+            >
+              Apply Leave
+            </Button>
+          </div>
+        ))}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/25 border border-border/40 backdrop-blur-md p-4 px-6 rounded-2xl h-[70px] justify-center sm:justify-start">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold">
             <span className="text-foreground font-bold">{formattedDate}</span>
@@ -385,8 +477,13 @@ export default function TeacherDashboard() {
                             <p className="text-xs font-bold text-muted-foreground/80">
                               {item.startTime} – {item.endTime}
                             </p>
-                            <h4 className="text-sm font-bold text-foreground">
+                            <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                               {item.subjectName} • Class {item.className}{item.sectionName}
+                              {item.isSubstitute && (
+                                <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-lg">
+                                  Substitute
+                                </Badge>
+                              )}
                             </h4>
                             <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">
                               Room {100 + (item.periodNumber || 1)}
