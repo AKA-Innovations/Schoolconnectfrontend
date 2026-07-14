@@ -254,8 +254,15 @@ export function ClassCapacityAnalytics() {
                 <XAxis dataKey="className" tickLine={false} axisLine={false} style={{ fontSize: '11px', fontWeight: 600 }} />
                 <YAxis tickLine={false} axisLine={false} style={{ fontSize: '11px', fontWeight: 600 }} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(0, 0, 0, 0.02)' }}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px' }}
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                  contentStyle={{ 
+                    background: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))', 
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}
+                  itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '12px' }}
+                  labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold', fontSize: '12px', marginBottom: '4px' }}
                 />
                 <Bar dataKey="filled" stackId="a" fill="#10b981" name="Filled Seats" radius={[0, 0, 4, 4]} />
                 <Bar dataKey="empty" stackId="a" fill="#e2e8f0" name="Empty Seats" radius={[4, 4, 0, 0]} />

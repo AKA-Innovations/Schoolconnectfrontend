@@ -45,7 +45,7 @@ export default function ClassManagementDashboard() {
         </div>
 
         {/* Stats Row */}
-        <ClassSummaryDashboard />
+        {/* <ClassSummaryDashboard /> */}
 
         {/* Live capacity view */}
         <div className="pt-2">

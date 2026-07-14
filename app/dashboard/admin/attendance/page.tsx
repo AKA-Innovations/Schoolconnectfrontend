@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 import { useAuthStore } from '@/store/authStore';
 import { useClassSectionLists } from '@/hooks/useClasses';
 import { useFilterAttendance, useStudentList, useBulkAttendance, useUpdateAttendance } from '@/hooks/useStudents';
@@ -268,11 +269,10 @@ export default function AdminAttendancePage() {
                </Select>
              </div>
 
-             <Input 
-              type="date" 
+             <DatePicker
               value={date} 
-              onChange={e => setDate(e.target.value)} 
-              className="h-10 w-40 max-sm:w-full rounded-xl font-semibold border-slate-200 shadow-xs"
+              onChange={setDate} 
+              className="h-10 w-40 max-sm:w-full"
             />
           </div>
         </div>
@@ -344,11 +344,10 @@ export default function AdminAttendancePage() {
           <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 px-3 py-1 rounded-full text-xs font-bold">
             Administrative Override
           </Badge>
-          <Input 
-            type="date" 
+          <DatePicker
             value={date} 
-            onChange={e => setDate(e.target.value)} 
-            className="h-10 w-44 rounded-xl font-bold"
+            onChange={setDate} 
+            className="h-10 w-44 font-bold"
           />
         </div>
       </div>

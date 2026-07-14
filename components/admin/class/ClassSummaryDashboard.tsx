@@ -39,7 +39,7 @@ export function ClassSummaryDashboard() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      {STAT_CONFIG.map((stat, i) => {
+      {/* {STAT_CONFIG.map((stat, i) => {
         const Icon = stat.icon;
         const value = isLoading ? null : (data as any)?.[stat.key] ?? 0;
         return (
@@ -69,7 +69,7 @@ export function ClassSummaryDashboard() {
             </div>
           </div>
         );
-      })}
+      })} */}
     </div>
   );
 }

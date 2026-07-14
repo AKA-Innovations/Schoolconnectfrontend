@@ -8,6 +8,7 @@ interface SelectProps {
   value?: string
   onValueChange?: (value: string) => void
   children?: React.ReactNode
+  className?: string
 }
 
 interface SelectContextType {
@@ -22,7 +23,7 @@ interface SelectContextType {
 
 const SelectContext = React.createContext<SelectContextType | null>(null)
 
-export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }) => {
+export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, className }) => {
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedLabel, setSelectedLabel] = React.useState("")
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
@@ -45,7 +46,7 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
 
   return (
     <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, selectedLabel, setSelectedLabel, triggerRef }}>
-      <div ref={containerRef} className="relative inline-block w-full">{children}</div>
+      <div ref={containerRef} className={cn("relative inline-block w-full", className)}>{children}</div>
     </SelectContext.Provider>
   )
 }

@@ -83,7 +83,7 @@ export default function AcademicAnalysis({ studentId, student }: AcademicAnalysi
       </div>
 
       {/* Performance Trend */}
-      <Card className="border-border shadow-sm rounded-4xl">
+      <Card className="border-border shadow-sm rounded-4xl overflow-hidden">
         <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
           <CardTitle className="text-lg font-bold tracking-tight">Performance Trend</CardTitle>
         </CardHeader>
@@ -110,7 +110,7 @@ export default function AcademicAnalysis({ studentId, student }: AcademicAnalysi
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Subject Performance */}
-        <Card className="border-border shadow-sm rounded-4xl">
+        <Card className="border-border shadow-sm rounded-4xl overflow-hidden">
           <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
             <CardTitle className="text-lg font-bold tracking-tight">Subject Performance</CardTitle>
           </CardHeader>
@@ -139,8 +139,8 @@ export default function AcademicAnalysis({ studentId, student }: AcademicAnalysi
         </Card>
 
         {/* Score Distribution */}
-        <Card className="border-border shadow-sm rounded-4xl">
-          <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
+        <Card className="border-border shadow-sm rounded-4xl overflow-hidden">
+          <CardHeader className="border-b border-border/50  bg-muted/10 py-6 px-8">
             <CardTitle className="text-lg font-bold tracking-tight">Subject Distribution</CardTitle>
           </CardHeader>
           <CardContent className="p-8 flex items-center justify-center">
@@ -151,7 +151,7 @@ export default function AcademicAnalysis({ studentId, student }: AcademicAnalysi
                     <Cell key={`cell-${index}`} fill={colours[index % colours.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: 'white' }} />
+                <Tooltip contentStyle={{ backgroundColor: 'rgba(0,0,0,0.2)', border: 'none', borderRadius: '8px', color: 'white' }} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -159,7 +159,7 @@ export default function AcademicAnalysis({ studentId, student }: AcademicAnalysi
       </div>
 
       {/* Statistics */}
-      <Card className="border-border shadow-sm rounded-4xl">
+      <Card className="border-border shadow-sm rounded-4xl overflow-hidden">
         <CardHeader className="border-b border-border/50 bg-muted/10 py-6 px-8">
           <CardTitle className="text-lg font-bold tracking-tight">Statistics</CardTitle>
         </CardHeader>

@@ -14,6 +14,7 @@ import { useClassSectionLists } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
+import { DatePicker } from '@/components/ui/datepicker';
 import { RefreshCw } from 'lucide-react';
 
 const statusOptions = ['Present', 'Absent', 'Late', 'HalfDay'] as const;
@@ -251,7 +252,7 @@ export default function AttendancePage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">Date</Label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl h-10" />
+              <DatePicker value={date} onChange={setDate} className="w-full" buttonClassName="h-10 rounded-xl" />
             </div>
             <div className="flex items-end">
               <Button 

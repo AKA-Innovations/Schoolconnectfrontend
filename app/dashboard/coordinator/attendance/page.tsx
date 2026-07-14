@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { DatePicker } from '@/components/ui/datepicker';
 
 const STATUS_CFG: Record<string, { color: string; icon: React.ElementType; style: string }> = {
   Present: { color: 'bg-green-100 text-green-700', icon: CheckCircle, style: 'bg-success/10 text-success border-success/20' },
@@ -336,11 +337,11 @@ export default function CoordinatorAttendancePage() {
             <Button variant="ghost" size="sm" className="rounded-lg bg-background shadow-xs h-8 text-xs font-bold">
               <LayoutGrid size={14} className="mr-2" /> Grid View
             </Button>
-            <Input 
-              type="date" 
+            <DatePicker 
               value={date} 
-              onChange={e => setDate(e.target.value)} 
-              className="h-8 w-40 text-xs border-none bg-transparent"
+              onChange={setDate} 
+              className="w-40"
+              buttonClassName="h-8 border-none bg-transparent shadow-none hover:bg-transparent"
             />
           </div>
         </div>
@@ -414,11 +415,11 @@ export default function CoordinatorAttendancePage() {
           <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1 rounded-full text-xs font-bold">
             Coordinator View
           </Badge>
-          <Input 
-            type="date" 
+          <DatePicker 
             value={date} 
-            onChange={e => setDate(e.target.value)} 
-            className="h-9 w-40 rounded-xl"
+            onChange={setDate} 
+            className="w-40"
+            buttonClassName="h-9 rounded-xl"
           />
         </div>
       </div>

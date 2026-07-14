@@ -18,6 +18,7 @@ import {
 } from '@/services/exam/mutations';
 import { useSchoolClasses, useSchoolSections, useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
 import { CURRENT_SESSION } from '@/lib/constants';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, CheckCircle2, AlertCircle, RefreshCw, Send, Check, Play, Globe, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -244,44 +245,67 @@ export function ResultMonitoring({ session }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          <select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <Select
+            value={selectedExamId ? String(selectedExamId) : 'all'}
+            onValueChange={(val) => setSelectedExamId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-40"
           >
-            <option value="">Select Exam</option>
-            {scheduledExams.map((e: any) => (
-              <option key={e.id} value={e.id}>{e.examName}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Exam" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Exam</SelectItem>
+              {scheduledExams.map((e: any) => (
+                <SelectItem key={e.id} value={String(e.id)}>
+                  {e.examName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {!isClassTeacherOnly ? (
             <>
-              <select
-                value={selectedClassId}
-                onChange={(e) => {
-                  setSelectedClassId(e.target.value ? Number(e.target.value) : '');
+              <Select
+                value={selectedClassId ? String(selectedClassId) : 'all'}
+                onValueChange={(val) => {
+                  setSelectedClassId(val === 'all' ? '' : Number(val));
                   setSelectedSectionId('');
                 }}
-                className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full sm:w-40"
               >
-                <option value="">Select Class</option>
-                {filteredClasses.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.className}</option>
-                ))}
-              </select>
+                <SelectTrigger className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold">
+                  <SelectValue placeholder="Select Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Select Class</SelectItem>
+                  {filteredClasses.map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      Class {c.className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              <select
-                value={selectedSectionId}
-                onChange={(e) => setSelectedSectionId(e.target.value ? Number(e.target.value) : '')}
-                disabled={!selectedClassId}
-                className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+              <Select
+                value={selectedSectionId ? String(selectedSectionId) : 'all'}
+                onValueChange={(val) => setSelectedSectionId(val === 'all' ? '' : Number(val))}
+                className="w-full sm:w-40"
               >
-                <option value="">Select Section</option>
-                {filteredSections.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.sectionName}</option>
-                ))}
-              </select>
+                <SelectTrigger 
+                  disabled={!selectedClassId}
+                  className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold"
+                >
+                  <SelectValue placeholder="Select Section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Select Section</SelectItem>
+                  {filteredSections.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      Section {s.sectionName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </>
           ) : (
             user?.classTeacherClass && (
