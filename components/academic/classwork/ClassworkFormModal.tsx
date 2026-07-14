@@ -14,6 +14,7 @@ import { AssignmentSelector } from '../shared/AssignmentSelector';
 import { ChapterSelect } from '../shared/ChapterSelect';
 import { TopicSelect } from '../shared/TopicSelect';
 import type { Classwork } from '@/services/academic/types';
+import { DatePicker } from '@/components/ui/datepicker';
 
 interface FormValues {
   assignmentKey: string; // "className|sectionName|mappingId"
@@ -228,10 +229,17 @@ export const ClassworkFormModal = React.memo(function ClassworkFormModal({
 
           {!isEditing && (
             <FormField label="Conducted On" error={errors.conductedOn?.message} required>
-              <input
-                {...register('conductedOn', { required: 'Required' })}
-                type="date"
-                className="field"
+              <Controller
+                control={control}
+                name="conductedOn"
+                rules={{ required: 'Required' }}
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Select Date"
+                  />
+                )}
               />
             </FormField>
           )}

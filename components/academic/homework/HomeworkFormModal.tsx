@@ -15,6 +15,7 @@ import { AssignmentSelector } from '../shared/AssignmentSelector';
 import { ChapterSelect } from '../shared/ChapterSelect';
 import { TopicSelect } from '../shared/TopicSelect';
 import type { Homework } from '@/services/academic/types';
+import { DatePicker } from '@/components/ui/datepicker';
 
 interface FormValues {
   assignmentKey: string; // "className|sectionName|mappingId"
@@ -272,10 +273,17 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
             </FormField>
 
             <FormField label="Due Date" error={errors.dueDate?.message} required>
-              <input
-                {...register('dueDate', { required: 'Required' })}
-                type="date"
-                className="field"
+              <Controller
+                control={control}
+                name="dueDate"
+                rules={{ required: 'Required' }}
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Select Date"
+                  />
+                )}
               />
             </FormField>
 

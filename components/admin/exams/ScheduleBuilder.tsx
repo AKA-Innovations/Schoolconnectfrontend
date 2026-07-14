@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { ExamScheduleItemDto } from '@/types/exam.types';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 
 interface Props {
   session: string;
@@ -561,11 +562,10 @@ export function ScheduleBuilder({ session }: Props) {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
-                          <Input
-                            type="date"
+                          <DatePicker
                             value={bulkStartDate}
-                            onChange={(e) => setBulkStartDate(e.target.value)}
-                            className="h-9 rounded-lg text-xs"
+                            onChange={setBulkStartDate}
+                            placeholder="Select Date"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
@@ -780,11 +780,10 @@ export function ScheduleBuilder({ session }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 w-full">
                               <div className="space-y-1">
                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Date</Label>
-                                <Input
-                                  type="date"
+                                <DatePicker
                                   value={values.date}
-                                  onChange={(e) => handleInputChange(sub.subjectId, 'date', e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
+                                  onChange={(val) => handleInputChange(sub.subjectId, 'date', val)}
+                                  placeholder="Select Date"
                                 />
                               </div>
                               <div className="space-y-1">
@@ -880,11 +879,10 @@ export function ScheduleBuilder({ session }: Props) {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-1.5">
                             <Label className="text-xs font-bold text-muted-foreground">Exam Date</Label>
-                            <Input
-                              type="date"
+                            <DatePicker
                               value={bulkScheduleDate}
-                              onChange={(e) => setBulkScheduleDate(e.target.value)}
-                              className="rounded-xl"
+                              onChange={setBulkScheduleDate}
+                              placeholder="Select Date"
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -1137,11 +1135,10 @@ export function ScheduleBuilder({ session }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-muted-foreground">Exam Date</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  className="rounded-xl"
+                  onChange={setEditDate}
+                  placeholder="Select Date"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">

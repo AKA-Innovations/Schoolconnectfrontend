@@ -13,6 +13,7 @@ import { InitializeBalancesDialog } from '@/components/teacher-leave/InitializeB
 import { LeaveRequestForm } from '@/components/teacher-leave/LeaveRequestForm';
 import type { TeacherLeave } from '@/types/leave.types';
 import { useSubstitutePeriods } from '@/hooks/useTeacherLeave';
+import { useTeacherRoles } from '@/lib/permissions';
 import { FileText, ArrowRightLeft, ClipboardCheck, Settings, CalendarDays, AlertCircle, Plus } from 'lucide-react';
 
 function AdminTeacherLeaveContent() {
@@ -25,6 +26,7 @@ function AdminTeacherLeaveContent() {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [initDialogOpen, setInitDialogOpen] = useState(false);
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+  const { isPrincipal } = useTeacherRoles();
 
   const todayStr = React.useMemo(() => {
     const d = new Date();
@@ -74,14 +76,16 @@ function AdminTeacherLeaveContent() {
               <Settings size={14} className="mr-1.5" />
               Initialize Balances
             </Button>
-            <Button
-              size="sm"
-              className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-bold text-xs"
-              onClick={() => setApplyDialogOpen(true)}
-            >
-              <Plus size={14} className="mr-1.5" />
-              Record Leave
-            </Button>
+            {isPrincipal && (
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-bold text-xs"
+                onClick={() => setApplyDialogOpen(true)}
+              >
+                <Plus size={14} className="mr-1.5" />
+                Apply Leave (Self)
+              </Button>
+            )}
           </div>
         </div>
 
@@ -155,11 +159,13 @@ function AdminTeacherLeaveContent() {
         open={initDialogOpen}
         onOpenChange={setInitDialogOpen}
       />
-      <LeaveRequestForm
-        open={applyDialogOpen}
-        onOpenChange={setApplyDialogOpen}
-        isAdmin
-      />
+      {isPrincipal && (
+        <LeaveRequestForm
+          open={applyDialogOpen}
+          onOpenChange={setApplyDialogOpen}
+          isAdmin={false}
+        />
+      )}
     </div>
   );
 }

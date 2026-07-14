@@ -93,16 +93,21 @@ export function TeacherProfileManager() {
   const { user } = useAuthStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState('basic');
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const teacherId = user?.id ?? '';
 
-  // Get aggregated data for header & avatar snapshot
   const {
-    data: teacher,
+    data: basicRes,
     isLoading: isTeacherLoading,
     isFetching: isTeacherFetching,
     refetch: refetchTeacher,
-  } = useTeacher(teacherId);
+  } = useTeacherBasicDetails(teacherId);
+  const teacher = basicRes?.data ?? basicRes;
 
   const fullName = teacher
     ? `${teacher.firstName ?? ''} ${teacher.lastName ?? ''}`.trim()
@@ -150,7 +155,7 @@ export function TeacherProfileManager() {
     toast.success('Profile refreshed');
   };
 
-  if (isTeacherLoading && !teacher) {
+  if (!isHydrated || (isTeacherLoading && !teacher)) {
     return <TeacherProfileSkeleton />;
   }
 

@@ -13,6 +13,7 @@ import { ClassworkFormModal } from './ClassworkFormModal';
 import { ClassworkDetailView } from './ClassworkDetailView';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 import { useAuthStore } from '@/store/authStore';
 import type { Classwork } from '@/services/academic/types';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -328,22 +329,24 @@ export function ClassworkManagement() {
         {dateRangePreset === 'custom' && (
           <>
             <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-3 bg-white h-10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">From</span>
-              <input
-                type="date"
+              <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">From</span>
+              <DatePicker
                 value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                className="border-none p-0 text-xs font-semibold text-slate-600 bg-transparent focus:ring-0 w-28 cursor-pointer"
+                onChange={(val) => { setStartDate(val); setPage(1); }}
+                placeholder="From Date"
+                className="w-32 border-none focus:ring-0 sm:w-32"
+                buttonClassName="border-none h-8 px-1 shadow-none"
               />
             </div>
 
             <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-3 bg-white h-10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">To</span>
-              <input
-                type="date"
+              <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">To</span>
+              <DatePicker
                 value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                className="border-none p-0 text-xs font-semibold text-slate-600 bg-transparent focus:ring-0 w-28 cursor-pointer"
+                onChange={(val) => { setEndDate(val); setPage(1); }}
+                placeholder="To Date"
+                className="w-32 border-none focus:ring-0 sm:w-32"
+                buttonClassName="border-none h-8 px-1 shadow-none"
               />
             </div>
           </>

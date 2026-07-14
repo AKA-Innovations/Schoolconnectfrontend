@@ -9,6 +9,7 @@ import { useCreateExam } from '@/services/exam/mutations';
 import { useExamTypes } from '@/services/exam/queries';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { DatePicker } from '@/components/ui/datepicker';
 
 interface Props {
   isOpen: boolean;
@@ -107,22 +108,18 @@ export function CreateExamModal({ isOpen, onClose, session, onSuccess }: Props) 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="startDate" className="font-semibold text-foreground text-xs uppercase tracking-wider">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="rounded-xl h-11"
+                  onChange={setStartDate}
+                  placeholder="Select Start Date"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endDate" className="font-semibold text-foreground text-xs uppercase tracking-wider">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
+                <DatePicker
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="rounded-xl h-11"
+                  onChange={setEndDate}
+                  placeholder="Select End Date"
                 />
               </div>
             </div>

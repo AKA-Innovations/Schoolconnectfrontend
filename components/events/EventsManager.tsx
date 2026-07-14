@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { DatePicker } from '@/components/ui/datepicker';
 
 function getWeekRange() {
   const today = new Date();
@@ -762,22 +763,18 @@ export function EventsManager({ role: userRole }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground">Start Date *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm"
-                  required
+                  onChange={setStartDate}
+                  placeholder="Select Start Date"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground">End Date *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm"
-                  required
+                  onChange={setEndDate}
+                  placeholder="Select End Date"
                 />
               </div>
             </div>
@@ -907,21 +904,17 @@ export function EventsManager({ role: userRole }: Props) {
                               });
                             };
                             return (
-                              <label
+                              <button
                                 key={s.id}
+                                type="button"
+                                onClick={handleToggleSection}
                                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs cursor-pointer select-none transition-all ${isSectionSelected
                                     ? 'bg-primary/10 border-primary text-primary font-medium'
                                     : 'bg-background hover:bg-muted/50 border-border/80 text-muted-foreground'
                                   }`}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={isSectionSelected}
-                                  onChange={handleToggleSection}
-                                  className="sr-only"
-                                />
                                 {s.sectionName}
-                              </label>
+                              </button>
                             );
                           })}
                         </div>

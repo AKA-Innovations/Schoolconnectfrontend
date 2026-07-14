@@ -55,6 +55,7 @@ export const API_ENDPOINTS = {
     COORDINATOR_CLASS_DELETE: (mappingId: number) => `/teacher/coordinator-class/${mappingId}`,
     ADD_CLASS_TEACHER: '/teacher/add-class-teacher',
     BIRTHDAYS: '/teacher/birthdays',
+    AVAILABLE_CLASS_TEACHERS: '/teacher/available-class-teachers',
   },
   CLASS: {
     // GET & POST both use the same base path (no /fetch/ prefix)
@@ -208,5 +209,8 @@ export const API_ENDPOINTS = {
     BASE: '/teacher-attendance',
     MARK: '/teacher-attendance/mark',
     DAY: '/teacher-attendance/day',
+  },
+  AUTH: {
+    UPDATE_STATUS: (id: string) => `/auth/update-user-status/${id}`,
   },
 } as const;

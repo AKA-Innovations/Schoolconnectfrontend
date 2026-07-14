@@ -33,7 +33,8 @@ import {
   useTeacherSchoolRecord,
   useTeacherCoordinatorClasses,
   useTeacherClassTeacher,
-  useTeacherClassSubjectDetails
+  useTeacherClassSubjectDetails,
+  useToggleTeacherStatus
 } from '@/hooks/useTeachers';
 import { useSubjectDetails, useCreateSubjectDetail, useDeleteSubjectDetail, useSubjectOptions, useClassSectionLists } from '@/hooks/useClasses';
 import { Teacher, Address, TeacherClass, SchoolRecord } from '@/types/roles';
@@ -42,7 +43,8 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import {
   ArrowLeft, Save, Plus, Trash2, MapPin, BookOpen, Briefcase,
   Users, Mail, Phone, Calendar, ShieldCheck, Activity,
-  Edit2, CheckCircle2, Camera, RefreshCw, GraduationCap
+  Edit2, CheckCircle2, Camera, RefreshCw, GraduationCap,
+  UserCheck, UserMinus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -64,7 +66,36 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
     setLocalReadOnly(readOnly);
   }, [readOnly]);
 
-  const { data: teacher, isLoading, isFetching, refetch } = useTeacher(teacherId);
+  const { data: basicRes, isLoading, isFetching, refetch } = useTeacherBasicDetails(teacherId);
+  const { data: classSubjectRes } = useTeacherClassSubjectDetails(teacherId);
+  const toggleMutation = useToggleTeacherStatus({});
+
+  const handleToggleStatus = () => {
+    const isActive = teacher.status === 'active';
+    const nextActive = !isActive;
+    const action = nextActive ? 'activate' : 'deactivate';
+
+    const textPrompt = window.prompt(
+      `⚠️ RED ALERT: You are about to ${action.toUpperCase()} this user.\n\nTo confirm, please type "${action}" below:`
+    );
+    if (textPrompt !== action) {
+      if (textPrompt !== null) {
+        alert("Action cancelled: Confirmation text did not match.");
+      }
+      return;
+    }
+
+    toggleMutation.mutate({ id: teacherId, isActive: nextActive }, {
+      onSuccess: () => {
+        toast.success(`User successfully ${nextActive ? 'activated' : 'deactivated'}`);
+        refetch();
+      },
+      onError: () => alert(`Could not ${action} staff member. Please try again.`),
+    });
+  };
+  
+  const teacher = basicRes?.data ?? basicRes;
+  const classesList = classSubjectRes?.data ?? classSubjectRes ?? [];
 
   if (isLoading) {
     return (
@@ -102,18 +133,20 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
               <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border border-border/40">
                 {teacher.employeeId}
               </span>
-              <span className={cn(
-                'px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border',
-                teacher.status === 'active'
-                  ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                  : 'bg-red-500/10 text-red-600 border-red-500/20'
-              )}>
-                {teacher.status}
-              </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              {teacher.firstName} {teacher.lastName}
-            </h1>
+            <div className="space-y-1 text-center md:text-left">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center justify-center md:justify-start gap-2">
+                {teacher.firstName} {teacher.lastName}
+                <span className={cn(
+                  "text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
+                  teacher.status === 'active'
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                    : "bg-rose-100 text-rose-700 border border-rose-200"
+                )}>
+                  {teacher.status || 'inactive'}
+                </span>
+              </h2>
+            </div>
             <div className="flex flex-wrap justify-center md:justify-start gap-x-5 gap-y-1.5 text-muted-foreground/70 mt-3">
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <Mail className="h-3.5 w-3.5 opacity-40 text-primary" />
@@ -143,6 +176,19 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
             </div>
           </div>
           <div className="absolute top-4 right-4 flex gap-2">
+            {teacher.status === 'active' ? (
+              <Button variant="secondary" size="icon" onClick={handleToggleStatus} disabled={toggleMutation.isPending}
+                className="rounded-xl h-10 w-10 shadow-sm border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 animate-in zoom-in duration-300 shrink-0"
+                title="Deactivate Staff Member">
+                <UserMinus className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button variant="secondary" size="icon" onClick={handleToggleStatus} disabled={toggleMutation.isPending}
+                className="rounded-xl h-10 w-10 shadow-sm border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 animate-in zoom-in duration-300 shrink-0"
+                title="Activate Staff Member">
+                <UserCheck className="h-4 w-4" />
+              </Button>
+            )}
             {localReadOnly && (
               <Button variant="secondary" size="icon" onClick={() => setLocalReadOnly(false)}
                 className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background animate-in zoom-in duration-300"
@@ -201,7 +247,7 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
           <TabsContent value="family"       className="mt-0"><FamilyDetailsTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
           <TabsContent value="employment"   className="mt-0"><EmploymentForm teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
           <TabsContent value="pedagogical"  className="mt-0"><PedagogicalSection teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
-          <TabsContent value="classes"      className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="classes"      className="mt-0"><ClassesSection teacherId={teacherId} classes={classesList} readOnly={localReadOnly} /></TabsContent>
           <TabsContent value="addresses"    className="mt-0"><AddressSection teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
         </div>
       </Tabs>

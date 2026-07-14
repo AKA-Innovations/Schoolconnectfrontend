@@ -103,17 +103,6 @@ export function TeacherTable({ teachers, isLoading, page, totalPages, onView, on
                         <Edit size={16} className="text-slate-400" />
                       </Button>
                     )}
-                    {onToggleStatus && (
-                      teacher.status === 'active' ? (
-                        <Button variant="ghost" size="icon" title="Deactivate" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={() => onToggleStatus(teacher.id, false)}>
-                          <UserX size={16} />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="icon" title="Activate" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-500" onClick={() => onToggleStatus(teacher.id, true)}>
-                          <UserCheck size={16} />
-                        </Button>
-                      )
-                    )}
                   </div>
                 </TableCell>
               </TableRow>
