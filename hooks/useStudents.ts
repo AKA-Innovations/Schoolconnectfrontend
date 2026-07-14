@@ -295,7 +295,18 @@ export function useDeleteAddress(studentId: string) {
 
 export const attendanceKeys = {
   all: ['attendance'] as const,
-  filter: (params: AttendanceFilterParams) => ['attendance', 'filter', params] as const,
+  filter: (params: AttendanceFilterParams) => [
+    'attendance',
+    'filter',
+    params.classSectionId,
+    params.date,
+    params.studentId,
+    params.teacherId,
+    params.session,
+    params.status,
+    params.fromDate,
+    params.toDate
+  ] as const,
 };
 
 export function useFilterAttendance(params: AttendanceFilterParams) {
@@ -303,8 +314,8 @@ export function useFilterAttendance(params: AttendanceFilterParams) {
   return useQuery({
     queryKey: attendanceKeys.filter(params),
     queryFn: () => studentService.filterAttendance(params),
-    enabled: !!(params.classSectionId && params.classSectionId > 0 && params.date),
-
+    enabled: !!((params.classSectionId || params.studentId || params.teacherId) && params.date),
+    staleTime: 10000, // 10s stale time to prevent spamming
   });
 }
 

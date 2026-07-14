@@ -18,6 +18,7 @@ export function TeacherManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'details'>('list');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [filters, setFilters] = useState<TeacherFilterParams>({
     page: 1, pageSize: 10, schoolId: schoolId || '',
   });
@@ -55,9 +56,8 @@ export function TeacherManagement() {
   if (viewMode === 'details' && selectedTeacher) return (
     <TeacherDetailsView
       teacherId={selectedTeacher.id}
-      onBack={() => setViewMode('list')}
-      onEdit={() => setViewMode('add')}
-      readOnly={true}
+      onBack={() => { setSelectedTeacher(null); setViewMode('list'); }}
+      readOnly={readOnlyMode}
     />
   );
 
@@ -99,8 +99,8 @@ export function TeacherManagement() {
         isLoading={isLoading}
         page={filters.page ?? 1}
         totalPages={totalPages}
-        onView={t => { setSelectedTeacher(t); setViewMode('details'); }}
-        onEdit={t => { setSelectedTeacher(t); setViewMode('add'); }}
+        onView={t => { setSelectedTeacher(t); setReadOnlyMode(true); setViewMode('details'); }}
+        onEdit={t => { setSelectedTeacher(t); setReadOnlyMode(false); setViewMode('details'); }}
         onToggleStatus={handleToggleStatus}
         onPageChange={p => setFilters(f => ({ ...f, page: p }))}
       />

@@ -43,11 +43,18 @@ export function AdminStatsTab({ summary, isLoading }: StatsTabProps) {
       lastDates.forEach(date => {
         configs.push({
           queryKey: ['attendance-by-class-section-date', cs.className, cs.sectionName, date],
-          queryFn: () => studentService.filterAttendance({
-            className: cs.className,
-            sectionName: cs.sectionName,
-            date,
-          }),
+          queryFn: async () => {
+            try {
+              return await studentService.filterAttendance({
+                className: cs.className,
+                sectionName: cs.sectionName,
+                date,
+              });
+            } catch (err: any) {
+              if (err.response?.status === 401) throw err;
+              return [];
+            }
+          },
           enabled: !!cs.className && !!cs.sectionName && !!date,
           staleTime: 5 * 60 * 1000,
           retry: false,

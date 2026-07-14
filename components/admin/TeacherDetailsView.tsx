@@ -57,7 +57,13 @@ interface TeacherDetailsViewProps {
 // ─── Root Component ──────────────────────────────────────────────────────────
 
 export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false }: TeacherDetailsViewProps) {
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState('basic');
+  const [localReadOnly, setLocalReadOnly] = useState(readOnly);
+
+  useEffect(() => {
+    setLocalReadOnly(readOnly);
+  }, [readOnly]);
+
   const { data: teacher, isLoading, isFetching, refetch } = useTeacher(teacherId);
 
   if (isLoading) {
@@ -90,7 +96,7 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
       {/* Header / Profile Card */}
       <Card className="erp-card overflow-hidden">
         <div className="relative p-6 sm:p-8 bg-card flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
-          <ProfileImageSection teacher={teacher} teacherId={teacherId} readOnly={readOnly} />
+          <ProfileImageSection teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} />
           <div className="flex-1 text-center md:text-left space-y-1.5">
             <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-1.5">
               <span className="bg-muted/30 text-muted-foreground px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest border border-border/40">
@@ -137,11 +143,18 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
             </div>
           </div>
           <div className="absolute top-4 right-4 flex gap-2">
-            {readOnly && onEdit && (
-              <Button variant="secondary" size="icon" onClick={onEdit}
+            {localReadOnly && (
+              <Button variant="secondary" size="icon" onClick={() => setLocalReadOnly(false)}
                 className="rounded-xl h-10 w-10 shadow-sm border border-border/50 bg-background/50 hover:bg-background animate-in zoom-in duration-300"
                 title="Edit Profile">
                 <Edit2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
+            {!localReadOnly && (
+              <Button variant="secondary" size="icon" onClick={() => setLocalReadOnly(true)}
+                className="rounded-xl h-10 w-10 shadow-sm border-2 border-emerald-500 bg-emerald-50 hover:bg-emerald-100 animate-in zoom-in duration-300"
+                title="View Profile (Lock Edit)">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               </Button>
             )}
             <Button variant="secondary" size="icon" onClick={() => { refetch(); toast.success('Profile refreshed'); }}
@@ -163,7 +176,11 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
         <div className="overflow-x-auto pb-2">
           <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
             {[
-              { id: 'personal',     label: 'Identity & Details' },
+              { id: 'basic',        label: 'Basic Details' },
+              { id: 'personal',     label: 'Personal Data' },
+              { id: 'academic',     label: 'Academic Data' },
+              { id: 'professional', label: 'Professional Data' },
+              { id: 'family',       label: 'Family Details' },
               { id: 'employment',   label: 'Employment' },
               { id: 'pedagogical',  label: 'Pedagogical' },
               { id: 'classes',      label: 'Classes' },
@@ -177,11 +194,15 @@ export function TeacherDetailsView({ teacherId, onBack, onEdit, readOnly = false
           </TabsList>
         </div>
         <div className="mt-6">
-          <TabsContent value="personal"    className="mt-0"><PersonalDetailsForm teacher={teacher} teacherId={teacherId} readOnly={readOnly} /></TabsContent>
-          <TabsContent value="employment"  className="mt-0"><EmploymentForm teacherId={teacherId} readOnly={readOnly} /></TabsContent>
-          <TabsContent value="pedagogical" className="mt-0"><PedagogicalSection teacherId={teacherId} readOnly={readOnly} /></TabsContent>
-          <TabsContent value="classes"     className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} readOnly={readOnly} /></TabsContent>
-          <TabsContent value="addresses"   className="mt-0"><AddressSection teacherId={teacherId} readOnly={readOnly} /></TabsContent>
+          <TabsContent value="basic"        className="mt-0"><BasicDetailsTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="personal"     className="mt-0"><PersonalDataTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="academic"     className="mt-0"><AcademicDataTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="professional" className="mt-0"><ProfessionalDataTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="family"       className="mt-0"><FamilyDetailsTab teacher={teacher} teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="employment"   className="mt-0"><EmploymentForm teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="pedagogical"  className="mt-0"><PedagogicalSection teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="classes"      className="mt-0"><ClassesSection teacherId={teacherId} classes={teacher.classes || []} readOnly={localReadOnly} /></TabsContent>
+          <TabsContent value="addresses"    className="mt-0"><AddressSection teacherId={teacherId} readOnly={localReadOnly} /></TabsContent>
         </div>
       </Tabs>
     </div>
@@ -247,20 +268,11 @@ function ProfileImageSection({ teacher, teacherId, readOnly }: { teacher: Teache
   );
 }
 
-// ─── Personal Identity Form (Tab-wise endpoints) ─────────────────────────────
+// ─── Sub-forms for Tabs ──────────────────────────────────────────────────────
 
-function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
+function BasicDetailsTab({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
   const { data: basicRes, refetch: refetchBasic } = useTeacherBasicDetails(teacherId);
-  const { data: personalRes, refetch: refetchPersonal } = useTeacherPersonalData(teacherId);
-  const { data: academicRes, refetch: refetchAcademic } = useTeacherAcademicData(teacherId);
-  const { data: professionalRes, refetch: refetchProfessional } = useTeacherProfessionalData(teacherId);
-  const { data: familyRes, refetch: refetchFamily } = useTeacherFamilyDetails(teacherId);
-
   const updateBasic = useUpdateTeacherBasicDetails(teacherId);
-  const updatePersonal = useUpdateTeacherPersonalData(teacherId);
-  const updateAcademic = useUpdateTeacherAcademicData(teacherId);
-  const updateProfessional = useUpdateTeacherProfessionalData(teacherId);
-  const updateFamily = useUpdateTeacherFamilyDetails(teacherId);
 
   const [basicForm, setBasicForm] = useState({
     firstName: '',
@@ -274,34 +286,6 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
     isCoordinator: false,
     isClassTeacher: false,
     isSubjectTeacher: false,
-  });
-
-  const [personalForm, setPersonalForm] = useState({
-    bloodGroup: '',
-    maritalStatus: '',
-    nationality: '',
-    religion: '',
-  });
-
-  const [academicForm, setAcademicForm] = useState({
-    highestQualification: '',
-    specialization: '',
-    university: '',
-    passingYear: '',
-  });
-
-  const [professionalForm, setProfessionalForm] = useState({
-    designation: '',
-    totalExperience: '',
-    previousSchool: '',
-  });
-
-  const [familyForm, setFamilyForm] = useState({
-    fatherName: '',
-    motherName: '',
-    spouseName: '',
-    children: 0,
-    emergencyContact: '',
   });
 
   useEffect(() => {
@@ -337,6 +321,97 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
     }
   }, [basicRes, teacher]);
 
+  const handleSaveBasic = () => {
+    updateBasic.mutate(basicForm, {
+      onSuccess: () => { toast.success('Basic details saved'); refetchBasic(); },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Save basic details failed')
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Basic details</CardTitle>
+          <CardDescription className="text-xs">Update teacher identity configuration.</CardDescription>
+        </div>
+        {!readOnly && (
+          <Button onClick={handleSaveBasic} disabled={updateBasic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> Save Basic
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FieldGroup label="First Name"><Input value={basicForm.firstName} onChange={e => setBasicForm(p => ({ ...p, firstName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Last Name"><Input value={basicForm.lastName} onChange={e => setBasicForm(p => ({ ...p, lastName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Date of Birth"><Input type="date" value={basicForm.dateOfBirth} onChange={e => setBasicForm(p => ({ ...p, dateOfBirth: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Gender">
+            <select value={basicForm.gender} onChange={e => setBasicForm(p => ({ ...p, gender: e.target.value }))} disabled={readOnly}
+              className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </FieldGroup>
+          <FieldGroup label="Mobile Number"><Input value={basicForm.mobileNumber} onChange={e => setBasicForm(p => ({ ...p, mobileNumber: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Alternate Mobile (optional)"><Input value={basicForm.alternateMobileNumber} onChange={e => setBasicForm(p => ({ ...p, alternateMobileNumber: e.target.value }))} disabled={readOnly} placeholder="Optional" className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Personal Email" className="md:col-span-2"><Input type="email" value={basicForm.emailId} onChange={e => setBasicForm(p => ({ ...p, emailId: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Institutional Roles</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {([
+              { key: 'isPrincipal',    label: 'Principal'       },
+              { key: 'isCoordinator',  label: 'Coordinator'     },
+              { key: 'isClassTeacher', label: 'Class Teacher'   },
+              { key: 'isSubjectTeacher', label: 'Subject Teacher' },
+            ] as const).map(r => (
+              <button key={r.key} type="button"
+                onClick={() => {
+                  if (readOnly) return;
+                  setBasicForm(p => {
+                    const nextValue = !(p as any)[r.key];
+                    const next = { ...p, [r.key]: nextValue };
+                    const EXCLUSIVE = ['isPrincipal', 'isCoordinator', 'isClassTeacher'];
+                    if (nextValue && EXCLUSIVE.includes(r.key)) {
+                      EXCLUSIVE.forEach(k => {
+                        if (k !== r.key) (next as any)[k] = false;
+                      });
+                    }
+                    return next;
+                  });
+                }}
+                className={cn(
+                  'flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all',
+                  (basicForm as any)[r.key] 
+                    ? 'bg-primary text-primary-foreground border-primary' 
+                    : cn('bg-muted/30 border-border/50', !readOnly && 'hover:bg-muted/50'),
+                  readOnly && 'cursor-default'
+                )}>
+                {r.label}
+                {(basicForm as any)[r.key] && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonalDataTab({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
+  const { data: personalRes, refetch: refetchPersonal } = useTeacherPersonalData(teacherId);
+  const updatePersonal = useUpdateTeacherPersonalData(teacherId);
+
+  const [personalForm, setPersonalForm] = useState({
+    bloodGroup: '',
+    maritalStatus: '',
+    nationality: '',
+    religion: '',
+  });
+
   useEffect(() => {
     const p = personalRes?.data?.teacherPersonalData ?? personalRes?.teacherPersonalData ?? personalRes;
     if (p) {
@@ -356,6 +431,58 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
       });
     }
   }, [personalRes, teacher]);
+
+  const handleSavePersonal = () => {
+    updatePersonal.mutate({ teacherPersonalData: personalForm }, {
+      onSuccess: () => { toast.success('Personal data saved'); refetchPersonal(); },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Save personal data failed')
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Personal Data</CardTitle>
+          <CardDescription className="text-xs">Update nationality and physical details.</CardDescription>
+        </div>
+        {!readOnly && (
+          <Button onClick={handleSavePersonal} disabled={updatePersonal.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> Save Personal
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FieldGroup label="Blood Group"><Input value={personalForm.bloodGroup} onChange={e => setPersonalForm(p => ({ ...p, bloodGroup: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Marital Status">
+            <select value={personalForm.maritalStatus} onChange={e => setPersonalForm(p => ({ ...p, maritalStatus: e.target.value }))} disabled={readOnly}
+              className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+              <option value="">Select</option>
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Divorced">Divorced</option>
+              <option value="Widowed">Widowed</option>
+            </select>
+          </FieldGroup>
+          <FieldGroup label="Nationality"><Input value={personalForm.nationality} onChange={e => setPersonalForm(p => ({ ...p, nationality: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Religion"><Input value={personalForm.religion} onChange={e => setPersonalForm(p => ({ ...p, religion: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AcademicDataTab({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
+  const { data: academicRes, refetch: refetchAcademic } = useTeacherAcademicData(teacherId);
+  const updateAcademic = useUpdateTeacherAcademicData(teacherId);
+
+  const [academicForm, setAcademicForm] = useState({
+    highestQualification: '',
+    specialization: '',
+    university: '',
+    passingYear: '',
+  });
 
   useEffect(() => {
     const a = academicRes?.data?.teacherAcademicData ?? academicRes?.teacherAcademicData ?? academicRes;
@@ -377,6 +504,48 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
     }
   }, [academicRes, teacher]);
 
+  const handleSaveAcademic = () => {
+    updateAcademic.mutate({ teacherAcademicData: academicForm }, {
+      onSuccess: () => { toast.success('Academic details saved'); refetchAcademic(); },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Save academic details failed')
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Academic Data</CardTitle>
+          <CardDescription className="text-xs">Update qualification credentials.</CardDescription>
+        </div>
+        {!readOnly && (
+          <Button onClick={handleSaveAcademic} disabled={updateAcademic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> Save Academic
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <FieldGroup label="Highest Qualification"><Input value={academicForm.highestQualification} onChange={e => setAcademicForm(p => ({ ...p, highestQualification: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Specialization"><Input value={academicForm.specialization} onChange={e => setAcademicForm(p => ({ ...p, specialization: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="University/College"><Input value={academicForm.university} onChange={e => setAcademicForm(p => ({ ...p, university: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Passing Year"><Input value={academicForm.passingYear} onChange={e => setAcademicForm(p => ({ ...p, passingYear: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfessionalDataTab({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
+  const { data: professionalRes, refetch: refetchProfessional } = useTeacherProfessionalData(teacherId);
+  const updateProfessional = useUpdateTeacherProfessionalData(teacherId);
+
+  const [professionalForm, setProfessionalForm] = useState({
+    designation: '',
+    totalExperience: '',
+    previousSchool: '',
+  });
+
   useEffect(() => {
     const pr = professionalRes?.data?.teacherProfessionalData ?? professionalRes?.teacherProfessionalData ?? professionalRes;
     if (pr) {
@@ -394,6 +563,49 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
       });
     }
   }, [professionalRes, teacher]);
+
+  const handleSaveProfessional = () => {
+    updateProfessional.mutate({ teacherProfessionalData: professionalForm }, {
+      onSuccess: () => { toast.success('Professional data saved'); refetchProfessional(); },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Save professional data failed')
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Professional Data</CardTitle>
+          <CardDescription className="text-xs">Update expertise and school deployment experience.</CardDescription>
+        </div>
+        {!readOnly && (
+          <Button onClick={handleSaveProfessional} disabled={updateProfessional.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> Save Professional
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FieldGroup label="Designation"><Input value={professionalForm.designation} onChange={e => setProfessionalForm(p => ({ ...p, designation: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Experience (Years)"><Input value={professionalForm.totalExperience} onChange={e => setProfessionalForm(p => ({ ...p, totalExperience: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Previous School/Employer"><Input value={professionalForm.previousSchool} onChange={e => setProfessionalForm(p => ({ ...p, previousSchool: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FamilyDetailsTab({ teacher, teacherId, readOnly }: { teacher: Teacher; teacherId: string; readOnly: boolean }) {
+  const { data: familyRes, refetch: refetchFamily } = useTeacherFamilyDetails(teacherId);
+  const updateFamily = useUpdateTeacherFamilyDetails(teacherId);
+
+  const [familyForm, setFamilyForm] = useState({
+    fatherName: '',
+    motherName: '',
+    spouseName: '',
+    children: 0,
+    emergencyContact: '',
+  });
 
   useEffect(() => {
     const f = familyRes?.data?.teacherFamilyDetails ?? familyRes?.teacherFamilyDetails ?? familyRes;
@@ -417,34 +629,6 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
     }
   }, [familyRes, teacher]);
 
-  const handleSaveBasic = () => {
-    updateBasic.mutate(basicForm, {
-      onSuccess: () => { toast.success('Basic details saved'); refetchBasic(); },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Save basic details failed')
-    });
-  };
-
-  const handleSavePersonal = () => {
-    updatePersonal.mutate({ teacherPersonalData: personalForm }, {
-      onSuccess: () => { toast.success('Personal data saved'); refetchPersonal(); },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Save personal data failed')
-    });
-  };
-
-  const handleSaveAcademic = () => {
-    updateAcademic.mutate({ teacherAcademicData: academicForm }, {
-      onSuccess: () => { toast.success('Academic details saved'); refetchAcademic(); },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Save academic details failed')
-    });
-  };
-
-  const handleSaveProfessional = () => {
-    updateProfessional.mutate({ teacherProfessionalData: professionalForm }, {
-      onSuccess: () => { toast.success('Professional data saved'); refetchProfessional(); },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Save professional data failed')
-    });
-  };
-
   const handleSaveFamily = () => {
     updateFamily.mutate({ teacherFamilyDetails: familyForm }, {
       onSuccess: () => { toast.success('Family details saved'); refetchFamily(); },
@@ -453,179 +637,28 @@ function PersonalDetailsForm({ teacher, teacherId, readOnly }: { teacher: Teache
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Basic Core */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Basic details</CardTitle>
-            <CardDescription className="text-xs">Update teacher identity configuration.</CardDescription>
-          </div>
-          {!readOnly && (
-            <Button onClick={handleSaveBasic} disabled={updateBasic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-              <Save className="mr-1.5 h-3.5 w-3.5" /> Save Basic
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FieldGroup label="First Name"><Input value={basicForm.firstName} onChange={e => setBasicForm(p => ({ ...p, firstName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Last Name"><Input value={basicForm.lastName} onChange={e => setBasicForm(p => ({ ...p, lastName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Date of Birth"><Input type="date" value={basicForm.dateOfBirth} onChange={e => setBasicForm(p => ({ ...p, dateOfBirth: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Gender">
-              <select value={basicForm.gender} onChange={e => setBasicForm(p => ({ ...p, gender: e.target.value }))} disabled={readOnly}
-                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </FieldGroup>
-            <FieldGroup label="Mobile Number"><Input value={basicForm.mobileNumber} onChange={e => setBasicForm(p => ({ ...p, mobileNumber: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Alternate Mobile (optional)"><Input value={basicForm.alternateMobileNumber} onChange={e => setBasicForm(p => ({ ...p, alternateMobileNumber: e.target.value }))} disabled={readOnly} placeholder="Optional" className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Personal Email" className="md:col-span-2"><Input type="email" value={basicForm.emailId} onChange={e => setBasicForm(p => ({ ...p, emailId: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Institutional Roles</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {([
-                { key: 'isPrincipal',    label: 'Principal'       },
-                { key: 'isCoordinator',  label: 'Coordinator'     },
-                { key: 'isClassTeacher', label: 'Class Teacher'   },
-                { key: 'isSubjectTeacher', label: 'Subject Teacher' },
-              ] as const).map(r => (
-                <button key={r.key} type="button"
-                  onClick={() => {
-                    if (readOnly) return;
-                    setBasicForm(p => {
-                      const nextValue = !(p as any)[r.key];
-                      const next = { ...p, [r.key]: nextValue };
-                      const EXCLUSIVE = ['isPrincipal', 'isCoordinator', 'isClassTeacher'];
-                      if (nextValue && EXCLUSIVE.includes(r.key)) {
-                        EXCLUSIVE.forEach(k => {
-                          if (k !== r.key) (next as any)[k] = false;
-                        });
-                      }
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    'flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all',
-                    (basicForm as any)[r.key] 
-                      ? 'bg-primary text-primary-foreground border-primary' 
-                      : cn('bg-muted/30 border-border/50', !readOnly && 'hover:bg-muted/50'),
-                    readOnly && 'cursor-default'
-                  )}>
-                  {r.label}
-                  {(basicForm as any)[r.key] && <CheckCircle2 className="h-4 w-4 shrink-0" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Personal Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Personal Data</CardTitle>
-            <CardDescription className="text-xs">Update nationality and physical details.</CardDescription>
-          </div>
-          {!readOnly && (
-            <Button onClick={handleSavePersonal} disabled={updatePersonal.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-              <Save className="mr-1.5 h-3.5 w-3.5" /> Save Personal
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <FieldGroup label="Blood Group"><Input value={personalForm.bloodGroup} onChange={e => setPersonalForm(p => ({ ...p, bloodGroup: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Marital Status">
-              <select value={personalForm.maritalStatus} onChange={e => setPersonalForm(p => ({ ...p, maritalStatus: e.target.value }))} disabled={readOnly}
-                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                <option value="">Select</option>
-                <option value="Single">Single</option>
-                <option value="Married">Married</option>
-                <option value="Divorced">Divorced</option>
-                <option value="Widowed">Widowed</option>
-              </select>
-            </FieldGroup>
-            <FieldGroup label="Nationality"><Input value={personalForm.nationality} onChange={e => setPersonalForm(p => ({ ...p, nationality: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Religion"><Input value={personalForm.religion} onChange={e => setPersonalForm(p => ({ ...p, religion: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Academic Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Academic Data</CardTitle>
-            <CardDescription className="text-xs">Update qualification credentials.</CardDescription>
-          </div>
-          {!readOnly && (
-            <Button onClick={handleSaveAcademic} disabled={updateAcademic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-              <Save className="mr-1.5 h-3.5 w-3.5" /> Save Academic
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <FieldGroup label="Highest Qualification"><Input value={academicForm.highestQualification} onChange={e => setAcademicForm(p => ({ ...p, highestQualification: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Specialization"><Input value={academicForm.specialization} onChange={e => setAcademicForm(p => ({ ...p, specialization: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="University/College"><Input value={academicForm.university} onChange={e => setAcademicForm(p => ({ ...p, university: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Passing Year"><Input value={academicForm.passingYear} onChange={e => setAcademicForm(p => ({ ...p, passingYear: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Professional Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Professional Data</CardTitle>
-            <CardDescription className="text-xs">Update expertise and school deployment experience.</CardDescription>
-          </div>
-          {!readOnly && (
-            <Button onClick={handleSaveProfessional} disabled={updateProfessional.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-              <Save className="mr-1.5 h-3.5 w-3.5" /> Save Professional
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FieldGroup label="Designation"><Input value={professionalForm.designation} onChange={e => setProfessionalForm(p => ({ ...p, designation: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Experience (Years)"><Input value={professionalForm.totalExperience} onChange={e => setProfessionalForm(p => ({ ...p, totalExperience: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Previous School/Employer"><Input value={professionalForm.previousSchool} onChange={e => setProfessionalForm(p => ({ ...p, previousSchool: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Family & Emergency */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Family & Emergency details</CardTitle>
-            <CardDescription className="text-xs">Update household details and emergency contact.</CardDescription>
-          </div>
-          {!readOnly && (
-            <Button onClick={handleSaveFamily} disabled={updateFamily.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-              <Save className="mr-1.5 h-3.5 w-3.5" /> Save Family
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FieldGroup label="Father's Name"><Input value={familyForm.fatherName} onChange={e => setFamilyForm(p => ({ ...p, fatherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Mother's Name"><Input value={familyForm.motherName} onChange={e => setFamilyForm(p => ({ ...p, motherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Spouse Name"><Input value={familyForm.spouseName} onChange={e => setFamilyForm(p => ({ ...p, spouseName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Number of Children"><Input type="number" value={familyForm.children} onChange={e => setFamilyForm(p => ({ ...p, children: parseInt(e.target.value, 10) || 0 }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-            <FieldGroup label="Emergency Contact Number" className="md:col-span-2"><Input value={familyForm.emergencyContact} onChange={e => setFamilyForm(p => ({ ...p, emergencyContact: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Family & Emergency details</CardTitle>
+          <CardDescription className="text-xs">Update household details and emergency contact.</CardDescription>
+        </div>
+        {!readOnly && (
+          <Button onClick={handleSaveFamily} disabled={updateFamily.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> Save Family
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FieldGroup label="Father's Name"><Input value={familyForm.fatherName} onChange={e => setFamilyForm(p => ({ ...p, fatherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Mother's Name"><Input value={familyForm.motherName} onChange={e => setFamilyForm(p => ({ ...p, motherName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Spouse Name"><Input value={familyForm.spouseName} onChange={e => setFamilyForm(p => ({ ...p, spouseName: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Number of Children"><Input type="number" value={familyForm.children} onChange={e => setFamilyForm(p => ({ ...p, children: parseInt(e.target.value, 10) || 0 }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+          <FieldGroup label="Emergency Contact Number" className="md:col-span-2"><Input value={familyForm.emergencyContact} onChange={e => setFamilyForm(p => ({ ...p, emergencyContact: e.target.value }))} disabled={readOnly} className="rounded-xl" /></FieldGroup>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

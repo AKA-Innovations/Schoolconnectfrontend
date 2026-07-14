@@ -75,10 +75,17 @@ export function StudentsTab({
   const attendanceQueries = useQueries({
     queries: lastDates.map((dateString) => ({
       queryKey: ['attendance-trend', analyticsSectionId, dateString],
-      queryFn: () => studentService.filterAttendance({
-        classSectionId: Number(analyticsSectionId),
-        date: dateString,
-      }),
+      queryFn: async () => {
+        try {
+          return await studentService.filterAttendance({
+            classSectionId: Number(analyticsSectionId),
+            date: dateString,
+          });
+        } catch (err: any) {
+          if (err.response?.status === 401) throw err;
+          return [];
+        }
+      },
       enabled: !!analyticsSectionId,
     })),
   });

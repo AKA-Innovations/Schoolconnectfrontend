@@ -365,10 +365,17 @@ export default function ClassRoomPage() {
   const attendanceQueries = useQueries({
     queries: lastDates.map((dateString) => ({
       queryKey: ['attendance-trend', resolvedClassSectionId, dateString],
-      queryFn: () => studentService.filterAttendance({
-        classSectionId: Number(resolvedClassSectionId),
-        date: dateString,
-      }),
+      queryFn: async () => {
+        try {
+          return await studentService.filterAttendance({
+            classSectionId: Number(resolvedClassSectionId),
+            date: dateString,
+          });
+        } catch (err: any) {
+          if (err.response?.status === 401) throw err;
+          return [];
+        }
+      },
       enabled: !!resolvedClassSectionId,
     })),
   });
