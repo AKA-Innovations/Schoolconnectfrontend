@@ -248,7 +248,7 @@ export default function AdminAttendancePage() {
                  <SelectContent>
                    <SelectItem value="all">All Classes</SelectItem>
                    {uniqueClasses.map((cls) => (
-                     <SelectItem key={cls} value={cls}>Class {cls}</SelectItem>
+                     <SelectItem key={cls} value={cls}>{`Class ${cls}`}</SelectItem>
                    ))}
                  </SelectContent>
                </Select>
@@ -263,7 +263,7 @@ export default function AdminAttendancePage() {
                  <SelectContent>
                    <SelectItem value="all">All Sections</SelectItem>
                    {uniqueSections.map((sec) => (
-                     <SelectItem key={sec} value={sec}>Section {sec}</SelectItem>
+                     <SelectItem key={sec} value={sec}>{`Section ${sec}`}</SelectItem>
                    ))}
                  </SelectContent>
                </Select>

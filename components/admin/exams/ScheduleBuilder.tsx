@@ -504,7 +504,7 @@ export function ScheduleBuilder({ session }: Props) {
             <SelectContent>
               <SelectItem value="all">Select Class</SelectItem>
               {allowedClasses.map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>Class {c.className}</SelectItem>
+                <SelectItem key={c.id} value={String(c.id)}>{`Class ${c.className}`}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -521,7 +521,7 @@ export function ScheduleBuilder({ session }: Props) {
               <SelectContent>
                 <SelectItem value="all">All Sections</SelectItem>
                 {allowedSections.map((s: any) => (
-                  <SelectItem key={s.id} value={String(s.id)}>Section {s.sectionName}</SelectItem>
+                  <SelectItem key={s.id} value={String(s.id)}>{`Section ${s.sectionName}`}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -661,7 +661,7 @@ export function ScheduleBuilder({ session }: Props) {
                             <SelectContent>
                               <SelectItem value="all">Select Class</SelectItem>
                               {schoolClasses.map((c: any) => (
-                                <SelectItem key={c.id} value={String(c.id)}>Class {c.className}</SelectItem>
+                                <SelectItem key={c.id} value={String(c.id)}>{`Class ${c.className}`}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

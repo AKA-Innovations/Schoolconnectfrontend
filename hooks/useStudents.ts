@@ -309,12 +309,12 @@ export const attendanceKeys = {
   ] as const,
 };
 
-export function useFilterAttendance(params: AttendanceFilterParams) {
+export function useFilterAttendance(params: AttendanceFilterParams, options?: { enabled?: boolean }) {
   console.log("Attendance Filter params:", params);
   return useQuery({
     queryKey: attendanceKeys.filter(params),
     queryFn: () => studentService.filterAttendance(params),
-    enabled: !!((params.classSectionId || params.studentId || params.teacherId) && params.date),
+    enabled: options?.enabled !== false && !!((params.classSectionId || params.studentId || params.teacherId) && params.date),
     staleTime: 10000, // 10s stale time to prevent spamming
   });
 }

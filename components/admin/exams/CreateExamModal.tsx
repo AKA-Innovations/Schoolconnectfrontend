@@ -10,6 +10,7 @@ import { useExamTypes } from '@/services/exam/queries';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/ui/datepicker';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface Props {
   isOpen: boolean;
@@ -94,15 +95,21 @@ export function CreateExamModal({ isOpen, onClose, session, onSuccess }: Props) 
 
             <div className="space-y-2">
               <Label className="font-semibold text-foreground text-xs uppercase tracking-wider">Exam Category</Label>
-              <select
+              <Select
                 value={examType}
-                onChange={(e) => setExamType(e.target.value)}
-                className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                onValueChange={setExamType}
               >
-                {typesArray.map((t: any) => (
-                  <option key={t.id} value={t.name}>{t.name.replace(/_/g, ' ')}</option>
-                ))}
-              </select>
+                <SelectTrigger className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <SelectValue placeholder="Select Exam Category" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border border-border shadow-lg bg-card">
+                  {typesArray.map((t: any) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
