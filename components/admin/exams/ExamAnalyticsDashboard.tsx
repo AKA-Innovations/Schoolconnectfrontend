@@ -111,9 +111,9 @@ export function ExamAnalyticsDashboard({ session }: Props) {
     return map;
   }, [studentsResponse]);
 
-  const uniqueTopperGrades = React.useMemo(() => {
-    const grades = toppers.map((t: any) => t.grade).filter(Boolean);
-    return [...new Set(grades)].sort();
+  const uniqueTopperGrades = React.useMemo<string[]>(() => {
+    const grades = toppers.map((t: any) => String(t.grade || '')).filter(Boolean);
+    return [...new Set(grades)].sort() as string[];
   }, [toppers]);
 
   const processedToppers = React.useMemo(() => {
