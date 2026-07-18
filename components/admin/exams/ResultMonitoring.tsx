@@ -17,6 +17,7 @@ import {
   useUpdatePrincipalRemarks,
 } from '@/services/exam/mutations';
 import { useSchoolClasses, useSchoolSections, useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, CheckCircle2, AlertCircle, RefreshCw, Send, Check, Play, Globe, Lock } from 'lucide-react';
@@ -27,7 +28,7 @@ interface Props {
 }
 
 export function ResultMonitoring({ session }: Props) {
-  const user = useAuthStore((s) => s.user);
+  const { user } = useTeacherProfile();
   const userRole = user?.role; // 'school_admin' or others
   const isPowerUser = userRole === 'principal' || userRole === 'school_admin' || !!user?.isPrincipal;
 
@@ -48,6 +49,30 @@ export function ResultMonitoring({ session }: Props) {
 
   const isClassTeacherOnly = !isPowerUser && (!!user?.isClassTeacher || !!user?.classTeacherClass);
 
+  // Resolve assigned class details from classSectionLists
+  const resolvedClass = React.useMemo(() => {
+    const assignedClass = user?.classTeacherClass;
+    if (!assignedClass || classSectionLists.length === 0) return null;
+
+    const match = classSectionLists.find((s: any) => {
+      const classDtlsId = assignedClass.classDtlsId || (assignedClass as any).id;
+      if (classDtlsId && (s.mappingId === classDtlsId || s.id === classDtlsId || s.masterSectionId === classDtlsId)) return true;
+      if (assignedClass.className && assignedClass.sectionName && s.className === assignedClass.className && s.sectionName === assignedClass.sectionName) return true;
+      return false;
+    });
+
+    if (match) {
+      return {
+        ...assignedClass,
+        className: match.className,
+        sectionName: match.sectionName,
+        classDtlsId: (assignedClass.classDtlsId && assignedClass.classDtlsId > 0) ? assignedClass.classDtlsId : (match.mappingId || match.id),
+        classId: match.classId,
+      };
+    }
+    return assignedClass;
+  }, [user?.classTeacherClass, classSectionLists]);
+
   // Fetch teacher's assigned classes and subjects (or all if principal/admin)
   const { data: mySubjectDetailsRaw } = useSubjectDetails(
     isPowerUser ? undefined : user?.id,
@@ -61,19 +86,15 @@ export function ResultMonitoring({ session }: Props) {
 
   // Auto-configure class & section for class teacher
   React.useEffect(() => {
-    if (isClassTeacherOnly && user?.classTeacherClass && classSectionLists.length > 0) {
-      const assigned = user.classTeacherClass as any;
-      const match = classSectionLists.find(
-        (s: any) =>
-          s.className === assigned.className &&
-          s.sectionName === assigned.sectionName
-      );
-      if (match) {
-        setSelectedClassId(match.classId);
-        setSelectedSectionId(match.id);
+    if (isClassTeacherOnly && resolvedClass) {
+      if (resolvedClass.classId) {
+        setSelectedClassId(Number(resolvedClass.classId));
+      }
+      if (resolvedClass.classDtlsId) {
+        setSelectedSectionId(Number(resolvedClass.classDtlsId));
       }
     }
-  }, [isClassTeacherOnly, user, classSectionLists]);
+  }, [isClassTeacherOnly, resolvedClass]);
 
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
@@ -308,9 +329,9 @@ export function ResultMonitoring({ session }: Props) {
               </Select>
             </>
           ) : (
-            user?.classTeacherClass && (
+            resolvedClass && (
               <Badge variant="outline" className="h-10 px-4 rounded-xl border-dashed border-primary/30 bg-primary/5 text-primary text-xs font-bold flex items-center gap-1.5 shrink-0">
-                My Class: {user.classTeacherClass.className} - {user.classTeacherClass.sectionName}
+                My Class: {resolvedClass.className || '-'} - {resolvedClass.sectionName || '-'}
               </Badge>
             )
           )}

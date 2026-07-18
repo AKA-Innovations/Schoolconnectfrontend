@@ -1247,7 +1247,7 @@ export default function ClassRoomPage() {
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                       {toppers.map((t: any) => (
-                                        <tr key={t.rank} className="hover:bg-slate-50/30">
+                                        <tr key={t.studentId} className="hover:bg-slate-50/30">
                                           <td className="p-4 px-6 font-bold text-primary">#{t.rank}</td>
                                           <td className="p-4 font-bold text-foreground">{t.studentId}</td>
                                           <td className="p-4 text-slate-400">{t.totalMarks}</td>

@@ -46,6 +46,9 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
 
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+  const mobileNavRef = React.useRef<HTMLDivElement>(null);
 
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
   const [isHydrated, setIsHydrated] = React.useState(false);
@@ -107,10 +110,38 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
     return list.filter((ann: any) => !readIds.includes(ann.id));
   }, [announcementsData, readIds]);
 
+  const activeSubLink = React.useMemo(() => {
+    return subLinks.find(sub => {
+      const [subPath, subQuery] = sub.href.split('?');
+      let isActive = pathname === subPath;
+      
+      if (subQuery) {
+        const params = new URLSearchParams(subQuery);
+        const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+          const currentVal = searchParams?.get(key);
+          if (key === 'tab' && value === 'profile' && !currentVal) {
+            return true;
+          }
+          return currentVal === value;
+        });
+        isActive = isActive && allParamsMatch;
+      } else {
+        const currentTab = searchParams?.get('tab');
+        if (currentTab && currentTab !== 'profile') {
+          isActive = false;
+        }
+      }
+      return isActive;
+    });
+  }, [subLinks, pathname, searchParams]);
+
   React.useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+      }
+      if (mobileNavRef.current && !mobileNavRef.current.contains(e.target as Node)) {
+        setIsMobileNavOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -160,14 +191,73 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
     <header
       className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border subtle-shadow"
     >
-      <button
-        type="button"
-        onClick={onMobileMenuClick}
-        className="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent transition-colors"
-        aria-label="Open sidebar"
-      >
-        <Menu size={18} />
-      </button>
+      <div className="flex items-center gap-3 lg:hidden">
+        <button
+          type="button"
+          onClick={onMobileMenuClick}
+          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent transition-colors"
+          aria-label="Open sidebar"
+        >
+          <Menu size={18} />
+        </button>
+
+        {/* Mobile Navigation Dropdown */}
+        {subLinks.length > 0 && (
+          <div className="relative" ref={mobileNavRef}>
+            <button
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent hover:border-primary/30 transition-all duration-300"
+            >
+              <span className="truncate max-w-[120px] sm:max-w-[200px]">
+                {activeSubLink?.name || activeSection?.name || 'Menu'}
+              </span>
+              <ChevronDown size={14} className={cn("transition-transform duration-300 text-muted-foreground", isMobileNavOpen && "rotate-180 text-primary")} />
+            </button>
+
+            {isMobileNavOpen && (
+              <div className="absolute left-0 mt-2 w-56 py-2 bg-background border border-border rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                {subLinks.map((sub) => {
+                  const [subPath, subQuery] = sub.href.split('?');
+                  let isActive = pathname === subPath;
+
+                  if (subQuery) {
+                    const params = new URLSearchParams(subQuery);
+                    const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+                      const currentVal = searchParams?.get(key);
+                      if (key === 'tab' && value === 'profile' && !currentVal) {
+                        return true;
+                      }
+                      return currentVal === value;
+                    });
+                    isActive = isActive && allParamsMatch;
+                  } else {
+                    const currentTab = searchParams?.get('tab');
+                    if (currentTab && currentTab !== 'profile') {
+                      isActive = false;
+                    }
+                  }
+
+                  return (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      onClick={() => setIsMobileNavOpen(false)}
+                      className={cn(
+                        'block px-4 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary border-l-2 border-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                      )}
+                    >
+                      {sub.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Sub navigation links shifted to Topbar */}
       <div className="hidden lg:flex items-center h-full gap-8 overflow-x-auto no-scrollbar ml-8 mr-auto">

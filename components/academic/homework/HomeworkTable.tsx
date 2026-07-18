@@ -16,7 +16,6 @@ interface Props {
   isLoading: boolean;
   onView: (hw: Homework) => void;
   onEdit: (hw: Homework) => void;
-  onDelete: (id: number) => void;
   page?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
@@ -29,7 +28,7 @@ function getHomeworkStatus(hw: Homework): string {
   return 'active';
 }
 
-export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLoading, onView, onEdit, onDelete, page, totalPages, onPageChange }: Props) {
+export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLoading, onView, onEdit, page, totalPages, onPageChange }: Props) {
   const role = useAuthStore((s) => s.role);
   const canManage = role === 'teacher' || role === 'subject_coordinator';
 
@@ -39,9 +38,11 @@ export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLo
       render: (item) => (
         <div className="flex flex-col gap-0.5 max-w-xs">
           <span className="font-bold text-slate-900 text-sm group-hover:text-teal-600 transition-colors truncate">📘 {item.title}</span>
-          <span className="text-[10px] font-medium text-slate-400">
-            Assigned by: {item.assignedBy || 'Teacher'}
-          </span>
+          {role !== 'teacher' && (
+            <span className="text-[10px] font-medium text-slate-400">
+              Assigned by: {item.assignedBy || 'Teacher'}
+            </span>
+          )}
         </div>
       ),
     },
@@ -86,19 +87,14 @@ export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLo
             <Eye size={16} className="text-slate-400" />
           </Button>
           {canManage && (
-            <>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
-                <Edit size={16} className="text-slate-400" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}>
-                <Trash2 size={16} />
-              </Button>
-            </>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
+              <Edit size={16} className="text-slate-400" />
+            </Button>
           )}
         </div>
       ),
     },
-  ], [onView, onEdit, onDelete, canManage]);
+  ], [onView, onEdit, canManage]);
 
   return <AcademicTable columns={columns} data={homeworks} isLoading={isLoading} rowKey={(i) => i.id} emptyIcon={<ClipboardList size={48} />} emptyMessage="No Homework Found" onRowClick={onView} page={page} totalPages={totalPages} onPageChange={onPageChange} />;
 });

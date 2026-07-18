@@ -282,6 +282,7 @@ export const HomeworkFormModal = React.memo(function HomeworkFormModal({
                     value={field.value}
                     onChange={field.onChange}
                     placeholder="Select Date"
+                    align="top"
                   />
                 )}
               />

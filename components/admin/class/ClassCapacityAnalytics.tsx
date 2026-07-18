@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useClassSectionLists } from '@/hooks/useClasses';
 import { useStudentList } from '@/hooks/useStudents';
+import { CURRENT_SESSION } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -31,7 +32,7 @@ function Progress({ value, className }: { value: number; className?: string }) {
 
 export function ClassCapacityAnalytics() {
   const { data: classSectionsData, isLoading: loadingClasses } = useClassSectionLists();
-  const { data: studentData, isLoading: loadingStudents } = useStudentList({ limit: 1000 });
+  const { data: studentData, isLoading: loadingStudents } = useStudentList({ limit: 10000 });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
@@ -54,7 +55,10 @@ export function ClassCapacityAnalytics() {
     const counts: Record<string, number> = {};
     const students = studentData?.items || [];
     students.forEach((student: any) => {
-      const acad = student.academics?.[0];
+      if (student.status && student.status.toUpperCase() !== 'ACTIVE') {
+        return;
+      }
+      const acad = student.academics?.find((a: any) => a.session === CURRENT_SESSION) || student.academics?.[0];
       if (acad) {
         const sectId = acad.classSectionId || acad.classSectionsId;
         if (sectId) {

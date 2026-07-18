@@ -217,7 +217,7 @@ export function ResultEntry() {
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((student) => {
+                  {students.map((student, index) => {
                     const grade = student.marksObtained !== '' 
                       ? calculateGrade(Number(student.marksObtained), student.maxMarks) 
                       : '-';
@@ -246,12 +246,29 @@ export function ResultEntry() {
                         </td>
                         <td className="px-2 py-1">
                           <Input 
+                            id={`result-marks-input-${student.studentId}`}
                             type="number"
                             className="h-9 rounded-lg"
                             placeholder=" / 100"
                             value={student.marksObtained}
                             disabled={isAbsent}
                             onChange={(e) => handleUpdateStudent(student.studentId, 'marksObtained', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                let nextIndex = index + 1;
+                                while (nextIndex < students.length) {
+                                  const nextStudent = students[nextIndex];
+                                  const nextInput = document.getElementById(`result-marks-input-${nextStudent.studentId}`) as HTMLInputElement | null;
+                                  if (nextInput && !nextInput.disabled) {
+                                    nextInput.focus();
+                                    nextInput.select();
+                                    break;
+                                  }
+                                  nextIndex++;
+                                }
+                              }
+                            }}
                           />
                         </td>
                         <td className="px-2 py-1">

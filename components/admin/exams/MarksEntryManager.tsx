@@ -756,7 +756,7 @@ export function MarksEntryManager({ session }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50 text-sm">
-                    {displayedStudents.map((student: any) => {
+                    {displayedStudents.map((student: any, index: number) => {
                       const academic = student.academics?.[0];
                       const studentGridData = marksGrid[student.id] || { marksObtained: '', isAbsent: false, remarks: '' };
                       const autoGrade = studentGridData.isAbsent
@@ -791,6 +791,7 @@ export function MarksEntryManager({ session }: Props) {
                           <td className="p-3">
                             <div className="relative">
                               <Input
+                                id={`marks-input-${student.id}`}
                                 type="number"
                                 value={studentGridData.marksObtained}
                                 max={currentSubjectConfig?.totalMarks}
@@ -798,6 +799,22 @@ export function MarksEntryManager({ session }: Props) {
                                 placeholder={`/ ${currentSubjectConfig?.totalMarks}`}
                                 disabled={studentGridData.isAbsent || isMarksLocked}
                                 onChange={(e) => handleMarkChange(student.id, 'marksObtained', e.target.value === '' ? '' : Number(e.target.value))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    let nextIndex = index + 1;
+                                    while (nextIndex < displayedStudents.length) {
+                                      const nextStudent = displayedStudents[nextIndex];
+                                      const nextInput = document.getElementById(`marks-input-${nextStudent.id}`) as HTMLInputElement | null;
+                                      if (nextInput && !nextInput.disabled) {
+                                        nextInput.focus();
+                                        nextInput.select();
+                                        break;
+                                      }
+                                      nextIndex++;
+                                    }
+                                  }
+                                }}
                                 className="h-9 rounded-lg text-center"
                               />
                             </div>

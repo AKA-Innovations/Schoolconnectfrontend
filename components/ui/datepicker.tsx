@@ -11,9 +11,10 @@ interface DatePickerProps {
   className?: string;
   placeholder?: string;
   buttonClassName?: string;
+  align?: 'top' | 'bottom';
 }
 
-export function DatePicker({ value, onChange, className, placeholder = 'Select Date', buttonClassName }: DatePickerProps) {
+export function DatePicker({ value, onChange, className, placeholder = 'Select Date', buttonClassName, align = 'bottom' }: DatePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   
   // Internal state for calendar navigation
@@ -143,7 +144,10 @@ export function DatePicker({ value, onChange, className, placeholder = 'Select D
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1.5 w-[280px] rounded-2xl border border-border bg-card p-3 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+        <div className={cn(
+          "absolute left-0 z-50 w-[280px] rounded-2xl border border-border bg-card p-3 shadow-xl animate-in fade-in zoom-in-95 duration-100",
+          align === 'top' ? "bottom-full mb-1.5" : "top-full mt-1.5"
+        )}>
           {/* Header */}
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs font-bold tracking-wide">

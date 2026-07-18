@@ -1,5 +1,6 @@
 import api from '../../lib/api';
 import { API_ENDPOINTS } from '../config';
+import { CURRENT_SESSION } from '../../lib/constants';
 import type {
   SubjectChapter,
   CreateSubjectChapterPayload,
@@ -32,9 +33,9 @@ export const academicService = {
   // ─── Subject Chapters ──────────────────────────────────────────────────────
 
   getSubjectChapters: async (subjectId?: number | string, session?: string): Promise<SubjectChapter[]> => {
-    if (!subjectId || !session) return [];
+    if (!subjectId) return [];
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_CHAPTER, {
-      params: { subjectId, session },
+      params: { subjectId, session: session ?? CURRENT_SESSION },
     });
     const raw = response.data;
     if (Array.isArray(raw)) return raw;
@@ -60,9 +61,9 @@ export const academicService = {
   // ─── Subject Topics ────────────────────────────────────────────────────────
 
   getSubjectTopics: async (chapterId: number | string, subjectId?: number | string, session?: string): Promise<SubjectTopic[]> => {
-    if (!chapterId || !subjectId || !session) return [];
+    if (!chapterId || !subjectId) return [];
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_TOPIC, {
-      params: { chapterId, subjectId, session },
+      params: { chapterId, subjectId, session: session ?? CURRENT_SESSION },
     });
 
     const raw = response.data;
@@ -90,7 +91,7 @@ export const academicService = {
   getSubjectProgress: async (subjectId: number | string, classSectionId: number | string, session?: string): Promise<SubjectProgressSummary | null> => {
     if (!subjectId || !classSectionId) return null;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.SUBJECT_PROGRESS, {
-      params: { subjectId, classSectionId, session },
+      params: { subjectId, classSectionId, session: session ?? CURRENT_SESSION },
     });
     return response.data;
   },
@@ -98,16 +99,19 @@ export const academicService = {
   getChapterProgress: async (chapterId: number | string, classSectionId: number | string, session?: string): Promise<ChapterProgressSummary | null> => {
     if (!chapterId || !classSectionId) return null;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.CHAPTER_PROGRESS, {
-      params: { chapterId, classSectionId, session },
+      params: { chapterId, classSectionId, session: session ?? CURRENT_SESSION },
     });
     return response.data;
   },
 
   // ─── Teaching Progress ─────────────────────────────────────────────────────
 
-  getTeachingProgress: async (teacherId?: string): Promise<TeachingProgress[]> => {
+  getTeachingProgress: async (teacherId?: string, session?: string): Promise<TeachingProgress[]> => {
+    const params: any = {};
+    if (teacherId) params.teacherId = teacherId;
+    params.session = session ?? CURRENT_SESSION;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, {
-      params: teacherId ? { teacherId } : undefined,
+      params,
     });
     return response.data ?? [];
   },
@@ -128,8 +132,10 @@ export const academicService = {
 
   // ─── Homework ──────────────────────────────────────────────────────────────
 
-  getHomeworks: async (classNameOrParams?: string | any): Promise<Homework[]> => {
-    const params = typeof classNameOrParams === 'string' ? { className: classNameOrParams } : classNameOrParams;
+  getHomeworks: async (classNameOrParams?: string | any, session?: string): Promise<Homework[]> => {
+    let params = typeof classNameOrParams === 'string' ? { className: classNameOrParams } : classNameOrParams;
+    params = { ...params };
+    params.session = session ?? params.session ?? CURRENT_SESSION;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.HOMEWORK, {
       params,
     });
@@ -234,8 +240,10 @@ export const academicService = {
 
   // ─── Classwork ─────────────────────────────────────────────────────────────
 
-  getClassworks: async (classIdOrParams?: string | any): Promise<Classwork[]> => {
-    const params = typeof classIdOrParams === 'string' ? { classId: classIdOrParams } : classIdOrParams;
+  getClassworks: async (classIdOrParams?: string | any, session?: string): Promise<Classwork[]> => {
+    let params = typeof classIdOrParams === 'string' ? { classId: classIdOrParams } : classIdOrParams;
+    params = { ...params };
+    params.session = session ?? params.session ?? CURRENT_SESSION;
     const response = await api.get(API_ENDPOINTS.ACADEMIC.CLASSWORK, {
       params,
     });
@@ -262,8 +270,10 @@ export const academicService = {
 
   // ─── Study Material ───────────────────────────────────────────────────────
 
-  getStudyMaterials: async (): Promise<StudyMaterial[]> => {
-    const response = await api.get(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL);
+  getStudyMaterials: async (session?: string): Promise<StudyMaterial[]> => {
+    const response = await api.get(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL, {
+      params: { session: session ?? CURRENT_SESSION },
+    });
     const raw = response.data;
     if (Array.isArray(raw)) return raw;
     if (raw?.data && Array.isArray(raw.data)) return raw.data;

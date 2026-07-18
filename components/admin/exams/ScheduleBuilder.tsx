@@ -682,7 +682,7 @@ export function ScheduleBuilder({ session }: Props) {
               </Card>
 
               {/* Builder Grid List */}
-              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card overflow-hidden">
+              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card relative">
                 <CardHeader className="border-b border-border/50 bg-muted/10 pb-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4">
                     <div>
