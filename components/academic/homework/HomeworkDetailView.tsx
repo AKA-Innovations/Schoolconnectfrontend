@@ -484,7 +484,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
               ) : !filteredStudents.length ? (
                 <p className="text-sm text-slate-400 py-12 text-center">No students found matching filters.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto pb-36 min-h-[260px]">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100 text-xs font-bold text-slate-400">
@@ -543,11 +543,10 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {Object.values(HomeworkStatus).map((status) => (
-                                    <SelectItem key={status} value={status}>
-                                      {getStatusLabel(status)}
-                                    </SelectItem>
-                                  ))}
+                                  <SelectItem value={HomeworkStatus.PENDING}>Pending</SelectItem>
+                                  <SelectItem value={HomeworkStatus.SUBMITTED}>Submitted</SelectItem>
+                                  <SelectItem value={HomeworkStatus.LATE}>Late</SelectItem>
+                                  <SelectItem value={HomeworkStatus.NOT_SUBMITTED}>Not Submitted</SelectItem>
                                 </SelectContent>
                               </Select>
                             </td>

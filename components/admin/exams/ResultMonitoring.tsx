@@ -87,11 +87,12 @@ export function ResultMonitoring({ session }: Props) {
   // Auto-configure class & section for class teacher
   React.useEffect(() => {
     if (isClassTeacherOnly && resolvedClass) {
-      if (resolvedClass.classId) {
-        setSelectedClassId(Number(resolvedClass.classId));
+      const resClass = resolvedClass as any;
+      if (resClass.classId) {
+        setSelectedClassId(Number(resClass.classId));
       }
-      if (resolvedClass.classDtlsId) {
-        setSelectedSectionId(Number(resolvedClass.classDtlsId));
+      if (resClass.classDtlsId) {
+        setSelectedSectionId(Number(resClass.classDtlsId));
       }
     }
   }, [isClassTeacherOnly, resolvedClass]);
