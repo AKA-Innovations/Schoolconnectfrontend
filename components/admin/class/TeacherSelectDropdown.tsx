@@ -2,9 +2,9 @@
 
 import React, { useMemo } from 'react';
 import { Label } from '@/components/ui/label';
-import { useAuthStore } from '@/store/authStore';
-import { useTeacherList } from '@/hooks/useTeachers';
-import { Loader2, UserCheck } from 'lucide-react';
+import { useAvailableClassTeachers, useTeacherBasicDetails } from '@/hooks/useTeachers';
+import { Loader2 } from 'lucide-react';
+import { CURRENT_SESSION } from '@/lib/constants';
 
 interface TeacherSelectDropdownProps {
   value: string;
@@ -20,22 +20,16 @@ export function TeacherSelectDropdown({
   currentTeacherId,
   className,
 }: TeacherSelectDropdownProps) {
-  const { schoolId } = useAuthStore();
+  // Fetch available class teachers for the session
+  const { data, isLoading } = useAvailableClassTeachers(CURRENT_SESSION);
 
-  const { data, isLoading } = useTeacherList({
-    schoolId: schoolId ?? '',
-    pageSize: 200,
-  });
+  // Fetch current class teacher details if editing
+  const { data: currentTeacherRes } = useTeacherBasicDetails(currentTeacherId ?? '');
+  const currentTeacher = currentTeacherRes?.data ?? currentTeacherRes;
 
-  // Show teachers who are not coordinators/principals and not already class teachers,
-  // plus the currently assigned one (editing). Subject teachers are always eligible.
   const eligibleTeachers = useMemo(() => {
     if (!data?.data) return [];
-    return data.data.filter(
-      (t) =>
-        t.id === currentTeacherId ||
-        (!t.isCoordinator && !t.isPrincipal && !t.isClassTeacher)
-    );
+    return data.data.filter((t: any) => t.teacherId !== currentTeacherId);
   }, [data?.data, currentTeacherId]);
 
   return (
@@ -56,24 +50,25 @@ export function TeacherSelectDropdown({
           className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm text-foreground outline-none transition focus:ring-2 focus:ring-ring focus:border-ring appearance-none cursor-pointer"
         >
           <option value="">— None (unassigned) —</option>
-          {eligibleTeachers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.firstName} {t.lastName}
-              {t.employeeId ? ` (${t.employeeId})` : ''}
-              {t.isClassTeacher ? ' ✓ assigned' : ''}
+          
+          {currentTeacherId && (
+            <option value={currentTeacherId}>
+              {currentTeacher
+                ? `${currentTeacher.firstName} ${currentTeacher.lastName} (Current)`
+                : 'Loading current teacher…'}
+            </option>
+          )}
+
+          {eligibleTeachers.map((t: any) => (
+            <option key={t.teacherId} value={t.teacherId}>
+              {t.teacherName}
             </option>
           ))}
         </select>
       )}
 
-      {!isLoading && eligibleTeachers.length === 0 && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-          <UserCheck className="h-3.5 w-3.5" />
-          All teachers are already assigned as class teachers.
-        </p>
-      )}
       <p className="text-[11px] text-muted-foreground">
-        Only teachers not already a Principal, Coordinator, or Class Teacher are shown.
+        Only available teachers who are not already a Principal, Coordinator, or Class Teacher are shown.
       </p>
     </div>
   );

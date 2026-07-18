@@ -22,12 +22,20 @@ interface Props { teacherIdOverride?: string; }
 
 export function ProgressManagement({ teacherIdOverride }: Props) {
   const user = useAuthStore((s) => s.user);
+  const role = useAuthStore((s) => s.role);
   const teacherId = teacherIdOverride ?? (user?.role === 'teacher' ? user.id : undefined);
+
+  const canLogProgress = role === 'teacher' || role === 'subject_coordinator';
 
   const [isFormOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<TeachingProgress | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedAssignment, setSelectedAssignment] = useState('');
+
+  // Admin cascading filter state
+  const [adminClass, setAdminClass] = useState('');
+  const [adminSection, setAdminSection] = useState('');
+  const [adminSubject, setAdminSubject] = useState('');
 
   const { data: taughtSubjects = [] } = useSubjectDetails(teacherId, CURRENT_SESSION);
   const { isClassTeacher, assignedClass } = useTeacherProfile();
@@ -45,6 +53,73 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
     if (isClassTeacher && classWideSubjects.length > 0) return classWideSubjects;
     return taughtSubjects;
   }, [taughtSubjects, classWideSubjects, isClassTeacher]);
+
+  const uniqueClasses = useMemo(() => {
+    const set = new Set(mySubjects.map((s) => s.className).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [mySubjects]);
+
+  const uniqueSections = useMemo(() => {
+    if (!adminClass) return [];
+    const set = new Set(
+      mySubjects
+        .filter((s) => s.className === adminClass)
+        .map((s) => s.sectionName)
+        .filter(Boolean) as string[]
+    );
+    return Array.from(set).sort();
+  }, [mySubjects, adminClass]);
+
+  const uniqueSubjects = useMemo(() => {
+    if (!adminClass || !adminSection) return [];
+    const set = new Set(
+      mySubjects
+        .filter((s) => s.className === adminClass && s.sectionName === adminSection)
+        .map((s) => s.subjectName)
+        .filter(Boolean) as string[]
+    );
+    return Array.from(set).sort();
+  }, [mySubjects, adminClass, adminSection]);
+
+  const handleClassChange = (newClass: string) => {
+    setAdminClass(newClass);
+    setAdminSection('');
+    setAdminSubject('');
+    setSelectedAssignment('');
+  };
+
+  const handleSectionChange = (newSection: string) => {
+    setAdminSection(newSection);
+    setAdminSubject('');
+    setSelectedAssignment('');
+  };
+
+  const handleSubjectChange = (newSubject: string) => {
+    setAdminSubject(newSubject);
+    const active = mySubjects.find(
+      (s) =>
+        (s.className ?? '') === adminClass &&
+        (s.sectionName ?? '') === adminSection &&
+        (s.subjectName ?? '') === newSubject
+    );
+    if (active) {
+      setSelectedAssignment(String(active.id));
+    } else {
+      setSelectedAssignment('');
+    }
+  };
+
+  // Sync state if selectedAssignment changes from outside/initial load
+  useEffect(() => {
+    if (selectedAssignment && mySubjects.length > 0) {
+      const active = mySubjects.find((s) => String(s.id) === selectedAssignment);
+      if (active) {
+        setAdminClass(active.className ?? '');
+        setAdminSection(active.sectionName ?? '');
+        setAdminSubject(active.subjectName ?? '');
+      }
+    }
+  }, [selectedAssignment, mySubjects]);
 
   // Derive IDs from selected assignment for API filtering
   const { selectedClassSectionId, selectedSubjectId } = useMemo(() => {
@@ -119,34 +194,98 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
         <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
-        <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl"
-          disabled={!selectedAssignment}>
-          <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Log Progress</span>
-        </Button>
+        {canLogProgress && (
+          <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl"
+            disabled={!selectedAssignment}>
+            <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Log Progress</span>
+          </Button>
+        )}
       </AcademicPageHeader>
 
       {/* Assignment selector */}
       {mySubjects.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignment:</span>
-          <div className="min-w-[280px]">
-            <Select
-              value={selectedAssignment}
-              onValueChange={setSelectedAssignment}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="— Select Class-Subject —" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">— Select Class-Subject —</SelectItem>
-                {mySubjects.map((sd) => (
-                  <SelectItem key={sd.id} value={String(sd.id)}>
-                    {sd.className} {sd.sectionName} — {sd.subjectName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          {!canLogProgress ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Class:</span>
+                <div className="min-w-[150px]">
+                  <Select value={adminClass} onValueChange={handleClassChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueClasses.map((c) => (
+                        <SelectItem key={c} value={c}>{`Class ${c}`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Section:</span>
+                <div className="min-w-[120px]">
+                  <Select 
+                    value={adminSection} 
+                    onValueChange={handleSectionChange}
+                    disabled={!adminClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Section" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueSections.map((s) => (
+                        <SelectItem key={s} value={s}>{`Section ${s}`}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Subject:</span>
+                <div className="min-w-[200px]">
+                  <Select 
+                    value={adminSubject} 
+                    onValueChange={handleSubjectChange}
+                    disabled={!adminSection}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueSubjects.map((sub) => (
+                        <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assignment:</span>
+              <div className="min-w-[280px]">
+                <Select
+                  value={selectedAssignment}
+                  onValueChange={setSelectedAssignment}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="— Select Class-Subject —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">— Select Class-Subject —</SelectItem>
+                    {mySubjects.map((sd) => (
+                      <SelectItem key={sd.id} value={String(sd.id)}>
+                        {`${sd.className || ''} ${sd.sectionName || ''} — ${sd.subjectName || ''}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

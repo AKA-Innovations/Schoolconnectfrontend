@@ -53,6 +53,17 @@ api.interceptors.request.use((config) => {
 
 import { toast } from 'sonner';
 
+let lastToastTime = 0;
+const TOAST_THROTTLE_MS = 3000;
+
+function showThrottledError(message: string) {
+  const now = Date.now();
+  if (now - lastToastTime > TOAST_THROTTLE_MS) {
+    toast.error(message);
+    lastToastTime = now;
+  }
+}
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
@@ -68,11 +79,11 @@ api.interceptors.response.use(
         localStorage.removeItem('auth-storage');
         window.location.href = '/login';
       } else if (status === 403) {
-        toast.error('Access Denied: You do not have permission to access this resource.');
+        showThrottledError('Access Denied: You do not have permission to access this resource.');
       } else if (status === 500) {
-        toast.error('Internal Server Error: Please try again later.');
+        showThrottledError('Internal Server Error: Please try again later.');
       } else if (!error.response) {
-        toast.error('Network Connection Error: Please check your network connectivity.');
+        showThrottledError('Network Connection Error: Please check your network connectivity.');
       }
     }
     return Promise.reject(error);

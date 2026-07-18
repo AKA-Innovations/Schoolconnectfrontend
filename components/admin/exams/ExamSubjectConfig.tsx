@@ -14,6 +14,7 @@ import { Plus, Trash2, RefreshCw, AlertCircle, Sparkles, HelpCircle, Copy, Grid 
 import { toast } from 'sonner';
 import { GradingType } from '@/types/exam.types';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   session: string;
@@ -36,8 +37,8 @@ export function ExamSubjectConfig({ session }: Props) {
     selectedClassId || undefined
   );
 
-  const subjects = Array.isArray(subjectsData) 
-    ? subjectsData 
+  const subjects = Array.isArray(subjectsData)
+    ? subjectsData
     : (subjectsData as any)?.data || (subjectsData as any)?.items || [];
 
   const { data: subjectOptions = [] } = useSubjectOptions(selectedClassId || undefined);
@@ -154,9 +155,9 @@ export function ExamSubjectConfig({ session }: Props) {
         Number(copySourceExamId),
         Number(copySourceClassId)
       );
-      
-      const sourceList = Array.isArray(sourceData) 
-        ? sourceData 
+
+      const sourceList = Array.isArray(sourceData)
+        ? sourceData
         : (sourceData as any)?.data || (sourceData as any)?.items || [];
 
       if (sourceList.length === 0) {
@@ -214,27 +215,41 @@ export function ExamSubjectConfig({ session }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+          <Select
+            value={selectedExamId ? String(selectedExamId) : 'all'}
+            onValueChange={(val) => setSelectedExamId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-48"
           >
-            <option value="">Select Exam</option>
-            {exams.map((e: any) => (
-              <option key={e.id} value={e.id}>{e.examName}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Exam" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Exam</SelectItem>
+              {exams.map((e: any) => (
+                <SelectItem key={e.id} value={String(e.id)}>
+                  {e.examName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+          <Select
+            value={selectedClassId ? String(selectedClassId) : 'all'}
+            onValueChange={(val) => setSelectedClassId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-48"
           >
-            <option value="">Select Class</option>
-            {classes.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.className}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Class</SelectItem>
+              {classes.map((c: any) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  Class {c.className}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Button
             variant="outline"

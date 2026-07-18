@@ -26,8 +26,16 @@ export function useTeacherProfile() {
       setIsSyncing(true);
       try {
         const updatedTeacher = await teacherService.getTeacherById(user.id);
-        // Persist the updated teacher into the auth store
-        setAuth({ user: updatedTeacher as any, token });
+        // Persist the updated teacher into the auth store, merging and preserving existing user properties
+        setAuth({ 
+          user: {
+            ...user,
+            ...updatedTeacher,
+            role: user.role,
+            schoolId: user.schoolId
+          } as any, 
+          token 
+        });
       } catch (err) {
         console.error('Teacher Profile Sync Error:', err);
       } finally {

@@ -6,6 +6,7 @@ import { useMarkAttendance, useTeacherAttendanceForDay } from '../../hooks/useTe
 import { AttendanceStatus } from '../../types/leave.types';
 import { Button } from '../ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { DatePicker } from '../ui/datepicker';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { CalendarDays, CheckCircle, Loader2, Users, ClipboardList, Search } from 'lucide-react';
@@ -164,18 +165,15 @@ export function TeacherAttendanceManager() {
       <div className="flex flex-col gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-10 pl-9 pr-4 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-              />
-            </div>
+            <DatePicker
+              value={selectedDate}
+              onChange={(val) => {
+                setSelectedDate(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Select Date"
+              className="w-40 font-semibold"
+            />
             <p className="text-xs text-slate-500">
               Marking attendance for <span className="font-bold text-slate-700">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</span>
             </p>

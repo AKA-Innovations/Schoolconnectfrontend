@@ -17,6 +17,8 @@ import { examService } from '@/services/exam/service';
 import { toast } from 'sonner';
 import { ExamScheduleItemDto } from '@/types/exam.types';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 
 interface Props {
   session: string;
@@ -470,44 +472,59 @@ export function ScheduleBuilder({ session }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+          <Select
+            value={selectedExamId ? String(selectedExamId) : 'all'}
+            onValueChange={(val) => setSelectedExamId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-48"
           >
-            <option value="">Select Exam</option>
-            {exams.map((e: any) => (
-              <option key={e.id} value={e.id}>{e.examName}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Exam" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Exam</SelectItem>
+              {exams.map((e: any) => (
+                <SelectItem key={e.id} value={String(e.id)}>{e.examName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            value={selectedClassId}
-            onChange={(e) => {
-              const val = e.target.value ? Number(e.target.value) : '';
-              setSelectedClassId(val);
+          <Select
+            value={selectedClassId ? String(selectedClassId) : 'all'}
+            onValueChange={(val) => {
+              const numVal = val === 'all' ? '' : Number(val);
+              setSelectedClassId(numVal);
               setSelectedSectionIds([]);
               setSelectedScheduleSectionId('');
             }}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+            className="w-full sm:w-48"
           >
-            <option value="">Select Class</option>
-            {allowedClasses.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.className}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Class</SelectItem>
+              {allowedClasses.map((c: any) => (
+                <SelectItem key={c.id} value={String(c.id)}>{`Class ${c.className}`}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {selectedClassId && (
-            <select
-              value={selectedScheduleSectionId}
-              onChange={(e) => setSelectedScheduleSectionId(e.target.value ? Number(e.target.value) : '')}
-              className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold animate-in fade-in slide-in-from-left-2 duration-300"
+            <Select
+              value={selectedScheduleSectionId ? String(selectedScheduleSectionId) : 'all'}
+              onValueChange={(val) => setSelectedScheduleSectionId(val === 'all' ? '' : Number(val))}
+              className="w-full sm:w-48 animate-in fade-in slide-in-from-left-2 duration-300"
             >
-              <option value="">All Sections</option>
-              {allowedSections.map((s: any) => (
-                <option key={s.id} value={s.id}>Section {s.sectionName}</option>
-              ))}
-            </select>
+              <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+                <SelectValue placeholder="All Sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sections</SelectItem>
+                {allowedSections.map((s: any) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{`Section ${s.sectionName}`}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           <Button
@@ -545,11 +562,10 @@ export function ScheduleBuilder({ session }: Props) {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
-                          <Input
-                            type="date"
+                          <DatePicker
                             value={bulkStartDate}
-                            onChange={(e) => setBulkStartDate(e.target.value)}
-                            className="h-9 rounded-lg text-xs"
+                            onChange={setBulkStartDate}
+                            placeholder="Select Date"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
@@ -616,29 +632,39 @@ export function ScheduleBuilder({ session }: Props) {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Source Exam</Label>
-                          <select
-                            value={copySourceExamId}
-                            onChange={(e) => setCopySourceExamId(e.target.value ? Number(e.target.value) : '')}
-                            className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+                          <Select
+                            value={copySourceExamId ? String(copySourceExamId) : 'all'}
+                            onValueChange={(val) => setCopySourceExamId(val === 'all' ? '' : Number(val))}
+                            className="w-full"
                           >
-                            <option value="">Select Exam</option>
-                            {exams.map((e: any) => (
-                              <option key={e.id} value={e.id}>{e.examName}</option>
-                            ))}
-                          </select>
+                            <SelectTrigger className="h-9 w-full rounded-lg border-border bg-card text-xs font-semibold">
+                              <SelectValue placeholder="Select Exam" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Select Exam</SelectItem>
+                              {exams.map((e: any) => (
+                                <SelectItem key={e.id} value={String(e.id)}>{e.examName}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
                           <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Source Class</Label>
-                          <select
-                            value={copySourceClassId}
-                            onChange={(e) => setCopySourceClassId(e.target.value ? Number(e.target.value) : '')}
-                            className="flex h-9 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 font-semibold"
+                          <Select
+                            value={copySourceClassId ? String(copySourceClassId) : 'all'}
+                            onValueChange={(val) => setCopySourceClassId(val === 'all' ? '' : Number(val))}
+                            className="w-full"
                           >
-                            <option value="">Select Class</option>
-                            {schoolClasses.map((c: any) => (
-                              <option key={c.id} value={c.id}>{c.className}</option>
-                            ))}
-                          </select>
+                            <SelectTrigger className="h-9 w-full rounded-lg border-border bg-card text-xs font-semibold">
+                              <SelectValue placeholder="Select Class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Select Class</SelectItem>
+                              {schoolClasses.map((c: any) => (
+                                <SelectItem key={c.id} value={String(c.id)}>{`Class ${c.className}`}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       <Button
@@ -656,7 +682,7 @@ export function ScheduleBuilder({ session }: Props) {
               </Card>
 
               {/* Builder Grid List */}
-              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card overflow-hidden">
+              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card relative">
                 <CardHeader className="border-b border-border/50 bg-muted/10 pb-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4">
                     <div>
@@ -754,11 +780,10 @@ export function ScheduleBuilder({ session }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 w-full">
                               <div className="space-y-1">
                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Date</Label>
-                                <Input
-                                  type="date"
+                                <DatePicker
                                   value={values.date}
-                                  onChange={(e) => handleInputChange(sub.subjectId, 'date', e.target.value)}
-                                  className="h-9 rounded-lg text-xs"
+                                  onChange={(val) => handleInputChange(sub.subjectId, 'date', val)}
+                                  placeholder="Select Date"
                                 />
                               </div>
                               <div className="space-y-1">
@@ -854,11 +879,10 @@ export function ScheduleBuilder({ session }: Props) {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-1.5">
                             <Label className="text-xs font-bold text-muted-foreground">Exam Date</Label>
-                            <Input
-                              type="date"
+                            <DatePicker
                               value={bulkScheduleDate}
-                              onChange={(e) => setBulkScheduleDate(e.target.value)}
-                              className="rounded-xl"
+                              onChange={setBulkScheduleDate}
+                              placeholder="Select Date"
                             />
                           </div>
                           <div className="space-y-1.5">
@@ -1111,11 +1135,10 @@ export function ScheduleBuilder({ session }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-muted-foreground">Exam Date</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  className="rounded-xl"
+                  onChange={setEditDate}
+                  placeholder="Select Date"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">

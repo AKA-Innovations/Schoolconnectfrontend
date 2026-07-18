@@ -7,7 +7,7 @@ import { Teacher, TeacherFilterParams } from '@/types/roles';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useTeacherList, useToggleTeacherStatus } from '@/hooks/useTeachers';
+import { useTeacherList } from '@/hooks/useTeachers';
 import { TeacherRegistrationForm } from '@/components/admin/TeacherRegistrationForm';
 import { TeacherDetailsView } from '@/components/admin/TeacherDetailsView';
 import { TeacherFilterBar } from '@/components/admin/teacher/TeacherFilterBar';
@@ -18,6 +18,7 @@ export function TeacherManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'details'>('list');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [filters, setFilters] = useState<TeacherFilterParams>({
     page: 1, pageSize: 10, schoolId: schoolId || '',
   });
@@ -26,7 +27,6 @@ export function TeacherManagement() {
   const queryFilters: TeacherFilterParams = { ...filters, firstName: debouncedSearch || undefined };
 
   const { data, isLoading, isFetching, refetch } = useTeacherList(queryFilters);
-  const toggleMutation = useToggleTeacherStatus(queryFilters);
 
   const teachers = data?.data ?? [];
   const totalPages = Math.ceil((data?.total ?? 0) / (filters.pageSize || 10));
@@ -34,14 +34,6 @@ export function TeacherManagement() {
   const resetFilters = () => {
     setSearchTerm('');
     setFilters({ page: 1, pageSize: 10, schoolId: schoolId || '' });
-  };
-
-  const handleToggleStatus = (id: string, isActive: boolean) => {
-    const action = isActive ? 'activate' : 'deactivate';
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this staff member?`)) return;
-    toggleMutation.mutate({ id, isActive }, {
-      onError: () => alert(`Could not ${action} staff member. Please try again.`),
-    });
   };
 
   if (viewMode === 'add') return (
@@ -55,9 +47,8 @@ export function TeacherManagement() {
   if (viewMode === 'details' && selectedTeacher) return (
     <TeacherDetailsView
       teacherId={selectedTeacher.id}
-      onBack={() => setViewMode('list')}
-      onEdit={() => setViewMode('add')}
-      readOnly={true}
+      onBack={() => { setSelectedTeacher(null); setViewMode('list'); }}
+      readOnly={readOnlyMode}
     />
   );
 
@@ -99,9 +90,8 @@ export function TeacherManagement() {
         isLoading={isLoading}
         page={filters.page ?? 1}
         totalPages={totalPages}
-        onView={t => { setSelectedTeacher(t); setViewMode('details'); }}
-        onEdit={t => { setSelectedTeacher(t); setViewMode('add'); }}
-        onToggleStatus={handleToggleStatus}
+        onView={t => { setSelectedTeacher(t); setReadOnlyMode(true); setViewMode('details'); }}
+        onEdit={t => { setSelectedTeacher(t); setReadOnlyMode(false); setViewMode('details'); }}
         onPageChange={p => setFilters(f => ({ ...f, page: p }))}
       />
     </div>

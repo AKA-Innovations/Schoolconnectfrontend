@@ -75,13 +75,14 @@ export default function StudentHomeworkPage() {
   const getStatusBadge = (hwId: number, dueDate: string) => {
     const sub = submissions.find((s) => s.homeworkId === hwId && s.studentId === user?.id);
     if (sub) {
-      if (sub.status === 'SUBMITTED') {
+      const normalizedStatus = (sub.status || '').toUpperCase();
+      if (normalizedStatus === 'SUBMITTED') {
         return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-50 font-bold">Submitted</Badge>;
       }
-      if (sub.status === 'LATE') {
+      if (normalizedStatus === 'LATE') {
         return <Badge className="bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-50 font-bold">Late Submission</Badge>;
       }
-      if (sub.status === 'GRADED') {
+      if (normalizedStatus === 'GRADED') {
         return <Badge className="bg-teal-50 text-teal-700 border border-teal-100 hover:bg-teal-50 font-bold">Graded</Badge>;
       }
     }
@@ -232,7 +233,7 @@ export default function StudentHomeworkPage() {
                       {mySubmission.remarks && (
                         <p className="text-[11px] text-slate-500 italic">“{mySubmission.remarks}”</p>
                       )}
-                      {mySubmission.status === 'GRADED' && (
+                      {(mySubmission.status || '').toUpperCase() === 'GRADED' && (
                         <div className="pt-2 border-t border-slate-200">
                           <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">Teacher Grade / Remarks:</span>
                           <p className="text-xs text-slate-800 font-bold mt-0.5">{(mySubmission as any).grade || 'No Grade'}</p>

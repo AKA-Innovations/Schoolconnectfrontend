@@ -15,6 +15,7 @@ import { examService } from '@/services/exam/service';
 import { useAuthStore } from '@/store/authStore';
 import { Save, Lock, Unlock, AlertCircle, RefreshCw, Sparkles, ArrowLeft, CheckCircle2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MarksEntryItemDto } from '@/types/exam.types';
 
 interface Props {
@@ -407,35 +408,43 @@ export function MarksEntryManager({ session }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
           {/* Exam Selector */}
-          <select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-48 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <Select
+            value={selectedExamId ? String(selectedExamId) : 'all'}
+            onValueChange={(val) => setSelectedExamId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-48"
           >
-            <option value="">Select Exam</option>
-            {scheduledExams.map((e: any) => (
-              <option key={e.id} value={e.id}>{e.examName}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-48 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Exam" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Exam</SelectItem>
+              {scheduledExams.map((e: any) => (
+                <SelectItem key={e.id} value={String(e.id)}>{e.examName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {/* Class, Section, and Subject Selector */}
-          <select
-            value={selectedMappingIndex}
-            onChange={(e) => setSelectedMappingIndex(e.target.value === '' ? '' : Number(e.target.value))}
-            className="flex h-10 w-full sm:w-64 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-            disabled={loadingSubjectDetails}
+          <Select
+            value={selectedMappingIndex === '' ? 'all' : String(selectedMappingIndex)}
+            onValueChange={(val) => setSelectedMappingIndex(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-64"
           >
-            <option value="">
-              {loadingSubjectDetails ? 'Loading assigned classes...' : 'Select Class, Section & Subject'}
-            </option>
-            {mySubjectDetails.map((sd: any, idx: number) => {
-              return (
-                <option key={sd.id} value={idx}>
+            <SelectTrigger 
+              disabled={loadingSubjectDetails}
+              className="h-10 w-full sm:w-64 rounded-xl border-border bg-card text-xs font-semibold"
+            >
+              <SelectValue placeholder={loadingSubjectDetails ? 'Loading assigned classes...' : 'Select Class, Section & Subject'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Class, Section & Subject</SelectItem>
+              {mySubjectDetails.map((sd: any, idx: number) => (
+                <SelectItem key={sd.id} value={String(idx)}>
                   {sd.className} - {sd.sectionName} - {sd.subjectName}
-                </option>
-              );
-            })}
-          </select>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
  
           <Button
             variant="outline"
@@ -747,7 +756,7 @@ export function MarksEntryManager({ session }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50 text-sm">
-                    {displayedStudents.map((student: any) => {
+                    {displayedStudents.map((student: any, index: number) => {
                       const academic = student.academics?.[0];
                       const studentGridData = marksGrid[student.id] || { marksObtained: '', isAbsent: false, remarks: '' };
                       const autoGrade = studentGridData.isAbsent
@@ -782,6 +791,7 @@ export function MarksEntryManager({ session }: Props) {
                           <td className="p-3">
                             <div className="relative">
                               <Input
+                                id={`marks-input-${student.id}`}
                                 type="number"
                                 value={studentGridData.marksObtained}
                                 max={currentSubjectConfig?.totalMarks}
@@ -789,6 +799,22 @@ export function MarksEntryManager({ session }: Props) {
                                 placeholder={`/ ${currentSubjectConfig?.totalMarks}`}
                                 disabled={studentGridData.isAbsent || isMarksLocked}
                                 onChange={(e) => handleMarkChange(student.id, 'marksObtained', e.target.value === '' ? '' : Number(e.target.value))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    let nextIndex = index + 1;
+                                    while (nextIndex < displayedStudents.length) {
+                                      const nextStudent = displayedStudents[nextIndex];
+                                      const nextInput = document.getElementById(`marks-input-${nextStudent.id}`) as HTMLInputElement | null;
+                                      if (nextInput && !nextInput.disabled) {
+                                        nextInput.focus();
+                                        nextInput.select();
+                                        break;
+                                      }
+                                      nextIndex++;
+                                    }
+                                  }
+                                }}
                                 className="h-9 rounded-lg text-center"
                               />
                             </div>

@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { DateTimePicker } from '@/components/ui/datetimepicker';
 
 function getWeekRange() {
   const today = new Date();
@@ -848,7 +849,7 @@ export function AnnouncementsManager({ role: userRole }: Props) {
       <Dialog open={formOpen} onOpenChange={(o) => { if (!o) resetForm(); setFormOpen(o); }}>
         <DialogContent className="max-w-2xl rounded-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>{isEditMode ? 'Edit Announcement' : 'Create New Announcement'}</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-foreground tracking-tight">{isEditMode ? 'Edit Announcement' : 'Create New Announcement'}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -995,22 +996,18 @@ export function AnnouncementsManager({ role: userRole }: Props) {
                             };
 
                             return (
-                              <label
+                              <button
                                 key={s.id}
+                                type="button"
+                                onClick={handleToggleSection}
                                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs cursor-pointer select-none transition-all ${
                                   isSectionSelected
                                     ? 'bg-primary/10 border-primary text-primary font-medium'
                                     : 'bg-background hover:bg-muted/50 border-border/80 text-muted-foreground'
                                 }`}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={isSectionSelected}
-                                  onChange={handleToggleSection}
-                                  className="sr-only"
-                                />
                                 {s.sectionName}
-                              </label>
+                              </button>
                             );
                           })}
                         </div>
@@ -1024,21 +1021,19 @@ export function AnnouncementsManager({ role: userRole }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground">Publish At (Optional)</label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={publishAt}
-                  onChange={e => setPublishAt(e.target.value)}
-                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm"
+                  onChange={setPublishAt}
+                  placeholder="Select Publish Date & Time"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground">Expires At (Optional)</label>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={expiresAt}
-                  onChange={e => setExpiresAt(e.target.value)}
-                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm"
+                  onChange={setExpiresAt}
+                  placeholder="Select Expiry Date & Time"
                 />
               </div>
             </div>

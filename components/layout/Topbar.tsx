@@ -3,7 +3,7 @@
 import React from 'react';
 import { useAuthStore } from '../../store/authStore';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useTeacherRoles } from '../../lib/permissions';
 import { getSidebarLinks, isLinkActive } from '../../lib/navigation';
 import { Bell, BellOff, Search, User, ChevronDown, Menu, LogOut, Sun, Moon } from 'lucide-react';
@@ -23,6 +23,7 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
   const { user, role, clearAuth } = useAuthStore();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const teacherRoles = useTeacherRoles();
 
   // Find the active main section using role and teacherRoles dynamic links
@@ -45,10 +46,15 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
 
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+  const mobileNavRef = React.useRef<HTMLDivElement>(null);
 
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  const [isHydrated, setIsHydrated] = React.useState(false);
 
   React.useEffect(() => {
+    setIsHydrated(true);
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
@@ -104,10 +110,38 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
     return list.filter((ann: any) => !readIds.includes(ann.id));
   }, [announcementsData, readIds]);
 
+  const activeSubLink = React.useMemo(() => {
+    return subLinks.find(sub => {
+      const [subPath, subQuery] = sub.href.split('?');
+      let isActive = pathname === subPath;
+      
+      if (subQuery) {
+        const params = new URLSearchParams(subQuery);
+        const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+          const currentVal = searchParams?.get(key);
+          if (key === 'tab' && value === 'profile' && !currentVal) {
+            return true;
+          }
+          return currentVal === value;
+        });
+        isActive = isActive && allParamsMatch;
+      } else {
+        const currentTab = searchParams?.get('tab');
+        if (currentTab && currentTab !== 'profile') {
+          isActive = false;
+        }
+      }
+      return isActive;
+    });
+  }, [subLinks, pathname, searchParams]);
+
   React.useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+      }
+      if (mobileNavRef.current && !mobileNavRef.current.contains(e.target as Node)) {
+        setIsMobileNavOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -139,7 +173,7 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
         subject_coordinator: '/dashboard/coordinator/announcements',
       };
       const path = role ? announcementsPaths[role] : '/dashboard';
-      window.location.href = path;
+      router.push(path);
     } catch (err) {
       console.error(err);
     }
@@ -157,14 +191,73 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
     <header
       className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border subtle-shadow"
     >
-      <button
-        type="button"
-        onClick={onMobileMenuClick}
-        className="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent transition-colors"
-        aria-label="Open sidebar"
-      >
-        <Menu size={18} />
-      </button>
+      <div className="flex items-center gap-3 lg:hidden">
+        <button
+          type="button"
+          onClick={onMobileMenuClick}
+          className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent transition-colors"
+          aria-label="Open sidebar"
+        >
+          <Menu size={18} />
+        </button>
+
+        {/* Mobile Navigation Dropdown */}
+        {subLinks.length > 0 && (
+          <div className="relative" ref={mobileNavRef}>
+            <button
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-accent hover:border-primary/30 transition-all duration-300"
+            >
+              <span className="truncate max-w-[120px] sm:max-w-[200px]">
+                {activeSubLink?.name || activeSection?.name || 'Menu'}
+              </span>
+              <ChevronDown size={14} className={cn("transition-transform duration-300 text-muted-foreground", isMobileNavOpen && "rotate-180 text-primary")} />
+            </button>
+
+            {isMobileNavOpen && (
+              <div className="absolute left-0 mt-2 w-56 py-2 bg-background border border-border rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                {subLinks.map((sub) => {
+                  const [subPath, subQuery] = sub.href.split('?');
+                  let isActive = pathname === subPath;
+
+                  if (subQuery) {
+                    const params = new URLSearchParams(subQuery);
+                    const allParamsMatch = Array.from(params.entries()).every(([key, value]) => {
+                      const currentVal = searchParams?.get(key);
+                      if (key === 'tab' && value === 'profile' && !currentVal) {
+                        return true;
+                      }
+                      return currentVal === value;
+                    });
+                    isActive = isActive && allParamsMatch;
+                  } else {
+                    const currentTab = searchParams?.get('tab');
+                    if (currentTab && currentTab !== 'profile') {
+                      isActive = false;
+                    }
+                  }
+
+                  return (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      onClick={() => setIsMobileNavOpen(false)}
+                      className={cn(
+                        'block px-4 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary border-l-2 border-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                      )}
+                    >
+                      {sub.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Sub navigation links shifted to Topbar */}
       <div className="hidden lg:flex items-center h-full gap-8 overflow-x-auto no-scrollbar ml-8 mr-auto">
@@ -272,7 +365,7 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
                       subject_coordinator: '/dashboard/coordinator/announcements',
                     };
                     const path = role ? announcementsPaths[role] : '/dashboard';
-                    window.location.href = path;
+                    router.push(path);
                   }}
                   className="text-[11px] font-bold text-primary hover:underline"
                 >
@@ -308,21 +401,34 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
               <div
                 className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center font-bold text-white shadow-lg shadow-primary/30 transition-transform group-hover:scale-105"
               >
-                {user?.name?.charAt(0).toUpperCase() || <User size={18} />}
+                {isHydrated && user?.name ? (
+                  user.name.charAt(0).toUpperCase()
+                ) : (
+                  <User size={18} />
+                )}
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-background rounded-full" />
             </div>
 
             {/* Name + Role */}
-            <div className="text-left hidden sm:flex flex-col justify-center">
-              <p className="text-sm font-bold text-foreground leading-none mb-1">
-                {user?.name || 'User'}
-              </p>
-              <div className="flex items-center">
-                <span className="text-[10px] font-black uppercase tracking-wider text-primary px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                  {role ? roleLabels[role] : 'User'}
-                </span>
-              </div>
+            <div className="text-left hidden sm:flex flex-col justify-center min-w-[5rem]">
+              {isHydrated ? (
+                <>
+                  <p className="text-sm font-bold text-foreground leading-none mb-1">
+                    {user?.name || 'User'}
+                  </p>
+                  <div className="flex items-center">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-primary px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                      {role ? roleLabels[role] : 'User'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-3.5 w-20 bg-muted animate-pulse rounded mb-1.5" />
+                  <div className="h-3 w-12 bg-muted animate-pulse rounded" />
+                </>
+              )}
             </div>
 
             <ChevronDown
@@ -335,7 +441,7 @@ export function Topbar({ onMobileMenuClick }: TopbarProps) {
           <div className="absolute top-full right-0 mt-2 w-48 py-2 bg-background border border-border rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-y-2 group-hover:translate-y-0 transition-all duration-300 z-50">
             <button
               className="w-full flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-              onClick={() => window.location.href = '/dashboard/teacher/profile'}
+              onClick={() => router.push('/dashboard/teacher/profile')}
             >
               <User size={16} className="text-muted-foreground" />
               <span>My Profile</span>

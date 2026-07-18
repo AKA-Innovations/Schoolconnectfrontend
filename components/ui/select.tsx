@@ -8,6 +8,8 @@ interface SelectProps {
   value?: string
   onValueChange?: (value: string) => void
   children?: React.ReactNode
+  className?: string
+  disabled?: boolean
 }
 
 interface SelectContextType {
@@ -18,11 +20,12 @@ interface SelectContextType {
   selectedLabel?: string
   setSelectedLabel: (label: string) => void
   triggerRef: React.RefObject<HTMLButtonElement | null>
+  disabled?: boolean
 }
 
 const SelectContext = React.createContext<SelectContextType | null>(null)
 
-export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }) => {
+export const Select: React.FC<SelectProps> = ({ value, onValueChange, children, className, disabled }) => {
   const [isOpen, setIsOpen] = React.useState(false)
   const [selectedLabel, setSelectedLabel] = React.useState("")
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
@@ -44,8 +47,8 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
   }, [isOpen])
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, selectedLabel, setSelectedLabel, triggerRef }}>
-      <div ref={containerRef} className="relative inline-block w-full">{children}</div>
+    <SelectContext.Provider value={{ value, onValueChange, isOpen, setIsOpen, selectedLabel, setSelectedLabel, triggerRef, disabled }}>
+      <div ref={containerRef} className={cn("relative inline-block w-full", className)}>{children}</div>
     </SelectContext.Provider>
   )
 }
@@ -53,10 +56,10 @@ export const Select: React.FC<SelectProps> = ({ value, onValueChange, children }
 export const SelectTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, children, ...props }, ref) => {
+>((({ className, children, ...props }, ref) => {
   const context = React.useContext(SelectContext)
   if (!context) throw new Error("SelectTrigger must be used within Select")
-  const { isOpen, setIsOpen, selectedLabel, triggerRef } = context
+  const { isOpen, setIsOpen, selectedLabel, triggerRef, disabled } = context
 
   // Forward ref helper
   React.useImperativeHandle(ref, () => triggerRef.current as HTMLButtonElement)
@@ -65,9 +68,11 @@ export const SelectTrigger = React.forwardRef<
     <button
       ref={triggerRef}
       type="button"
-      onClick={() => setIsOpen(!isOpen)}
+      onClick={() => !disabled && setIsOpen(!isOpen)}
+      disabled={disabled}
       className={cn(
         "flex h-10 w-full items-center justify-between rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer hover:border-slate-300",
+        disabled && "opacity-50 cursor-not-allowed hover:border-slate-200/80",
         className
       )}
       {...props}
@@ -76,7 +81,7 @@ export const SelectTrigger = React.forwardRef<
       <ChevronDown className={cn("h-4 w-4 ml-2 text-slate-400 transition-transform duration-200", isOpen && "transform rotate-180")} />
     </button>
   )
-})
+}))
 SelectTrigger.displayName = "SelectTrigger"
 
 export const SelectValue: React.FC<{ placeholder?: string }> = ({ placeholder }) => {

@@ -365,10 +365,17 @@ export default function ClassRoomPage() {
   const attendanceQueries = useQueries({
     queries: lastDates.map((dateString) => ({
       queryKey: ['attendance-trend', resolvedClassSectionId, dateString],
-      queryFn: () => studentService.filterAttendance({
-        classSectionId: Number(resolvedClassSectionId),
-        date: dateString,
-      }),
+      queryFn: async () => {
+        try {
+          return await studentService.filterAttendance({
+            classSectionId: Number(resolvedClassSectionId),
+            date: dateString,
+          });
+        } catch (err: any) {
+          if (err.response?.status === 401) throw err;
+          return [];
+        }
+      },
       enabled: !!resolvedClassSectionId,
     })),
   });
@@ -1240,7 +1247,7 @@ export default function ClassRoomPage() {
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                       {toppers.map((t: any) => (
-                                        <tr key={t.rank} className="hover:bg-slate-50/30">
+                                        <tr key={t.studentId} className="hover:bg-slate-50/30">
                                           <td className="p-4 px-6 font-bold text-primary">#{t.rank}</td>
                                           <td className="p-4 font-bold text-foreground">{t.studentId}</td>
                                           <td className="p-4 text-slate-400">{t.totalMarks}</td>

@@ -146,7 +146,7 @@ export function useToggleTeacherStatus(filters: TeacherFilterParams) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      teacherService.updateTeacherDetails(id, { isActive } as any),
+      teacherService.updateUserStatus(id, isActive),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: teacherKeys.all });
     },
@@ -354,5 +354,13 @@ export function useTeacherBirthdays(date: string) {
     queryKey: teacherKeys.birthdays(date),
     queryFn: () => teacherService.getBirthdays(date),
     enabled: !!date,
+  });
+}
+
+export function useAvailableClassTeachers(session: string) {
+  return useQuery({
+    queryKey: [...teacherKeys.all, 'available-class-teachers', session],
+    queryFn: () => teacherService.getAvailableClassTeachers(session),
+    enabled: !!session,
   });
 }

@@ -18,6 +18,7 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { SubjectChapter, SubjectTopic } from '@/services/academic/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /* ─── Draft row types ─────────────────────────────────────────────────────── */
 
@@ -274,41 +275,70 @@ export function CurriculumBuilder() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="field-label">Class <span className="text-rose-500 ml-0.5">*</span></label>
-              <select
-                value={selectedClass}
-                onChange={(e) => handleClassChange(e.target.value)}
-                className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all"
+              <Select
+                value={selectedClass || 'all'}
+                onValueChange={(val) => handleClassChange(val === 'all' ? '' : val)}
+                className="w-full"
               >
-                <option value="">Select Class</option>
-                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+                <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-sm font-medium">
+                  <SelectValue placeholder="Select Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Select Class</SelectItem>
+                  {classes.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      Class {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <label className="field-label">Section <span className="text-rose-500 ml-0.5">*</span></label>
-              <select
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                disabled={!selectedClass}
-                className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all disabled:opacity-40"
+              <Select
+                value={selectedSection || 'all'}
+                onValueChange={(val) => setSelectedSection(val === 'all' ? '' : val)}
+                className="w-full"
               >
-                <option value="">Select Section</option>
-                {sections.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+                <SelectTrigger 
+                  disabled={!selectedClass}
+                  className="h-11 w-full rounded-xl border-slate-200 bg-white text-sm font-medium"
+                >
+                  <SelectValue placeholder="Select Section" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Select Section</SelectItem>
+                  {sections.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      Section {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
               <label className="field-label">Subject <span className="text-rose-500 ml-0.5">*</span></label>
-              <select
-                value={selectedSubjectId}
-                onChange={(e) => handleSubjectChange(e.target.value)}
-                disabled={!selectedClass || loadingSubjects}
-                className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all disabled:opacity-40"
+              <Select
+                value={selectedSubjectId ? String(selectedSubjectId) : 'all'}
+                onValueChange={(val) => handleSubjectChange(val === 'all' ? '' : val)}
+                className="w-full"
               >
-                <option value="">{loadingSubjects ? 'Loading…' : 'Select Subject'}</option>
-                {subjectOptions.map((sub) => (
-                  <option key={sub.id} value={sub.id}>{sub.subjectName} ({sub.subjectCode})</option>
-                ))}
-              </select>
+                <SelectTrigger 
+                  disabled={!selectedClass || loadingSubjects}
+                  className="h-11 w-full rounded-xl border-slate-200 bg-white text-sm font-medium"
+                >
+                  <SelectValue placeholder={loadingSubjects ? 'Loading…' : 'Select Subject'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Select Subject</SelectItem>
+                  {subjectOptions.map((sub) => (
+                    <SelectItem key={sub.id} value={String(sub.id)}>
+                      {sub.subjectName} ({sub.subjectCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

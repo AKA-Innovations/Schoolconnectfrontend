@@ -142,6 +142,14 @@ export function LeaveRequestForm({ open, onOpenChange, isAdmin }: LeaveRequestFo
   const handleDateClick = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cellDate = new Date(date);
+    cellDate.setHours(0, 0, 0, 0);
+    if (cellDate < today) {
+      return;
+    }
+
     // Check if the clicked date itself is already taken
     if (takenDates.has(dateStr)) {
       toast.error('This date is already taken by another leave request.');
@@ -190,9 +198,17 @@ export function LeaveRequestForm({ open, onOpenChange, isAdmin }: LeaveRequestFo
     const isEnd = endDate === dateStr;
     const isInRange = startDate && endDate && dateStr > startDate && dateStr < endDate;
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cellDate = new Date(date);
+    cellDate.setHours(0, 0, 0, 0);
+    const isPast = cellDate < today;
+
     let base = "h-8 w-8 text-xs font-bold rounded-full flex items-center justify-center transition-all cursor-pointer select-none ";
 
-    if (isTaken) {
+    if (isPast) {
+      base += "text-slate-300 cursor-not-allowed opacity-50";
+    } else if (isTaken) {
       base += "bg-rose-50 text-rose-400 line-through cursor-not-allowed";
     } else if (isStart || isEnd) {
       base += "bg-violet-600 text-white shadow-sm";

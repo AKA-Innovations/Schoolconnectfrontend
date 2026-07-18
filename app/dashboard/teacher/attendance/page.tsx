@@ -14,6 +14,7 @@ import { useClassSectionLists } from '@/hooks/useClasses';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 import { CURRENT_SESSION } from '@/lib/constants';
+import { DatePicker } from '@/components/ui/datepicker';
 import { RefreshCw } from 'lucide-react';
 
 const statusOptions = ['Present', 'Absent', 'Late', 'HalfDay'] as const;
@@ -45,18 +46,24 @@ export default function AttendancePage() {
   // Resolve assignedClass names if they are missing but ID is present (lookup from allSections)
   const resolvedAssignedClass = useMemo(() => {
     if (!assignedClass) return null;
-    if (assignedClass.className && assignedClass.sectionName) return assignedClass;
+    if (assignedClass.className && assignedClass.sectionName && assignedClass.classDtlsId) return assignedClass;
 
-    // Try to find names in allSections list by ID (check multiple possible ID fields)
+    // Try to find names/IDs in allSections list by ID (string-safe) or by name matching
     const match = allSections.find(s => 
-      s.id === assignedClass.classDtlsId || 
-      s.id === assignedClass.id ||
-      s.mappingId === assignedClass.id ||
-      s.mappingId === assignedClass.classDtlsId
+      (assignedClass.classDtlsId && String(s.id) === String(assignedClass.classDtlsId)) || 
+      (assignedClass.classDtlsId && String(s.masterSectionId) === String(assignedClass.classDtlsId)) || 
+      (assignedClass.classDtlsId && String(s.mappingId) === String(assignedClass.classDtlsId)) || 
+      (assignedClass.id && String(s.id) === String(assignedClass.id)) ||
+      (assignedClass.id && String(s.masterSectionId) === String(assignedClass.id)) ||
+      (assignedClass.id && String(s.mappingId) === String(assignedClass.id)) ||
+      (s.className && s.sectionName && 
+       String(s.className).toLowerCase().replace('class ', '').trim() === String(assignedClass.className).toLowerCase().replace('class ', '').trim() && 
+       String(s.sectionName).toLowerCase() === String(assignedClass.sectionName).toLowerCase())
     );
     if (match) {
       return {
         ...assignedClass,
+        classDtlsId: match.masterSectionId || match.id || match.mappingId,
         className: match.className,
         sectionName: match.sectionName
       };
@@ -67,16 +74,17 @@ export default function AttendancePage() {
   const className = resolvedAssignedClass?.className || '';
   const sectionName = resolvedAssignedClass?.sectionName || '';
   const targetId = resolvedAssignedClass?.classDtlsId;
+  const isResolved = !!(className && sectionName && targetId);
 
   const { data: studentData, isLoading: studentsLoading } = useStudentList({
     classSectionId: targetId,
     limit: 100,
-  });
+  }, { enabled: isResolved });
 
   const { data: existingAttendance } = useFilterAttendance({
     classSectionId: targetId,
     date,
-  });
+  }, { enabled: isResolved });
 
   const bulkMutation = useBulkAttendance();
   const updateMutation = useUpdateAttendance();
@@ -91,7 +99,10 @@ export default function AttendancePage() {
   // Initialize attendance map when students load
   useEffect(() => {
     if (students.length === 0) return;
-    const map: Record<string, { status: AttendanceStatus; remarks: string }> = {};
+    
+    const newMap: Record<string, { status: AttendanceStatus; remarks: string }> = {};
+    let hasChanges = false;
+    
     students.forEach(s => {
       const studentRoll = s.academics?.[0]?.rollNumber;
       const existing = existingAttendanceRecords.find((a: any) => 
@@ -99,12 +110,20 @@ export default function AttendancePage() {
         (studentRoll && (a.studentRollNumber === studentRoll || a.rollNumber === studentRoll))
       );
       
-      map[s.id] = {
-        status: (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus,
-        remarks: existing?.remarks ?? '',
-      };
+      const status = (existing?.attendanceStatus || existing?.status || 'Present') as AttendanceStatus;
+      const remarks = existing?.remarks ?? '';
+      
+      newMap[s.id] = { status, remarks };
+      
+      const current = attendanceMap[s.id];
+      if (!current || current.status !== status || current.remarks !== remarks) {
+        hasChanges = true;
+      }
     });
-    setAttendanceMap(map);
+
+    if (hasChanges || Object.keys(attendanceMap).length !== students.length) {
+      setAttendanceMap(newMap);
+    }
   }, [students, existingAttendanceRecords]);
 
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
@@ -226,7 +245,6 @@ export default function AttendancePage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Attendance Management</h1>
         <p className="text-sm text-muted-foreground">Mark and manage daily student attendance</p>
       </div>
-
       {/* Filters — class/section locked to assigned class */}
       <Card className="border-border shadow-sm">
         <CardContent className="p-6">
@@ -250,8 +268,8 @@ export default function AttendancePage() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-muted-foreground">Date</Label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl h-10" />
+              <Label className="text-xs font-semibold text-muted-foreground block">Date</Label>
+              <DatePicker value={date} onChange={setDate} className="w-full sm:w-full" buttonClassName="h-10 rounded-xl" />
             </div>
             <div className="flex items-end">
               <Button 

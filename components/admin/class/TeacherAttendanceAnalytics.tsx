@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { CalendarDays, CheckCircle, Search, Users, UserCheck, UserX, Clock, Calendar } from 'lucide-react';
@@ -308,18 +309,15 @@ export function TeacherAttendanceAnalytics() {
       <div className="flex flex-col gap-4 bg-card p-6 rounded-2xl border border-border shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-10 pl-9 pr-4 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-              />
-            </div>
+            <DatePicker
+              value={selectedDate}
+              onChange={(val) => {
+                setSelectedDate(val);
+                setCurrentPage(1);
+              }}
+              placeholder="Select Date"
+              className="w-40 font-bold"
+            />
             <p className="text-xs text-muted-foreground">
               Logging attendance for <span className="font-bold text-foreground">{new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}</span>
             </p>

@@ -8,6 +8,7 @@ import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
 import { StudentListItem, AttendanceRecord } from '@/types/student.types';
 import { Users, GraduationCap, CalendarCheck2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,27 +132,51 @@ export function ClassStudentsView() {
         <CardContent className="p-4 flex flex-wrap gap-4 items-end">
           <div className="flex flex-col gap-1.5 min-w-45">
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Class</label>
-            <select
-              value={selectedClass}
-              onChange={(e) => { setSelectedClass(e.target.value); setSelectedSection(''); clearFilters(); }}
-              className="h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={loadingClasses}
+            <Select 
+              value={selectedClass} 
+              onValueChange={(val) => { 
+                setSelectedClass(val === "all" ? "" : val); 
+                setSelectedSection(''); 
+                clearFilters(); 
+              }}
             >
-              <option value="">Select class…</option>
-              {classNames.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+              <SelectTrigger 
+                disabled={loadingClasses}
+                className="h-10 rounded-xl border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <SelectValue placeholder="Select class..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Select class...</SelectItem>
+                {classNames.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    Class {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-1.5 min-w-40">
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Section</label>
-            <select
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              className="h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              disabled={!selectedClass}
+            <Select 
+              value={selectedSection || "all"} 
+              onValueChange={(val) => setSelectedSection(val === "all" ? "" : val)}
             >
-              <option value="">All sections</option>
-              {sectionsForClass.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+              <SelectTrigger 
+                disabled={!selectedClass}
+                className="h-10 rounded-xl border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <SelectValue placeholder="All sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sections</SelectItem>
+                {sectionsForClass.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    Section {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {selectedClass && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold h-10">

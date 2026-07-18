@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
 import { useStudentList, useFilterAttendance } from '@/hooks/useStudents';
 import { useHomeworks } from '@/hooks/useAcademic';
+import { studentService } from '@/services/student.service';
 import { 
   BookOpen, Users, GraduationCap, ClipboardCheck, 
   AlertCircle, FileText, Eye, BarChart2, TrendingUp
@@ -133,14 +134,9 @@ function ClassCard({
         <div className="relative pt-1 h-9 overflow-hidden">
           {/* Normal Buttons (default state) */}
           <div className="flex gap-2 w-full transition-all duration-300 group-hover:md:-translate-y-12">
-            <Button asChild size="sm" className="rounded-xl text-xs h-9 px-3 font-bold flex-1 bg-slate-900 hover:bg-slate-800 text-white border-0">
+            <Button asChild size="sm" className="rounded-xl text-xs h-9 px-3 font-bold w-full bg-slate-900 hover:bg-slate-800 text-white border-0">
               <Link href={detailUrl}>
                 Open Class
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs h-9 px-3 font-bold border-slate-200 text-slate-600 flex-1 hover:bg-slate-50">
-              <Link href={`${detailUrl}?tab=attendance`}>
-                Attendance
               </Link>
             </Button>
           </div>
@@ -152,11 +148,6 @@ function ClassCard({
               <Button asChild variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-slate-50" title="Open Class">
                 <Link href={detailUrl}>
                   <Eye className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-slate-50" title="Mark Attendance">
-                <Link href={`${detailUrl}?tab=attendance`}>
-                  <ClipboardCheck className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-slate-50" title="Homework">
@@ -176,6 +167,8 @@ function ClassCard({
     </Card>
   );
 }
+
+import { useQueries } from '@tanstack/react-query';
 
 export default function TeacherClassesPage() {
   const user = useAuthStore((s) => s.user);
@@ -216,10 +209,24 @@ export default function TeacherClassesPage() {
     return new Set(mySubjectDetails.map((s) => s.subjectName)).size;
   }, [mySubjectDetails]);
 
-  // Calculate total students across all assigned sections
+  // Fetch student counts dynamically for each section
+  const studentQueries = useQueries({
+    queries: resolvedClassSections.map((cs) => ({
+      queryKey: ['student-list-count', cs.classSectionId],
+      queryFn: () => studentService.list({ classSectionId: cs.classSectionId, limit: 1 }),
+      enabled: !!cs.classSectionId && cs.classSectionId > 0,
+    })),
+  });
+
+  // Calculate total students across all assigned sections dynamically
   const totalStudentsTaught = useMemo(() => {
-    return resolvedClassSections.length * 28; // fallback realistic estimate if individual query arrays aren't loaded yet
-  }, [resolvedClassSections]);
+    let total = 0;
+    studentQueries.forEach((q) => {
+      const count = (q.data as any)?.pagination?.totalItemsCount ?? (q.data as any)?.items?.length ?? 0;
+      total += count;
+    });
+    return total;
+  }, [studentQueries]);
 
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-in fade-in duration-500 bg-slate-50/30 min-h-screen">

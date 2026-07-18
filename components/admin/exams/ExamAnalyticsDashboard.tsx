@@ -4,12 +4,16 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useExams, useClassOverview, useSubjectAnalysis, useToppers, useExamSubjects } from '@/services/exam/queries';
 import { useSchoolClasses, useSchoolSections } from '@/hooks/useClasses';
+import { useStudentList } from '@/hooks/useStudents';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
 import { Award, TrendingUp, BookOpen, Users, HelpCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { useQueries } from '@tanstack/react-query';
 import { examService } from '@/services/exam/service';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   session: string;
@@ -22,6 +26,10 @@ export function ExamAnalyticsDashboard({ session }: Props) {
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
   const [selectedSectionId, setSelectedSectionId] = useState<number | ''>('');
+
+  const [topperSearch, setTopperSearch] = useState('');
+  const [topperGradeFilter, setTopperGradeFilter] = useState('');
+  const [topperSortBy, setTopperSortBy] = useState<'rank-asc' | 'rank-desc' | 'pct-desc' | 'pct-asc' | 'name-asc' | 'name-desc'>('rank-asc');
 
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
@@ -86,6 +94,106 @@ export function ExamAnalyticsDashboard({ session }: Props) {
 
   const classOverviewData = classOverview?.data || classOverview;
   const toppers = toppersList?.data || (Array.isArray(toppersList) ? toppersList : []);
+
+  const { data: studentsResponse } = useStudentList({
+    limit: 1000,
+  });
+
+  const studentMap = React.useMemo(() => {
+    const map: Record<string, any> = {};
+    if (studentsResponse?.items) {
+      studentsResponse.items.forEach((s: any) => {
+        if (s.id) {
+          map[s.id] = s;
+        }
+      });
+    }
+    return map;
+  }, [studentsResponse]);
+
+  const uniqueTopperGrades = React.useMemo(() => {
+    const grades = toppers.map((t: any) => t.grade).filter(Boolean);
+    return [...new Set(grades)].sort();
+  }, [toppers]);
+
+  const processedToppers = React.useMemo(() => {
+    let result = toppers.map((t: any) => {
+      const studentObj = studentMap[t.studentId];
+      const studentName = studentObj ? `${studentObj.firstName} ${studentObj.lastName}` : (t.studentName || 'Unknown Student');
+      const studentEmail = studentObj?.emailId || '';
+      
+      const calculatedObtained = t.percentage !== undefined && t.totalMarks
+        ? Math.round((t.percentage / 100) * t.totalMarks)
+        : '-';
+      const obtained = t.marksObtained !== undefined && t.marksObtained !== null && t.marksObtained !== ''
+        ? t.marksObtained 
+        : (t.obtainedMarks !== undefined && t.obtainedMarks !== null && t.obtainedMarks !== ''
+          ? t.obtainedMarks
+          : calculatedObtained
+        );
+
+      const calculateGradeFromPct = (pct: number) => {
+        if (pct >= 90) return 'A';
+        if (pct >= 80) return 'B';
+        if (pct >= 70) return 'C';
+        if (pct >= 60) return 'D';
+        if (pct >= 50) return 'E';
+        return 'F';
+      };
+
+      const grade = t.grade || (t.percentage !== undefined ? calculateGradeFromPct(t.percentage) : '-');
+
+      return {
+        ...t,
+        studentName,
+        studentEmail,
+        marksObtained: obtained,
+        grade,
+      };
+    });
+
+    const seen = new Set<string>();
+    result = result.filter((t: any) => {
+      const key = `${t.studentId}-${t.rank}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    if (topperSearch.trim()) {
+      const queryStr = topperSearch.toLowerCase().trim();
+      result = result.filter(
+        (t: any) =>
+          t.studentName.toLowerCase().includes(queryStr) ||
+          t.studentId.toLowerCase().includes(queryStr)
+      );
+    }
+
+    if (topperGradeFilter) {
+      result = result.filter((t: any) => t.grade === topperGradeFilter);
+    }
+
+    result.sort((a: any, b: any) => {
+      switch (topperSortBy) {
+        case 'rank-asc':
+          return a.rank - b.rank;
+        case 'rank-desc':
+          return b.rank - a.rank;
+        case 'pct-desc':
+          return b.percentage - a.percentage;
+        case 'pct-asc':
+          return a.percentage - b.percentage;
+        case 'name-asc':
+          return a.studentName.localeCompare(b.studentName);
+        case 'name-desc':
+          return b.studentName.localeCompare(a.studentName);
+        default:
+          return a.rank - b.rank;
+      }
+    });
+
+    return result;
+  }, [toppers, studentMap, topperSearch, topperGradeFilter, topperSortBy]);
 
   // Compile subject averages chart data from actual backend API results
   const subjectData = React.useMemo(() => {
@@ -165,39 +273,65 @@ export function ExamAnalyticsDashboard({ session }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          <select
-            value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <Select
+            value={selectedExamId ? String(selectedExamId) : 'all'}
+            onValueChange={(val) => setSelectedExamId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-40"
           >
-            <option value="">Select Exam</option>
-            {exams.map((e: any) => (
-              <option key={e.id} value={e.id}>{e.examName}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Exam" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Exam</SelectItem>
+              {exams.map((e: any) => (
+                <SelectItem key={e.id} value={String(e.id)}>
+                  {e.examName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : '')}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <Select
+            value={selectedClassId ? String(selectedClassId) : 'all'}
+            onValueChange={(val) => {
+              setSelectedClassId(val === 'all' ? '' : Number(val));
+              setSelectedSectionId('');
+            }}
+            className="w-full sm:w-40"
           >
-            <option value="">Select Class</option>
-            {schoolClasses.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.className}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold">
+              <SelectValue placeholder="Select Class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Class</SelectItem>
+              {schoolClasses.map((c: any) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  Class {c.className}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select
-            value={selectedSectionId}
-            onChange={(e) => setSelectedSectionId(e.target.value ? Number(e.target.value) : '')}
-            disabled={!selectedClassId}
-            className="flex h-10 w-full sm:w-40 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <Select
+            value={selectedSectionId ? String(selectedSectionId) : 'all'}
+            onValueChange={(val) => setSelectedSectionId(val === 'all' ? '' : Number(val))}
+            className="w-full sm:w-40"
           >
-            <option value="">Select Section</option>
-            {classSections.map((s: any) => (
-              <option key={s.id} value={s.id}>{s.sectionName}</option>
-            ))}
-          </select>
+            <SelectTrigger 
+              disabled={!selectedClassId}
+              className="h-10 w-full sm:w-40 rounded-xl border-border bg-card text-xs font-semibold"
+            >
+              <SelectValue placeholder="Select Section" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Select Section</SelectItem>
+              {classSections.map((s: any) => (
+                <SelectItem key={s.id} value={String(s.id)}>
+                  Section {s.sectionName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Button
             variant="outline"
@@ -345,32 +479,87 @@ export function ExamAnalyticsDashboard({ session }: Props) {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border/50 text-xs font-semibold uppercase text-muted-foreground bg-muted/20">
-                        <th className="p-3 px-6">Rank</th>
-                        <th className="p-3">Student ID</th>
-                        <th className="p-3">Total Marks</th>
-                        <th className="p-3">Obtained Marks</th>
-                        <th className="p-3">Percentage</th>
-                        <th className="p-3 pr-6 text-right">Grade</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/50">
-                      {toppers.map((t: any) => (
-                        <tr key={t.rank} className="hover:bg-muted/5">
-                          <td className="p-3 px-6 font-bold text-primary">#{t.rank}</td>
-                          <td className="p-3 font-bold">{t.studentId}</td>
-                          <td className="p-3 text-muted-foreground">{t.totalMarks}</td>
-                          <td className="p-3 font-medium">{t.marksObtained}</td>
-                          <td className="p-3 font-extrabold text-green-600">{t.percentage.toFixed(1)}%</td>
-                          <td className="p-3 pr-6 text-right font-black">{t.grade}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  {/* Filters Bar */}
+                  <div className="p-4 bg-muted/10 border-b border-border/50 flex flex-col sm:flex-row gap-3">
+                    <Input
+                      placeholder="Search topper name or ID..."
+                      value={topperSearch}
+                      onChange={(e) => setTopperSearch(e.target.value)}
+                      className="h-9 text-xs max-w-xs rounded-xl"
+                    />
+                    <Select
+                      value={topperGradeFilter || 'all'}
+                      onValueChange={(val) => setTopperGradeFilter(val === 'all' ? '' : val)}
+                    >
+                      <SelectTrigger className="h-9 w-full sm:w-36 text-xs font-semibold rounded-xl bg-card">
+                        <SelectValue placeholder="All Grades" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Grades</SelectItem>
+                        {uniqueTopperGrades.map((g) => (
+                          <SelectItem key={g} value={g}>
+                            Grade {g}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={topperSortBy}
+                      onValueChange={(val) => setTopperSortBy(val as any)}
+                    >
+                      <SelectTrigger className="h-9 w-full sm:w-44 text-xs font-semibold rounded-xl bg-card ml-auto">
+                        <SelectValue placeholder="Sort By" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rank-asc">Rank: Low to High</SelectItem>
+                        <SelectItem value="rank-desc">Rank: High to Low</SelectItem>
+                        <SelectItem value="pct-desc">Percentage: High to Low</SelectItem>
+                        <SelectItem value="pct-asc">Percentage: Low to High</SelectItem>
+                        <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                        <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {processedToppers.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <HelpCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground/35" />
+                      <p className="text-xs font-bold">No matching toppers found</p>
+                      <p className="text-[10px] text-muted-foreground/80 mt-0.5">Try adjusting your search query or grade filters.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-border/50 text-xs font-semibold uppercase text-muted-foreground bg-muted/20">
+                            <th className="p-3 px-6">Rank</th>
+                            <th className="p-3">Student Name</th>
+                            <th className="p-3">Total Marks</th>
+                            <th className="p-3">Obtained Marks</th>
+                            <th className="p-3">Percentage</th>
+                            <th className="p-3 pr-6 text-right">Grade</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {processedToppers.map((t: any) => (
+                            <tr key={t.studentId} className="hover:bg-muted/5">
+                              <td className="p-3 px-6 font-bold text-primary">#{t.rank}</td>
+                              <td className="p-3">
+                                <p className="font-bold text-foreground">{t.studentName}</p>
+                                <p className="text-[10px] text-muted-foreground/60">{t.studentId}</p>
+                              </td>
+                              <td className="p-3 text-muted-foreground">{t.totalMarks}</td>
+                              <td className="p-3 font-medium">{t.marksObtained}</td>
+                              <td className="p-3 font-extrabold text-green-600">{t.percentage.toFixed(1)}%</td>
+                              <td className="p-3 pr-6 text-right font-black">{t.grade}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

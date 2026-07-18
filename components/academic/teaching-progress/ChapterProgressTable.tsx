@@ -9,6 +9,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { useChapterProgress } from '@/hooks/useAcademic';
 import { CURRENT_SESSION } from '@/lib/constants';
 import type { SubjectChapter } from '@/services/academic/types';
+import { useAuthStore } from '@/store/authStore';
 
 interface Props {
   chapters: SubjectChapter[];
@@ -28,6 +29,8 @@ function ChapterProgressRow({
 }) {
   const { data: progress } = useChapterProgress(chapter.id, classSectionId, CURRENT_SESSION);
   const [isExpanded, setIsExpanded] = useState(false);
+  const role = useAuthStore((s) => s.role);
+  const canEdit = role === 'teacher' || role === 'subject_coordinator';
 
   const displayProgress = useMemo(() => {
     if (!progress) return null;
@@ -131,16 +134,18 @@ function ChapterProgressRow({
           <span className="text-xs text-slate-300">—</span>
         )}
       </td>
-      <td className="py-4 px-6 text-right">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md opacity-0 group-hover:opacity-100 transition-all"
-          onClick={() => onEdit(chapter)}
-        >
-          <Edit size={16} className="text-slate-400" />
-        </Button>
-      </td>
+      {canEdit && (
+        <td className="py-4 px-6 text-right">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md opacity-0 group-hover:opacity-100 transition-all"
+            onClick={() => onEdit(chapter)}
+          >
+            <Edit size={16} className="text-slate-400" />
+          </Button>
+        </td>
+      )}
     </tr>
   );
 }
@@ -151,6 +156,9 @@ export const ChapterProgressTable = React.memo(function ChapterProgressTable({
   isLoading, 
   onEdit 
 }: Props) {
+  const role = useAuthStore((s) => s.role);
+  const canEdit = role === 'teacher' || role === 'subject_coordinator';
+
   if (isLoading) {
     return (
       <div className="p-12 flex items-center justify-center bg-white rounded-3xl shadow-sm">
@@ -178,7 +186,7 @@ export const ChapterProgressTable = React.memo(function ChapterProgressTable({
             <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Progress</th>
             <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
             <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400">Coverage</th>
-            <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Action</th>
+            {canEdit && <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Action</th>}
           </tr>
         </thead>
         <tbody>

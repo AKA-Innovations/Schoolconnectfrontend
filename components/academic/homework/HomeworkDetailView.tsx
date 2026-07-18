@@ -118,8 +118,13 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
 
   const getCurrentVal = (studentId: string) => {
     const sub = getStudentSubmission(studentId);
+    const rawStatus = (sub?.status || '').toLowerCase();
+    let resolvedStatus = HomeworkStatus.PENDING;
+    if (rawStatus === 'submitted') resolvedStatus = HomeworkStatus.SUBMITTED;
+    else if (rawStatus === 'late') resolvedStatus = HomeworkStatus.LATE;
+    else if (rawStatus === 'not_submitted') resolvedStatus = HomeworkStatus.NOT_SUBMITTED;
     return {
-      status: (sub?.status as HomeworkStatus) || HomeworkStatus.PENDING,
+      status: resolvedStatus,
       remarks: sub?.remarks || '',
     };
   };
@@ -168,7 +173,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
       updateSub.mutate({
         id: sub.id,
         data: {
-          status: edit.status,
+          status: edit.status.toUpperCase(),
           remarks: edit.remarks,
           submittedAt: submittedAt || undefined,
         }
@@ -190,7 +195,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
         session: CURRENT_SESSION,
         homeworkId: homework.id,
         studentId,
-        status: edit.status,
+        status: edit.status.toUpperCase(),
         remarks: edit.remarks,
         submittedAt: submittedAt || undefined,
       }, {
@@ -234,7 +239,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
           await updateSub.mutateAsync({
             id: sub.id,
             data: {
-              status: edit.status,
+              status: edit.status.toUpperCase(),
               remarks: edit.remarks,
               submittedAt: submittedAt || undefined,
             }
@@ -244,7 +249,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
             session: CURRENT_SESSION,
             homeworkId: homework.id,
             studentId,
-            status: edit.status,
+            status: edit.status.toUpperCase(),
             remarks: edit.remarks,
             submittedAt: submittedAt || undefined,
           });
@@ -534,7 +539,7 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
                                 value={current.status}
                                 onValueChange={(val) => handleStatusChange(student.id, val as HomeworkStatus)}
                               >
-                                <SelectTrigger className={`h-8 rounded-lg text-xs w-[140px] font-semibold border ${STATUS_COLORS[current.status].badge}`}>
+                                <SelectTrigger className={`h-8 rounded-lg text-xs w-[140px] font-semibold border ${STATUS_COLORS[current.status]?.badge || STATUS_COLORS[HomeworkStatus.PENDING].badge}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

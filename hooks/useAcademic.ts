@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { academicService } from '@/services/academic.service';
+import { CURRENT_SESSION } from '@/lib/constants';
 import type {
   CreateSubjectChapterPayload,
   UpdateSubjectChapterPayload,
@@ -112,10 +113,11 @@ export function useDeleteTopic() {
 
 // ─── Teaching Progress ────────────────────────────────────────────────────────
 
-export function useTeachingProgressList(teacherId?: string) {
+export function useTeachingProgressList(teacherId?: string, session?: string) {
+  const resolvedSession = session ?? CURRENT_SESSION;
   return useQuery({
-    queryKey: academicKeys.teachingProgress(teacherId),
-    queryFn: () => academicService.getTeachingProgress(teacherId),
+    queryKey: [...academicKeys.teachingProgress(teacherId), resolvedSession],
+    queryFn: () => academicService.getTeachingProgress(teacherId, resolvedSession),
   });
 }
 
@@ -179,15 +181,20 @@ export function useChapterProgress(chapterId?: number | string, classSectionId?:
 
 // ─── Homework ─────────────────────────────────────────────────────────────────
 
-export function useHomeworks(classNameOrParams?: string | any) {
+export function useHomeworks(classNameOrParams?: string | any, session?: string) {
+  const resolvedSession = (typeof classNameOrParams === 'object' && classNameOrParams?.session)
+    ? classNameOrParams.session
+    : (session ?? CURRENT_SESSION);
+
   const queryKey = typeof classNameOrParams === 'string'
-    ? academicKeys.homeworks(classNameOrParams)
+    ? academicKeys.homeworks(classNameOrParams + '_' + resolvedSession)
     : classNameOrParams
-      ? ['academic', 'homeworks', classNameOrParams]
-      : ['academic', 'homeworks'];
+      ? ['academic', 'homeworks', { ...classNameOrParams, session: resolvedSession }]
+      : ['academic', 'homeworks', resolvedSession];
+
   return useQuery({
     queryKey,
-    queryFn: () => academicService.getHomeworks(classNameOrParams),
+    queryFn: () => academicService.getHomeworks(classNameOrParams, resolvedSession),
     placeholderData: (prev) => prev,
     enabled: classNameOrParams === undefined || !!classNameOrParams,
   });
@@ -312,15 +319,20 @@ export function useDeleteSubmission(homeworkId: number) {
 
 // ─── Classwork ────────────────────────────────────────────────────────────────
 
-export function useClassworks(classIdOrParams?: string | any) {
+export function useClassworks(classIdOrParams?: string | any, session?: string) {
+  const resolvedSession = (typeof classIdOrParams === 'object' && classIdOrParams?.session)
+    ? classIdOrParams.session
+    : (session ?? CURRENT_SESSION);
+
   const queryKey = typeof classIdOrParams === 'string'
-    ? academicKeys.classworks(classIdOrParams)
+    ? academicKeys.classworks(classIdOrParams + '_' + resolvedSession)
     : classIdOrParams
-      ? ['academic', 'classworks', classIdOrParams]
-      : ['academic', 'classworks'];
+      ? ['academic', 'classworks', { ...classIdOrParams, session: resolvedSession }]
+      : ['academic', 'classworks', resolvedSession];
+
   return useQuery({
     queryKey,
-    queryFn: () => academicService.getClassworks(classIdOrParams),
+    queryFn: () => academicService.getClassworks(classIdOrParams, resolvedSession),
     placeholderData: (prev) => prev,
     enabled: classIdOrParams === undefined || !!classIdOrParams,
   });
@@ -353,10 +365,11 @@ export function useDeleteClasswork() {
 
 // ─── Study Material ──────────────────────────────────────────────────────────
 
-export function useStudyMaterials() {
+export function useStudyMaterials(session?: string) {
+  const resolvedSession = session ?? CURRENT_SESSION;
   return useQuery({
-    queryKey: academicKeys.materials(),
-    queryFn: () => academicService.getStudyMaterials(),
+    queryKey: [...academicKeys.materials(), resolvedSession],
+    queryFn: () => academicService.getStudyMaterials(resolvedSession),
   });
 }
 

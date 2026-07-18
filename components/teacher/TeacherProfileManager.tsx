@@ -92,39 +92,36 @@ export function TeacherProfileManager() {
   const router = useRouter();
   const { user } = useAuthStore();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState('basic');
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const teacherId = user?.id ?? '';
 
-  // Get aggregated data for header & avatar snapshot
   const {
-    data: teacher,
+    data: basicRes,
     isLoading: isTeacherLoading,
     isFetching: isTeacherFetching,
     refetch: refetchTeacher,
-  } = useTeacher(teacherId);
+  } = useTeacherBasicDetails(teacherId);
+  const teacher = basicRes?.data ?? basicRes;
+
+  const fullName = teacher
+    ? `${teacher.firstName ?? ''} ${teacher.lastName ?? ''}`.trim()
+    : 'Faculty Member';
+  const initials = teacher
+    ? `${(teacher.firstName ?? '').charAt(0)}${(teacher.lastName ?? '').charAt(0)}`
+    : '';
 
   const uploadMutation = useUploadTeacherImage(teacherId);
   const deleteMutation = useDeleteTeacherImage(teacherId);
 
-  const fullName = useMemo(() => {
-    if (!teacher) return user?.name ?? 'Teacher';
-    return `${teacher.firstName ?? ''} ${teacher.lastName ?? ''}`.trim() || user?.name || 'Teacher';
-  }, [teacher, user?.name]);
-
-  const initials = useMemo(() => {
-    return fullName
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-  }, [fullName]);
-
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !teacherId) return;
+    if (!file) return;
 
     uploadMutation.mutate(file, {
       onSuccess: async () => {
@@ -158,7 +155,7 @@ export function TeacherProfileManager() {
     toast.success('Profile refreshed');
   };
 
-  if (isTeacherLoading && !teacher) {
+  if (!isHydrated || (isTeacherLoading && !teacher)) {
     return <TeacherProfileSkeleton />;
   }
 
@@ -290,7 +287,11 @@ export function TeacherProfileManager() {
             <div className="overflow-x-auto pb-2">
               <TabsList className="flex w-max min-w-full gap-2 bg-muted/20 p-1.5 rounded-2xl border border-border/50">
                 {[
-                  { id: 'personal', label: 'Identity & Details' },
+                  { id: 'basic', label: 'Basic Details' },
+                  { id: 'personal', label: 'Personal Data' },
+                  { id: 'academic', label: 'Academic Data' },
+                  { id: 'professional', label: 'Professional Data' },
+                  { id: 'family', label: 'Family Details' },
                   { id: 'employment', label: 'Employment' },
                   { id: 'classes', label: 'Classes & Pedagogical' },
                   { id: 'addresses', label: 'Addresses' },
@@ -307,14 +308,34 @@ export function TeacherProfileManager() {
             </div>
 
             <div className="mt-4">
-              {/* Identity & Details Tab */}
-              <TabsContent value="personal" className="mt-0 space-y-6">
-                <IdentityDetailsTab teacherId={teacherId} roleStack={[
+              {/* Basic Details Tab */}
+              <TabsContent value="basic" className="mt-0">
+                <BasicDetailsTab teacherId={teacherId} roleStack={[
                   teacher.isPrincipal && 'Principal',
                   teacher.isCoordinator && 'Coordinator',
                   teacher.isClassTeacher && 'Class Teacher',
                   teacher.isSubjectTeacher && 'Subject Teacher'
                 ].filter(Boolean) as string[]} />
+              </TabsContent>
+
+              {/* Personal Data Tab */}
+              <TabsContent value="personal" className="mt-0">
+                <PersonalDataTab teacherId={teacherId} />
+              </TabsContent>
+
+              {/* Academic Data Tab */}
+              <TabsContent value="academic" className="mt-0">
+                <AcademicDataTab teacherId={teacherId} />
+              </TabsContent>
+
+              {/* Professional Data Tab */}
+              <TabsContent value="professional" className="mt-0">
+                <ProfessionalDataTab teacherId={teacherId} />
+              </TabsContent>
+
+              {/* Family Details Tab */}
+              <TabsContent value="family" className="mt-0">
+                <FamilyDetailsTab teacherId={teacherId} />
               </TabsContent>
 
               {/* Employment Tab */}
@@ -340,26 +361,13 @@ export function TeacherProfileManager() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SUB-COMPONENTS
+// SUB-COMPONENTS FOR TAB-WISE DATA
 // ═════════════════════════════════════════════════════════════════════════════
 
-// ─── 1. Identity & Details Tab Component ─────────────────────────────────────
-function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleStack: string[] }) {
-  // Query tab data
-  const { data: basicRes, isLoading: loadingBasic, refetch: refetchBasic } = useTeacherBasicDetails(teacherId);
-  const { data: personalRes, isLoading: loadingPersonal, refetch: refetchPersonal } = useTeacherPersonalData(teacherId);
-  const { data: academicRes, isLoading: loadingAcademic, refetch: refetchAcademic } = useTeacherAcademicData(teacherId);
-  const { data: professionalRes, isLoading: loadingProfessional, refetch: refetchProfessional } = useTeacherProfessionalData(teacherId);
-  const { data: familyRes, isLoading: loadingFamily, refetch: refetchFamily } = useTeacherFamilyDetails(teacherId);
-
-  // Mutations
+function BasicDetailsTab({ teacherId, roleStack }: { teacherId: string; roleStack: string[] }) {
+  const { data: basicRes, refetch: refetchBasic } = useTeacherBasicDetails(teacherId);
   const updateBasic = useUpdateTeacherBasicDetails(teacherId);
-  const updatePersonal = useUpdateTeacherPersonalData(teacherId);
-  const updateAcademic = useUpdateTeacherAcademicData(teacherId);
-  const updateProfessional = useUpdateTeacherProfessionalData(teacherId);
-  const updateFamily = useUpdateTeacherFamilyDetails(teacherId);
 
-  // Local state forms
   const [basicForm, setBasicForm] = useState({
     firstName: '',
     lastName: '',
@@ -370,35 +378,6 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
     emailId: '',
   });
 
-  const [personalForm, setPersonalForm] = useState({
-    bloodGroup: '',
-    maritalStatus: '',
-    nationality: '',
-    religion: '',
-  });
-
-  const [academicForm, setAcademicForm] = useState({
-    highestQualification: '',
-    specialization: '',
-    university: '',
-    passingYear: '',
-  });
-
-  const [professionalForm, setProfessionalForm] = useState({
-    designation: '',
-    totalExperience: '',
-    previousSchool: '',
-  });
-
-  const [familyForm, setFamilyForm] = useState({
-    fatherName: '',
-    motherName: '',
-    spouseName: '',
-    children: 0,
-    emergencyContact: '',
-  });
-
-  // Sync state with query responses
   useEffect(() => {
     const b = basicRes?.data ?? basicRes;
     if (b) {
@@ -414,6 +393,91 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
     }
   }, [basicRes]);
 
+  const handleSaveBasic = () => {
+    updateBasic.mutate(basicForm, {
+      onSuccess: () => {
+        toast.success('Basic details updated successfully');
+        refetchBasic();
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Update basic details failed'),
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Basic Core Details</CardTitle>
+          <CardDescription className="text-xs">Primary identification details.</CardDescription>
+        </div>
+        <Button onClick={handleSaveBasic} disabled={updateBasic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+          <Save className="mr-1.5 h-3.5 w-3.5" /> {updateBasic.isPending ? 'Saving...' : 'Save'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ProfileField label="First Name">
+            <Input value={basicForm.firstName} onChange={(e) => setBasicForm({ ...basicForm, firstName: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Last Name">
+            <Input value={basicForm.lastName} onChange={(e) => setBasicForm({ ...basicForm, lastName: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Date of Birth">
+            <Input type="date" value={basicForm.dateOfBirth} onChange={(e) => setBasicForm({ ...basicForm, dateOfBirth: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Gender">
+            <select
+              value={basicForm.gender}
+              onChange={(e) => setBasicForm({ ...basicForm, gender: e.target.value })}
+              className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </ProfileField>
+          <ProfileField label="Mobile Number">
+            <Input value={basicForm.mobileNumber} onChange={(e) => setBasicForm({ ...basicForm, mobileNumber: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Alternate Mobile Number">
+            <Input value={basicForm.alternateMobileNumber} onChange={(e) => setBasicForm({ ...basicForm, alternateMobileNumber: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Personal Email" className="md:col-span-2">
+            <Input type="email" value={basicForm.emailId} onChange={(e) => setBasicForm({ ...basicForm, emailId: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Institutional Roles (Read-Only)</p>
+          <div className="flex flex-wrap gap-2">
+            {roleStack.length > 0 ? (
+              roleStack.map((role) => (
+                <span key={role} className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> {role}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground/50">No institutional roles assigned.</span>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonalDataTab({ teacherId }: { teacherId: string }) {
+  const { data: personalRes, refetch: refetchPersonal } = useTeacherPersonalData(teacherId);
+  const updatePersonal = useUpdateTeacherPersonalData(teacherId);
+
+  const [personalForm, setPersonalForm] = useState({
+    bloodGroup: '',
+    maritalStatus: '',
+    nationality: '',
+    religion: '',
+  });
+
   useEffect(() => {
     const p = personalRes?.data?.teacherPersonalData ?? personalRes?.teacherPersonalData ?? personalRes;
     if (p) {
@@ -425,6 +489,68 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
       });
     }
   }, [personalRes]);
+
+  const handleSavePersonal = () => {
+    updatePersonal.mutate({ teacherPersonalData: personalForm }, {
+      onSuccess: () => {
+        toast.success('Personal data updated successfully');
+        refetchPersonal();
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Update personal data failed'),
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Personal Data</CardTitle>
+          <CardDescription className="text-xs">Physical attributes and nationality profiles.</CardDescription>
+        </div>
+        <Button onClick={handleSavePersonal} disabled={updatePersonal.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+          <Save className="mr-1.5 h-3.5 w-3.5" /> {updatePersonal.isPending ? 'Saving...' : 'Save'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ProfileField label="Blood Group">
+            <Input value={personalForm.bloodGroup} onChange={(e) => setPersonalForm({ ...personalForm, bloodGroup: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Marital Status">
+            <select
+              value={personalForm.maritalStatus}
+              onChange={(e) => setPersonalForm({ ...personalForm, maritalStatus: e.target.value })}
+              className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select</option>
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Divorced">Divorced</option>
+              <option value="Widowed">Widowed</option>
+            </select>
+          </ProfileField>
+          <ProfileField label="Nationality">
+            <Input value={personalForm.nationality} onChange={(e) => setPersonalForm({ ...personalForm, nationality: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Religion">
+            <Input value={personalForm.religion} onChange={(e) => setPersonalForm({ ...personalForm, religion: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AcademicDataTab({ teacherId }: { teacherId: string }) {
+  const { data: academicRes, refetch: refetchAcademic } = useTeacherAcademicData(teacherId);
+  const updateAcademic = useUpdateTeacherAcademicData(teacherId);
+
+  const [academicForm, setAcademicForm] = useState({
+    highestQualification: '',
+    specialization: '',
+    university: '',
+    passingYear: '',
+  });
 
   useEffect(() => {
     const a = academicRes?.data?.teacherAcademicData ?? academicRes?.teacherAcademicData ?? academicRes;
@@ -438,6 +564,57 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
     }
   }, [academicRes]);
 
+  const handleSaveAcademic = () => {
+    updateAcademic.mutate({ teacherAcademicData: academicForm }, {
+      onSuccess: () => {
+        toast.success('Academic details updated successfully');
+        refetchAcademic();
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Update academic details failed'),
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Academic Data</CardTitle>
+          <CardDescription className="text-xs">Highest degree qualifications and universities.</CardDescription>
+        </div>
+        <Button onClick={handleSaveAcademic} disabled={updateAcademic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+          <Save className="mr-1.5 h-3.5 w-3.5" /> {updateAcademic.isPending ? 'Saving...' : 'Save'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ProfileField label="Highest Qualification">
+            <Input value={academicForm.highestQualification} onChange={(e) => setAcademicForm({ ...academicForm, highestQualification: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Specialization">
+            <Input value={academicForm.specialization} onChange={(e) => setAcademicForm({ ...academicForm, specialization: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="University/College">
+            <Input value={academicForm.university} onChange={(e) => setAcademicForm({ ...academicForm, university: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Passing Year">
+            <Input value={academicForm.passingYear} onChange={(e) => setAcademicForm({ ...academicForm, passingYear: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfessionalDataTab({ teacherId }: { teacherId: string }) {
+  const { data: professionalRes, refetch: refetchProfessional } = useTeacherProfessionalData(teacherId);
+  const updateProfessional = useUpdateTeacherProfessionalData(teacherId);
+
+  const [professionalForm, setProfessionalForm] = useState({
+    designation: '',
+    totalExperience: '',
+    previousSchool: '',
+  });
+
   useEffect(() => {
     const pr = professionalRes?.data?.teacherProfessionalData ?? professionalRes?.teacherProfessionalData ?? professionalRes;
     if (pr) {
@@ -448,6 +625,56 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
       });
     }
   }, [professionalRes]);
+
+  const handleSaveProfessional = () => {
+    updateProfessional.mutate({ teacherProfessionalData: professionalForm }, {
+      onSuccess: () => {
+        toast.success('Professional data updated successfully');
+        refetchProfessional();
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Update professional data failed'),
+    });
+  };
+
+  return (
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Professional Data</CardTitle>
+          <CardDescription className="text-xs">Faculty experience and designation details.</CardDescription>
+        </div>
+        <Button onClick={handleSaveProfessional} disabled={updateProfessional.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+          <Save className="mr-1.5 h-3.5 w-3.5" /> {updateProfessional.isPending ? 'Saving...' : 'Save'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <ProfileField label="Designation">
+            <Input value={professionalForm.designation} onChange={(e) => setProfessionalForm({ ...professionalForm, designation: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Experience (Years)">
+            <Input value={professionalForm.totalExperience} onChange={(e) => setProfessionalForm({ ...professionalForm, totalExperience: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Previous School/Employer">
+            <Input value={professionalForm.previousSchool} onChange={(e) => setProfessionalForm({ ...professionalForm, previousSchool: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FamilyDetailsTab({ teacherId }: { teacherId: string }) {
+  const { data: familyRes, refetch: refetchFamily } = useTeacherFamilyDetails(teacherId);
+  const updateFamily = useUpdateTeacherFamilyDetails(teacherId);
+
+  const [familyForm, setFamilyForm] = useState({
+    fatherName: '',
+    motherName: '',
+    spouseName: '',
+    children: 0,
+    emergencyContact: '',
+  });
 
   useEffect(() => {
     const f = familyRes?.data?.teacherFamilyDetails ?? familyRes?.teacherFamilyDetails ?? familyRes;
@@ -462,46 +689,6 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
     }
   }, [familyRes]);
 
-  const handleSaveBasic = () => {
-    updateBasic.mutate(basicForm, {
-      onSuccess: () => {
-        toast.success('Basic details updated successfully');
-        refetchBasic();
-      },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Update basic details failed'),
-    });
-  };
-
-  const handleSavePersonal = () => {
-    updatePersonal.mutate({ teacherPersonalData: personalForm }, {
-      onSuccess: () => {
-        toast.success('Personal data updated successfully');
-        refetchPersonal();
-      },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Update personal data failed'),
-    });
-  };
-
-  const handleSaveAcademic = () => {
-    updateAcademic.mutate({ teacherAcademicData: academicForm }, {
-      onSuccess: () => {
-        toast.success('Academic details updated successfully');
-        refetchAcademic();
-      },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Update academic details failed'),
-    });
-  };
-
-  const handleSaveProfessional = () => {
-    updateProfessional.mutate({ teacherProfessionalData: professionalForm }, {
-      onSuccess: () => {
-        toast.success('Professional data updated successfully');
-        refetchProfessional();
-      },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Update professional data failed'),
-    });
-  };
-
   const handleSaveFamily = () => {
     updateFamily.mutate({ teacherFamilyDetails: familyForm }, {
       onSuccess: () => {
@@ -511,213 +698,42 @@ function IdentityDetailsTab({ teacherId, roleStack }: { teacherId: string; roleS
       onError: (err: any) => toast.error(err.response?.data?.message || 'Update family details failed'),
     });
   };
-
-  const loadingAny = loadingBasic || loadingPersonal || loadingAcademic || loadingProfessional || loadingFamily;
-
-  if (loadingAny) {
-    return (
-      <div className="space-y-6">
-        <Card className="h-64 rounded-3xl bg-muted/20 animate-pulse" />
-        <Card className="h-64 rounded-3xl bg-muted/20 animate-pulse" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Basic Core Details */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Basic Core Details</CardTitle>
-            <CardDescription className="text-xs">Primary identification details.</CardDescription>
-          </div>
-          <Button onClick={handleSaveBasic} disabled={updateBasic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {updateBasic.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ProfileField label="First Name">
-              <Input value={basicForm.firstName} onChange={(e) => setBasicForm({ ...basicForm, firstName: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Last Name">
-              <Input value={basicForm.lastName} onChange={(e) => setBasicForm({ ...basicForm, lastName: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Date of Birth">
-              <Input type="date" value={basicForm.dateOfBirth} onChange={(e) => setBasicForm({ ...basicForm, dateOfBirth: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Gender">
-              <select
-                value={basicForm.gender}
-                onChange={(e) => setBasicForm({ ...basicForm, gender: e.target.value })}
-                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </ProfileField>
-            <ProfileField label="Mobile Number">
-              <Input value={basicForm.mobileNumber} onChange={(e) => setBasicForm({ ...basicForm, mobileNumber: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Alternate Mobile Number">
-              <Input value={basicForm.alternateMobileNumber} onChange={(e) => setBasicForm({ ...basicForm, alternateMobileNumber: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Personal Email" className="md:col-span-2">
-              <Input type="email" value={basicForm.emailId} onChange={(e) => setBasicForm({ ...basicForm, emailId: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Institutional Roles (Read-Only)</p>
-            <div className="flex flex-wrap gap-2">
-              {roleStack.length > 0 ? (
-                roleStack.map((role) => (
-                  <span key={role} className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-                    <CheckCircle2 className="h-3 w-3" /> {role}
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs text-muted-foreground/50">No institutional roles assigned.</span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Personal Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Personal Data</CardTitle>
-            <CardDescription className="text-xs">Physical attributes and nationality profiles.</CardDescription>
-          </div>
-          <Button onClick={handleSavePersonal} disabled={updatePersonal.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {updatePersonal.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ProfileField label="Blood Group">
-              <Input value={personalForm.bloodGroup} onChange={(e) => setPersonalForm({ ...personalForm, bloodGroup: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Marital Status">
-              <select
-                value={personalForm.maritalStatus}
-                onChange={(e) => setPersonalForm({ ...personalForm, maritalStatus: e.target.value })}
-                className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Select</option>
-                <option value="Single">Single</option>
-                <option value="Married">Married</option>
-                <option value="Divorced">Divorced</option>
-                <option value="Widowed">Widowed</option>
-              </select>
-            </ProfileField>
-            <ProfileField label="Nationality">
-              <Input value={personalForm.nationality} onChange={(e) => setPersonalForm({ ...personalForm, nationality: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Religion">
-              <Input value={personalForm.religion} onChange={(e) => setPersonalForm({ ...personalForm, religion: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Academic Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Academic Data</CardTitle>
-            <CardDescription className="text-xs">Highest degree qualifications and universities.</CardDescription>
-          </div>
-          <Button onClick={handleSaveAcademic} disabled={updateAcademic.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {updateAcademic.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <ProfileField label="Highest Qualification">
-              <Input value={academicForm.highestQualification} onChange={(e) => setAcademicForm({ ...academicForm, highestQualification: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Specialization">
-              <Input value={academicForm.specialization} onChange={(e) => setAcademicForm({ ...academicForm, specialization: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="University/College">
-              <Input value={academicForm.university} onChange={(e) => setAcademicForm({ ...academicForm, university: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Passing Year">
-              <Input value={academicForm.passingYear} onChange={(e) => setAcademicForm({ ...academicForm, passingYear: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Professional Data */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Professional Data</CardTitle>
-            <CardDescription className="text-xs">Faculty experience and designation details.</CardDescription>
-          </div>
-          <Button onClick={handleSaveProfessional} disabled={updateProfessional.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {updateProfessional.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ProfileField label="Designation">
-              <Input value={professionalForm.designation} onChange={(e) => setProfessionalForm({ ...professionalForm, designation: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Experience (Years)">
-              <Input value={professionalForm.totalExperience} onChange={(e) => setProfessionalForm({ ...professionalForm, totalExperience: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Previous School/Employer">
-              <Input value={professionalForm.previousSchool} onChange={(e) => setProfessionalForm({ ...professionalForm, previousSchool: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Family Details */}
-      <Card className="erp-card overflow-hidden">
-        <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base font-bold">Family Details</CardTitle>
-            <CardDescription className="text-xs">Emergency contacts and household status.</CardDescription>
-          </div>
-          <Button onClick={handleSaveFamily} disabled={updateFamily.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {updateFamily.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ProfileField label="Father's Name">
-              <Input value={familyForm.fatherName} onChange={(e) => setFamilyForm({ ...familyForm, fatherName: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Mother's Name">
-              <Input value={familyForm.motherName} onChange={(e) => setFamilyForm({ ...familyForm, motherName: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Spouse Name">
-              <Input value={familyForm.spouseName} onChange={(e) => setFamilyForm({ ...familyForm, spouseName: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-            <ProfileField label="Number of Children">
-              <Input
-                type="number"
-                value={familyForm.children}
-                onChange={(e) => setFamilyForm({ ...familyForm, children: parseInt(e.target.value, 10) || 0 })}
-                className="rounded-xl"
-              />
-            </ProfileField>
-            <ProfileField label="Emergency Contact Number" className="md:col-span-2">
-              <Input value={familyForm.emergencyContact} onChange={(e) => setFamilyForm({ ...familyForm, emergencyContact: e.target.value })} className="rounded-xl" />
-            </ProfileField>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="erp-card overflow-hidden">
+      <CardHeader className="border-b border-border/50 bg-muted/10 flex flex-row items-center justify-between py-5 px-6">
+        <div>
+          <CardTitle className="text-base font-bold">Family Details</CardTitle>
+          <CardDescription className="text-xs">Emergency contacts and household status.</CardDescription>
+        </div>
+        <Button onClick={handleSaveFamily} disabled={updateFamily.isPending} className="rounded-xl h-9 px-4 font-semibold text-xs shrink-0">
+          <Save className="mr-1.5 h-3.5 w-3.5" /> {updateFamily.isPending ? 'Saving...' : 'Save'}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ProfileField label="Father's Name">
+            <Input value={familyForm.fatherName} onChange={(e) => setFamilyForm({ ...familyForm, fatherName: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Mother's Name">
+            <Input value={familyForm.motherName} onChange={(e) => setFamilyForm({ ...familyForm, motherName: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Spouse Name">
+            <Input value={familyForm.spouseName} onChange={(e) => setFamilyForm({ ...familyForm, spouseName: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+          <ProfileField label="Number of Children">
+            <Input
+              type="number"
+              value={familyForm.children}
+              onChange={(e) => setFamilyForm({ ...familyForm, children: parseInt(e.target.value, 10) || 0 })}
+              className="rounded-xl"
+            />
+          </ProfileField>
+          <ProfileField label="Emergency Contact Number" className="md:col-span-2">
+            <Input value={familyForm.emergencyContact} onChange={(e) => setFamilyForm({ ...familyForm, emergencyContact: e.target.value })} className="rounded-xl" />
+          </ProfileField>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

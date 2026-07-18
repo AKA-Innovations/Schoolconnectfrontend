@@ -10,6 +10,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { LeaveStatus, type ListLeaveFilters, type TeacherLeave } from '../../types/leave.types';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { DatePicker } from '../ui/datepicker';
 import { toast } from 'sonner';
 import { CalendarDays, X, Check, XCircle, Clock, FileText, Search, RotateCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -207,31 +208,25 @@ export function LeaveRequestsTable({ teacherId, isAdmin, onApprove, onReject, fi
 
           {/* Date range filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={startDateFilter}
-                onChange={(e) => {
-                  setStartDateFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-10 pl-9 pr-4 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-              />
-            </div>
+            <DatePicker
+              value={startDateFilter}
+              onChange={(val) => {
+                setStartDateFilter(val);
+                setCurrentPage(1);
+              }}
+              placeholder="From Date"
+              className="w-36 font-semibold"
+            />
             <span className="text-xs text-slate-400 font-semibold">to</span>
-            <div className="relative">
-              <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={endDateFilter}
-                onChange={(e) => {
-                  setEndDateFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-10 pl-9 pr-4 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-              />
-            </div>
+            <DatePicker
+              value={endDateFilter}
+              onChange={(val) => {
+                setEndDateFilter(val);
+                setCurrentPage(1);
+              }}
+              placeholder="To Date"
+              className="w-36 font-semibold"
+            />
             {(startDateFilter || endDateFilter) && (
               <Button
                 variant="ghost"
@@ -314,7 +309,14 @@ export function LeaveRequestsTable({ teacherId, isAdmin, onApprove, onReject, fi
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={status.variant}>{status.label}</Badge>
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                        {leave.status === 'REJECTED' && leave.rejectionReason && (
+                          <span className="text-[10px] text-rose-500 font-semibold italic max-w-[120px] truncate block" title={leave.rejectionReason}>
+                            Remark: {leave.rejectionReason}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -359,11 +361,6 @@ export function LeaveRequestsTable({ teacherId, isAdmin, onApprove, onReject, fi
                           >
                             <RotateCcw size={12} className="mr-1" /> Revoke
                           </Button>
-                        )}
-                        {leave.status === 'REJECTED' && leave.rejectionReason && (
-                          <span className="text-[10px] text-red-400 italic max-w-[120px] truncate" title={leave.rejectionReason}>
-                            {leave.rejectionReason}
-                          </span>
                         )}
                       </div>
                     </TableCell>

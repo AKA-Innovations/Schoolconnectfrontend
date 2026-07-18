@@ -388,4 +388,16 @@ export const teacherService = {
     });
     return response.data;
   },
+
+  getAvailableClassTeachers: async (session: string): Promise<any> => {
+    const response = await api.get(API_ENDPOINTS.TEACHER.AVAILABLE_CLASS_TEACHERS, {
+      params: { session },
+    });
+    return response.data;
+  },
+
+  updateUserStatus: async (id: string, isActive: boolean): Promise<any> => {
+    const response = await api.put(API_ENDPOINTS.AUTH.UPDATE_STATUS(id), { isActive });
+    return response.data;
+  },
 };

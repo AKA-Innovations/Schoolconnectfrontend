@@ -95,7 +95,7 @@ export default function LoginPage() {
       if ((data.role === 'teacher' || data.role === 'subject_coordinator') && backendUserId) {
         try {
           const teacherDetails = await teacherService.getTeacherById(backendUserId);
-          const assignedClass = teacherDetails.classTeacherAssignment ?? null;
+          const assignedClass = teacherDetails.classTeacherClass ?? null;
           const coordinatorClasses = (teacherDetails.coordinatorMappings ?? []).map((m) => m.className);
           if (teacherDetails.isPrincipal) {
             document.cookie = `is-principal=true; path=/; SameSite=Strict${securePart}`;
@@ -111,7 +111,11 @@ export default function LoginPage() {
               isClassTeacher: teacherDetails.isClassTeacher ?? false,
               isSubjectTeacher: teacherDetails.isSubjectTeacher ?? false,
               classTeacherClass: assignedClass
-                ? { className: assignedClass.className, sectionName: assignedClass.sectionName }
+                ? { 
+                    classDtlsId: assignedClass.classDtlsId, 
+                    className: assignedClass.className, 
+                    sectionName: assignedClass.sectionName 
+                  }
                 : null,
               coordinatorClasses: coordinatorClasses.length > 0 ? coordinatorClasses : undefined,
             },

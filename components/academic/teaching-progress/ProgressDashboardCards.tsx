@@ -10,7 +10,7 @@ import { CURRENT_SESSION } from '@/lib/constants';
 
 function ProgressCardItem({ assignment }: { assignment: any }) {
   const { data: progress, isLoading } = useSubjectProgress(
-    assignment.subjectDtlsId || assignment.subjectId, 
+    assignment.subjectDtlsId || assignment.subjectId,
     assignment.classDtlsId || assignment.classSectionId,
     CURRENT_SESSION
   );
@@ -32,7 +32,7 @@ function ProgressCardItem({ assignment }: { assignment: any }) {
   if (!normalized) return null;
 
   return (
-    <Card className="rounded-2xl border border-border/40 shadow-sm bg-card overflow-hidden">
+    <Card className="rounded-2xl border border-border/40 shadow-sm bg-card overflow-">
       <CardContent className="p-0">
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
@@ -57,9 +57,9 @@ function ProgressCardItem({ assignment }: { assignment: any }) {
 
           <div className="space-y-2">
             <div className="h-1.5 w-full bg-muted/40 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-1000" 
-                style={{ width: `${normalized.percentage}%` }} 
+              <div
+                className="h-full bg-primary transition-all duration-1000"
+                style={{ width: `${normalized.percentage}%` }}
               />
             </div>
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
@@ -90,7 +90,7 @@ export const ProgressDashboardCards = () => {
   }
 
   return (
-    <div className="flex flex-col gap-4 max-h-[380px] overflow-y-auto pr-1.5 scrollbar-thin">
+    <div className="flex flex-col gap-4 max-h-[320px] overflow-y-auto pr-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-slate-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
       {assignments.map((as) => (
         <ProgressCardItem key={as.id} assignment={as} />
       ))}

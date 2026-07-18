@@ -14,8 +14,10 @@ import { HomeworkFormModal } from './HomeworkFormModal';
 import { HomeworkDetailView } from './HomeworkDetailView';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datepicker';
 import type { Homework } from '@/services/academic/types';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 const getDateRange = (preset: string) => {
   const start = new Date();
@@ -60,6 +62,7 @@ export function HomeworkManagement() {
 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'overdue'>('all');
   const [dateRangePreset, setDateRangePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
   const [startDate, setStartDate] = useState('');
@@ -72,7 +75,6 @@ export function HomeworkManagement() {
   const [isFormOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<Homework | null>(null);
   const [viewItem, setViewItem] = useState<Homework | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const user = useAuthStore((s) => s.role === 'teacher' ? s.user : null);
   const role = useAuthStore((s) => s.role);
@@ -82,8 +84,7 @@ export function HomeworkManagement() {
 
   // Extract class name filter if classFilter is set to pass to backend query
   const backendClassName = useMemo(() => {
-    if (!classFilter) return undefined;
-    return classFilter.split('-')[0];
+    return classFilter || undefined;
   }, [classFilter]);
 
   // Query parameters for backend pagination
@@ -102,7 +103,6 @@ export function HomeworkManagement() {
     role === 'teacher' ? user?.id : undefined,
     'all'
   );
-  const deleteMutation = useDeleteHomework();
 
   // Filter sections options to only show teacher-assigned classes/sections
   const filteredSections = useMemo(() => {
@@ -120,6 +120,26 @@ export function HomeworkManagement() {
       s.id > 0 && teacherAssignments.some(ta => ta.className === s.className && ta.sectionName === s.sectionName)
     );
   }, [allSections, role, user, teacherAssignments]);
+
+  // Unique sorted class names from filteredSections
+  const classOptions = useMemo(() => {
+    const classes = new Set<string>();
+    filteredSections.forEach(s => {
+      if (s.className) classes.add(s.className);
+    });
+    return Array.from(classes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [filteredSections]);
+
+  // Unique sorted section names for the selected class (or all sections if no class selected)
+  const sectionOptions = useMemo(() => {
+    const sections = new Set<string>();
+    filteredSections.forEach(s => {
+      if (!classFilter || s.className === classFilter) {
+        if (s.sectionName) sections.add(s.sectionName);
+      }
+    });
+    return Array.from(sections).sort();
+  }, [filteredSections, classFilter]);
 
   // Metrics summary
   const counts = useMemo(() => {
@@ -154,10 +174,11 @@ export function HomeworkManagement() {
   const filteredAndSortedHomeworks = useMemo(() => {
     let items = data ?? [];
 
-    // Filter by class/section format "className-sectionName"
     if (classFilter) {
-      const [cls, sec] = classFilter.split('-');
-      items = items.filter(h => h.className === cls && h.sectionName === sec);
+      items = items.filter(h => h.className === classFilter);
+    }
+    if (sectionFilter) {
+      items = items.filter(h => h.sectionName === sectionFilter);
     }
 
     // Filter by date range preset or custom
@@ -209,7 +230,7 @@ export function HomeworkManagement() {
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, debouncedSearch, classFilter, dateRangePreset, startDate, endDate, statusFilter, sortBy, sortOrder]);
+  }, [data, debouncedSearch, classFilter, sectionFilter, dateRangePreset, startDate, endDate, statusFilter, sortBy, sortOrder]);
 
   // Paginated chunk for safe display
   const paginatedHomeworks = useMemo(() => {
@@ -237,15 +258,12 @@ export function HomeworkManagement() {
     params.set('homeworkId', String(hw.id));
     router.replace(`${window.location.pathname}?${params.toString()}`);
   }, [router]);
-  const handleDelete = useCallback((id: number) => setDeleteTarget(id), []);
-  const handleDeleteConfirm = useCallback(() => {
-    if (deleteTarget == null) return;
-    deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) });
-  }, [deleteTarget, deleteMutation]);
+
 
   const handleClearFilters = useCallback(() => {
     setSearch('');
     setClassFilter('');
+    setSectionFilter('');
     setStatusFilter('all');
     setDateRangePreset('all');
     setStartDate('');
@@ -295,20 +313,40 @@ export function HomeworkManagement() {
       </div>
 
       <AcademicFilterBar searchTerm={search} onSearchChange={setSearch} searchPlaceholder="Search homework..."
-        onClear={handleClearFilters} hasActiveFilters={!!(search || classFilter || statusFilter !== 'all' || dateRangePreset !== 'all' || startDate || endDate || sortBy !== 'dueDate' || sortOrder !== 'desc')}>
-        <div className="w-40">
+        onClear={handleClearFilters} hasActiveFilters={!!(search || classFilter || sectionFilter || statusFilter !== 'all' || dateRangePreset !== 'all' || startDate || endDate || sortBy !== 'dueDate' || sortOrder !== 'desc')}>
+        <div className="w-36">
           <Select
             value={classFilter}
-            onValueChange={(val) => { setClassFilter(val); setPage(1); }}
+            onValueChange={(val) => { setClassFilter(val); setSectionFilter(''); setPage(1); }}
           >
             <SelectTrigger>
               <SelectValue placeholder="All Classes" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">All Classes</SelectItem>
-              {filteredSections.map((cs) => (
-                <SelectItem key={cs.id} value={`${cs.className}-${cs.sectionName}`}>
-                  Class {cs.className}-{cs.sectionName}
+              {classOptions.map((cls) => (
+                <SelectItem key={cls} value={cls}>
+                  Class {cls}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-32">
+          <Select
+            value={sectionFilter}
+            onValueChange={(val) => { setSectionFilter(val); setPage(1); }}
+            disabled={!classFilter}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={classFilter ? "All Sections" : "Select Class"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Sections</SelectItem>
+              {sectionOptions.map((sec) => (
+                <SelectItem key={sec} value={sec}>
+                  Section {sec}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -352,22 +390,24 @@ export function HomeworkManagement() {
         {dateRangePreset === 'custom' && (
           <>
             <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-3 bg-white h-10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">From</span>
-              <input
-                type="date"
+              <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">From</span>
+              <DatePicker
                 value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                className="border-none p-0 text-xs font-semibold text-slate-600 bg-transparent focus:ring-0 w-28 cursor-pointer"
+                onChange={(val) => { setStartDate(val); setPage(1); }}
+                placeholder="From Date"
+                className="w-32 border-none focus:ring-0 sm:w-32"
+                buttonClassName="border-none h-8 px-1 shadow-none"
               />
             </div>
 
             <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl px-3 bg-white h-10">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">To</span>
-              <input
-                type="date"
+              <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">To</span>
+              <DatePicker
                 value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                className="border-none p-0 text-xs font-semibold text-slate-600 bg-transparent focus:ring-0 w-28 cursor-pointer"
+                onChange={(val) => { setEndDate(val); setPage(1); }}
+                placeholder="To Date"
+                className="w-32 border-none focus:ring-0 sm:w-32"
+                buttonClassName="border-none h-8 px-1 shadow-none"
               />
             </div>
           </>
@@ -398,14 +438,11 @@ export function HomeworkManagement() {
         </div>
       </AcademicFilterBar>
 
-      <HomeworkTable homeworks={paginatedHomeworks} isLoading={isLoading} onView={handleView} onEdit={handleEdit} onDelete={handleDelete}
+      <HomeworkTable homeworks={paginatedHomeworks} isLoading={isLoading} onView={handleView} onEdit={handleEdit}
         page={page} totalPages={totalPages} onPageChange={setPage} />
 
       <HomeworkFormModal open={isFormOpen} onOpenChange={setFormOpen} editItem={editItem}
         onSuccess={() => { setFormOpen(false); setEditItem(null); }} />
-
-      <DeleteConfirmDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title="Delete Homework" description="This will permanently delete this homework and all related submissions and documents." onConfirm={handleDeleteConfirm} loading={deleteMutation.isPending} />
     </div>
   );
 }
