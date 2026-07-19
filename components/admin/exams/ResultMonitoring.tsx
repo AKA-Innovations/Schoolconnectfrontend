@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/authStore';
-import { useExams, useClassResults } from '@/services/exam/queries';
-import { useQuery } from '@tanstack/react-query';
+import { useExams, useClassResults, useExamSubjects, useMarks } from '@/services/exam/queries';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { examService } from '@/services/exam/service';
 import {
   useGenerateResults,
@@ -16,7 +17,7 @@ import {
   useUpdateTeacherRemarks,
   useUpdatePrincipalRemarks,
 } from '@/services/exam/mutations';
-import { useSchoolClasses, useSchoolSections, useSubjectDetails, useClassSectionLists } from '@/hooks/useClasses';
+import { useSchoolClasses, useSchoolSections, useSubjectDetails, useClassSectionLists, useSubjectOptions } from '@/hooks/useClasses';
 import { useStudentList } from '@/hooks/useStudents';
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 import { CURRENT_SESSION } from '@/lib/constants';
@@ -82,13 +83,27 @@ export function ResultMonitoring({ session }: Props) {
   );
   const mySubjectDetails = (mySubjectDetailsRaw as any[]) || [];
 
+  const searchParams = useSearchParams();
+
   const [selectedExamId, setSelectedExamId] = useState<number | ''>('');
   const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
   const [selectedSectionId, setSelectedSectionId] = useState<number | ''>('');
 
-  // Auto-configure class & section for class teacher
+  // Auto-configure from query parameters if navigating from schedule page
   React.useEffect(() => {
-    if (isClassTeacherOnly && resolvedClass) {
+    const examParam = searchParams.get('examId');
+    const classParam = searchParams.get('classId');
+    const sectionParam = searchParams.get('sectionId');
+
+    if (examParam) setSelectedExamId(Number(examParam));
+    if (classParam) setSelectedClassId(Number(classParam));
+    if (sectionParam) setSelectedSectionId(Number(sectionParam));
+  }, [searchParams]);
+
+  // Auto-configure class & section for class teacher (if not overridden by URL query parameters)
+  React.useEffect(() => {
+    const hasUrlParams = searchParams.get('examId') || searchParams.get('classId') || searchParams.get('sectionId');
+    if (!hasUrlParams && isClassTeacherOnly && resolvedClass) {
       const resClass = resolvedClass as any;
       if (resClass.classId) {
         setSelectedClassId(Number(resClass.classId));
@@ -97,7 +112,7 @@ export function ResultMonitoring({ session }: Props) {
         setSelectedSectionId(Number(resClass.classDtlsId));
       }
     }
-  }, [isClassTeacherOnly, resolvedClass]);
+  }, [isClassTeacherOnly, resolvedClass, searchParams]);
 
   const { data: classSections = [] } = useSchoolSections(
     selectedClassId ? Number(selectedClassId) : undefined
@@ -150,6 +165,57 @@ export function ResultMonitoring({ session }: Props) {
     classSectionId: selectedSectionId ? Number(selectedSectionId) : undefined,
     limit: 150,
   });
+
+  // Fetch all subjects taught in this class
+  const { data: classSubjectsRaw = [] } = useSubjectOptions(selectedClassId || undefined);
+  const classSubjects = Array.isArray(classSubjectsRaw) ? classSubjectsRaw : [];
+
+  // Fetch subjects configured for this exam and class to request subject-wise analysis
+  const { data: examSubjects = [] } = useExamSubjects(
+    session,
+    Number(selectedExamId) || 0,
+    Number(selectedClassId) || undefined
+  );
+
+  // Fetch subject analysis for each subject in this class section
+  const subjectQueries = useQueries({
+    queries: examSubjects.map((sub: any) => ({
+      queryKey: ['subject-analysis-detail', selectedExamId, selectedClassId, selectedSectionId, sub.subjectId],
+      queryFn: () => examService.getSubjectAnalysis({
+        session,
+        examId: Number(selectedExamId) || undefined,
+        classId: Number(selectedClassId) || undefined,
+        classSectionId: Number(selectedSectionId) || undefined,
+        subjectId: sub.subjectId,
+      }),
+      enabled: !!selectedExamId && !!selectedClassId && !!selectedSectionId && !!sub.subjectId,
+    })),
+  });
+
+  // Fetch subject-wise marks for all class subjects in parallel
+  const subjectMarksQueries = useQueries({
+    queries: classSubjects.map((sub: any) => ({
+      queryKey: ['subject-marks-list', selectedExamId, selectedClassId, selectedSectionId, sub.id],
+      queryFn: () => examService.getMarks(
+        Number(selectedExamId) || 0,
+        Number(selectedClassId) || 0,
+        Number(selectedSectionId) || 0,
+        sub.id
+      ),
+      enabled: !!selectedExamId && !!selectedClassId && !!selectedSectionId && !!sub.id,
+    })),
+  });
+
+  const allMarks = React.useMemo(() => {
+    const combined: any[] = [];
+    subjectMarksQueries.forEach((q) => {
+      const marksList = q.data || [];
+      if (Array.isArray(marksList)) {
+        combined.push(...marksList);
+      }
+    });
+    return combined;
+  }, [subjectMarksQueries]);
 
   const studentsList = studentsResponse?.items || [];
 
@@ -313,14 +379,29 @@ export function ResultMonitoring({ session }: Props) {
       else ranges[5].count++;
     });
 
+    // Compile subject averages chart data from actual backend API results
+    const subjectAverages = examSubjects.map((sub: any, idx: number) => {
+      const queryResult = (subjectQueries[idx] as any)?.data?.data || (subjectQueries[idx] as any)?.data;
+      return {
+        subject: sub.subjectName || `Subject ${sub.subjectId}`,
+        average: queryResult?.avgMarks !== undefined && sub.totalMarks > 0
+          ? Math.round((queryResult.avgMarks / sub.totalMarks) * 100)
+          : undefined,
+        highest: queryResult?.highestMarks,
+        lowest: queryResult?.lowestMarks,
+        passRate: queryResult?.passPercentage,
+      };
+    }).filter((s: any) => s.average !== undefined);
+
     return {
       passRate,
       classAvg,
       toppers,
       weakStudents,
       scoreDistribution: ranges,
+      subjectAverages,
     };
-  }, [resultsList]);
+  }, [resultsList, examSubjects, subjectQueries]);
 
   return (
     <div className="space-y-6">
@@ -368,7 +449,7 @@ export function ResultMonitoring({ session }: Props) {
                   <SelectItem value="all">Select Class</SelectItem>
                   {filteredClasses.map((c: any) => (
                     <SelectItem key={c.id} value={String(c.id)}>
-                      Class {c.className}
+                      {`Class ${c.className}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -389,7 +470,7 @@ export function ResultMonitoring({ session }: Props) {
                   <SelectItem value="all">Select Section</SelectItem>
                   {filteredSections.map((s: any) => (
                     <SelectItem key={s.id} value={String(s.id)}>
-                      Section {s.sectionName}
+                      {`Section ${s.sectionName}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -548,12 +629,12 @@ export function ResultMonitoring({ session }: Props) {
               </div>
 
               {/* Score Distribution Chart */}
-              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card p-6 flex flex-col justify-between">
+              <Card className="rounded-2xl border border-border/80 shadow-sm bg-card p-6 flex flex-col justify-between h-[380px]">
                 <div className="border-b border-border/50 pb-3 mb-4">
                   <p className="font-bold text-sm">Class Score Distribution</p>
                   <p className="text-[10px] text-muted-foreground">Range analysis of student scores.</p>
                 </div>
-                <div className="h-64 flex-1">
+                <div className="h-[260px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analyticsSummary.scoreDistribution}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.03)" vertical={false} />
@@ -565,6 +646,27 @@ export function ResultMonitoring({ session }: Props) {
                   </ResponsiveContainer>
                 </div>
               </Card>
+
+              {/* Subject Wise Performance Chart */}
+              {analyticsSummary.subjectAverages && analyticsSummary.subjectAverages.length > 0 && (
+                <Card className="rounded-2xl border border-border/80 shadow-sm bg-card p-6 flex flex-col justify-between h-[380px] xl:col-span-3">
+                  <div className="border-b border-border/50 pb-3 mb-4">
+                    <p className="font-bold text-sm">Subject-wise Performance</p>
+                    <p className="text-[10px] text-muted-foreground">Average percentage score per subject in this exam.</p>
+                  </div>
+                  <div className="h-[260px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={analyticsSummary.subjectAverages}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.03)" vertical={false} />
+                        <XAxis dataKey="subject" fontSize={9} stroke="#94a3b8" axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} fontSize={9} stroke="#94a3b8" axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: 'white', fontSize: '11px' }} />
+                        <Bar dataKey="average" fill="#10b981" radius={[6, 6, 0, 0]} name="Average Score %" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
 
@@ -588,6 +690,11 @@ export function ResultMonitoring({ session }: Props) {
                       <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/20">
                         <th className="p-4 px-6">Rank</th>
                         <th className="p-4">Student ID</th>
+                        {classSubjects.map((sub: any) => (
+                          <th key={sub.id} className="p-4 text-center bg-slate-50/50 border-x border-border/10 font-bold text-slate-800">
+                            {sub.subjectName || `Subject ${sub.subjectId}`}
+                          </th>
+                        ))}
                         <th className="p-4 text-center">Marks</th>
                         <th className="p-4 text-center">Pct %</th>
                         <th className="p-4 text-center">Grade</th>
@@ -605,6 +712,20 @@ export function ResultMonitoring({ session }: Props) {
                           <tr key={res.id} className="hover:bg-muted/5 transition-colors">
                             <td className="p-4 px-6 font-bold text-primary">#{res.rank || '-'}</td>
                             <td className="p-4 font-semibold">{getStudentName(res.studentId)}</td>
+                            {classSubjects.map((sub: any) => {
+                              const matchMark = allMarks.find((m: any) => m.studentId === res.studentId && m.subjectId === sub.id);
+                              return (
+                                <td key={sub.id} className="p-4 text-center font-bold border-x border-border/10">
+                                  {matchMark?.isAbsent ? (
+                                    <span className="text-rose-500 font-semibold">Ab</span>
+                                  ) : (matchMark?.marksObtained !== undefined && matchMark?.marksObtained !== null) ? (
+                                    <span className="text-indigo-600">{matchMark.marksObtained}</span>
+                                  ) : (
+                                    <span className="text-slate-300 font-normal">—</span>
+                                  )}
+                                </td>
+                              );
+                            })}
                             <td className="p-4 text-center font-medium">
                               {res.obtainedMarks ?? res.marksObtained ?? 0} <span className="text-muted-foreground/60 text-xs">/ {res.totalMarks}</span>
                             </td>

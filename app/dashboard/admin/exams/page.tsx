@@ -48,7 +48,11 @@ export default function ExamsPage() {
       case 'schedules':
         return <ScheduleBuilder session={session} />;
       case 'results':
-        return <ResultMonitoring session={session} />;
+        return (
+          <React.Suspense fallback={<div className="p-12 text-center text-muted-foreground">Loading...</div>}>
+            <ResultMonitoring session={session} />
+          </React.Suspense>
+        );
       case 'analytics':
         return <ExamAnalyticsDashboard session={session} />;
       default:

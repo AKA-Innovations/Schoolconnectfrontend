@@ -245,7 +245,7 @@ export function ExamSubjectConfig({ session }: Props) {
               <SelectItem value="all">Select Class</SelectItem>
               {classes.map((c: any) => (
                 <SelectItem key={c.id} value={String(c.id)}>
-                  Class {c.className}
+                  {`Class ${c.className}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -309,17 +309,22 @@ export function ExamSubjectConfig({ session }: Props) {
                 <form onSubmit={handleAddSubject} className="space-y-4">
                   <div className="space-y-2">
                     <Label className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Subject</Label>
-                    <select
-                      value={newSubjectId}
-                      onChange={(e) => setNewSubjectId(e.target.value ? Number(e.target.value) : '')}
-                      className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      required
+                    <Select
+                      value={newSubjectId ? String(newSubjectId) : 'none'}
+                      onValueChange={(val) => setNewSubjectId(val === 'none' ? '' : Number(val))}
                     >
-                      <option value="">Select Subject</option>
-                      {subjectOptions.map(opt => (
-                        <option key={opt.id} value={opt.id}>{opt.subjectName}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="h-11 w-full rounded-xl border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary/20">
+                        <SelectValue placeholder="Select Subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select Subject</SelectItem>
+                        {subjectOptions.map((opt) => (
+                          <SelectItem key={opt.id} value={String(opt.id)}>
+                            {opt.subjectName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">

@@ -107,13 +107,20 @@ export const academicService = {
   // ─── Teaching Progress ─────────────────────────────────────────────────────
 
   getTeachingProgress: async (teacherId?: string, session?: string): Promise<TeachingProgress[]> => {
-    const params: any = {};
-    if (teacherId) params.teacherId = teacherId;
-    params.session = session ?? CURRENT_SESSION;
-    const response = await api.get(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, {
-      params,
-    });
-    return response.data ?? [];
+    try {
+      const params: any = {};
+      if (teacherId) params.teacherId = teacherId;
+      params.session = session ?? CURRENT_SESSION;
+      const response = await api.get(API_ENDPOINTS.ACADEMIC.TEACHING_PROGRESS, {
+        params,
+      });
+      return response.data ?? [];
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        return [];
+      }
+      throw e;
+    }
   },
 
   createTeachingProgress: async (data: CreateTeachingProgressPayload): Promise<TeachingProgress> => {
