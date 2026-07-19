@@ -13,7 +13,6 @@ import { AcademicFilterBar } from '../shared/AcademicFilterBar';
 import { ProgressAnalytics } from './ProgressAnalytics';
 import type { TeachingProgress, SubjectChapter } from '@/services/academic/types';
 import { ChapterProgressTable } from './ChapterProgressTable';
-import { ProgressFormModal } from './ProgressFormModal';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 import { useTeacherProfile } from '@/hooks/useTeacherProfile';
@@ -27,8 +26,6 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
 
   const canLogProgress = role === 'teacher' || role === 'subject_coordinator';
 
-  const [isFormOpen, setFormOpen] = useState(false);
-  const [editItem, setEditItem] = useState<TeachingProgress | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedAssignment, setSelectedAssignment] = useState('');
 
@@ -171,35 +168,12 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
     }
   }, [mySubjects, selectedAssignment]);
 
-  const handleEdit = (ch: SubjectChapter) => {
-    setEditItem({
-      id: 0,
-      chapterId: ch.id,
-      subjectId: Number(selectedSubjectId),
-      classSectionId: Number(selectedClassSectionId),
-      status: 'not_started',
-      completionPercentage: 0,
-      session: CURRENT_SESSION,
-      schoolId: ch.schoolId,
-      topicId: 0,
-      createdAt: '',
-      updatedAt: ''
-    } as any);
-    setFormOpen(true);
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <AcademicPageHeader badge="Syllabus Tracking" title="Teaching" titleAccent="Progress">
         <Button variant="outline" size="icon" onClick={() => refetch()} className="rounded-2xl h-12 w-12 border-slate-200">
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
-        {canLogProgress && (
-          <Button onClick={() => { setEditItem(null); setFormOpen(true); }} className="h-12 px-6 rounded-2xl"
-            disabled={!selectedAssignment}>
-            <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Log Progress</span>
-          </Button>
-        )}
       </AcademicPageHeader>
 
       {/* Assignment selector */}
@@ -343,12 +317,7 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
         chapters={items} 
         classSectionId={selectedClassSectionId} 
         isLoading={chaptersLoading} 
-        onEdit={handleEdit} 
       />
-
-      <ProgressFormModal open={isFormOpen} onOpenChange={setFormOpen} editItem={editItem}
-        prefill={prefill}
-        onSuccess={() => { setFormOpen(false); setEditItem(null); refetch(); }} />
     </div>
   );
 }

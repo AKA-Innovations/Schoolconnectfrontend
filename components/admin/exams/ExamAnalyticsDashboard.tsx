@@ -306,7 +306,7 @@ export function ExamAnalyticsDashboard({ session }: Props) {
               <SelectItem value="all">Select Class</SelectItem>
               {schoolClasses.map((c: any) => (
                 <SelectItem key={c.id} value={String(c.id)}>
-                  Class {c.className}
+                  {`Class ${c.className}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -327,7 +327,7 @@ export function ExamAnalyticsDashboard({ session }: Props) {
               <SelectItem value="all">Select Section</SelectItem>
               {classSections.map((s: any) => (
                 <SelectItem key={s.id} value={String(s.id)}>
-                  Section {s.sectionName}
+                  {`Section ${s.sectionName}`}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -91,7 +91,9 @@ export function ExamsTab({
 
       {/* Results Consolidation & Monitoring */}
       {activeSub === 'results' && (
-        <ResultMonitoring session={CURRENT_SESSION} />
+        <React.Suspense fallback={<div className="p-12 text-center text-muted-foreground">Loading...</div>}>
+          <ResultMonitoring session={CURRENT_SESSION} />
+        </React.Suspense>
       )}
 
       {/* Exam Performance Analytics */}

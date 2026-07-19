@@ -988,20 +988,13 @@ export function ScheduleBuilder({ session }: Props) {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {scheduleTab === 'conducted' && (
-                            <>
-                              <Link href="/dashboard/teacher/exams/result-entry">
-                                <Button size="sm" variant="outline" className="h-7 px-3 text-[10px] font-bold border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer">
-                                  Enter Marks
-                                </Button>
-                              </Link>
-                              <Link href="/dashboard/teacher/exams/results">
+                           {scheduleTab === 'conducted' && (
+                              <Link href={`/dashboard/teacher/exams/results?examId=${sch.examId}&classId=${sch.classId}&sectionId=${sch.classSectionId}`}>
                                 <Button size="sm" variant="outline" className="h-7 px-3 text-[10px] font-bold border-primary/20 text-primary hover:bg-primary/5 rounded-lg cursor-pointer">
                                   View Results
                                 </Button>
                               </Link>
-                            </>
-                          )}
+                            )}
                           <Button
                             size="icon"
                             variant="ghost"
