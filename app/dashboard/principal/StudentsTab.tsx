@@ -13,6 +13,9 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { useExams, useClassOverview, useToppers, useExamSubjects } from '@/services/exam/queries';
 import { useSchoolClasses, useSchoolSections, useSubjectDetails } from '@/hooks/useClasses';
 import { useSubjectProgress, academicKeys } from '@/hooks/useAcademic';
+import { useStudentList, studentKeys } from '@/hooks/useStudents';
+import { useAuthStore } from '@/store/authStore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQueries } from '@tanstack/react-query';
 import { examService } from '@/services/exam/service';
 import { studentService } from '@/services/student.service';
@@ -20,20 +23,15 @@ import { academicService } from '@/services/academic.service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
 
 interface StudentsTabProps {
-  allStudents: any[];
   classSections: any[];
-  totalStudents: number;
-  loadingStudents: boolean;
   TableSkeleton: React.ComponentType<any>;
 }
 
 export function StudentsTab({
-  allStudents,
   classSections,
-  totalStudents,
-  loadingStudents,
 }: StudentsTabProps) {
   const router = useRouter();
+  const schoolId = useAuthStore((s) => s.schoolId);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
@@ -230,15 +228,22 @@ export function StudentsTab({
   const classOverviewData = classOverview?.data || classOverview;
   const toppers = toppersList?.data || (Array.isArray(toppersList) ? toppersList : []);
 
+  // Fetch all students for mapping in analytics tab only
+  const { data: allStudentsData } = useStudentList(
+    { schoolId: schoolId ?? '', page: 1, limit: 1000 },
+    { enabled: activeSubTab === 'analytics' }
+  );
+  const allStudentsForMapping = allStudentsData?.items ?? [];
+
   const studentMap = useMemo(() => {
     const map: Record<string, any> = {};
-    allStudents.forEach((s) => {
+    allStudentsForMapping.forEach((s) => {
       if (s.id) {
         map[s.id] = s;
       }
     });
     return map;
-  }, [allStudents]);
+  }, [allStudentsForMapping]);
 
   const uniqueTopperGrades = useMemo(() => {
     const grades = toppers.map((t: any) => t.grade).filter(Boolean);
@@ -356,9 +361,82 @@ export function StudentsTab({
   const finalClassData = classData || mockClassDistribution;
   const isDataAvailable = classData !== null;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [studentSearch, selectedClass, selectedSection]);
+
+
+  const hasFilters = !!(studentSearch.trim() || selectedClass || selectedSection);
+
+  // Extract first word for backend first name search parameter (min 3 chars)
+  const searchTerms = useMemo(() => studentSearch.trim().split(/\s+/), [studentSearch]);
+  const firstNameFilter = (searchTerms[0] && searchTerms[0].length >= 3) ? searchTerms[0] : undefined;
+
+  // Find all sections belonging to the selected Class
+  const sectionsOfSelectedClass = useMemo(() => {
+    if (!selectedClass) return [];
+    return classSections.filter(
+      (cs: any) => cs.className === selectedClass && (!selectedSection || cs.sectionName === selectedSection)
+    );
+  }, [classSections, selectedClass, selectedSection]);
+
+  // Run queries in parallel for each section of the selected class
+  const sectionQueries = useQueries({
+    queries: sectionsOfSelectedClass.map((sec: any) => ({
+      queryKey: studentKeys.list({
+        schoolId: schoolId ?? '',
+        classSectionId: Number(sec.masterSectionId || sec.id),
+        limit: 150, // Fetch all students of this section
+      }),
+      queryFn: () => studentService.list({
+        schoolId: schoolId ?? '',
+        classSectionId: Number(sec.masterSectionId || sec.id),
+        limit: 150,
+      }),
+      enabled: !!schoolId && !!selectedClass,
+    })),
+  });
+
+  const loadingSections = sectionQueries.some((q) => q.isLoading);
+
+  // Combine results from all section queries and enrich academics
+  const sectionStudents = useMemo(() => {
+    const list: any[] = [];
+    sectionQueries.forEach((q) => {
+      const items = (q.data as any)?.items ?? (q.data as any)?.data ?? [];
+      if (Array.isArray(items)) {
+        list.push(...items);
+      }
+    });
+    // Enrich academics with className/sectionName (same as useStudentList enrichment)
+    return list.map((student) => {
+      const academics = (student.academics ?? []).map((acad: any) => {
+        const csId = acad.classSectionId || acad.classSectionsId;
+        if (csId && (!acad.className || !acad.sectionName) && classSections.length) {
+          const section = classSections.find(
+            (s: any) => s.id === csId || s.masterSectionId === csId || s.mappingId === csId
+          );
+          if (section) {
+            return { ...acad, className: section.className, sectionName: section.sectionName };
+          }
+        }
+        return acad;
+      });
+      return { ...student, academics };
+    });
+  }, [sectionQueries, classSections]);
+
+  const defaultFilters = useMemo(() => ({
+    schoolId: schoolId ?? '',
+    page: currentPage,
+    limit: itemsPerPage,
+    ...(firstNameFilter && { firstName: firstNameFilter }),
+  }), [schoolId, currentPage, itemsPerPage, firstNameFilter]);
+
+  const { data: defaultStudentData, isLoading: loadingDefault } = useStudentList(
+    defaultFilters,
+    { enabled: !selectedClass }
+  );
+
+  const loadingStudents = selectedClass ? loadingSections : loadingDefault;
+  const studentsList = selectedClass ? sectionStudents : (defaultStudentData?.items ?? []);
 
   // 1. Get unique classes list
   const classesList = useMemo(() => {
@@ -406,7 +484,7 @@ export function StudentsTab({
 
   // 4. Transform and enrich students for StudentTableBody structure
   const mappedStudents = useMemo(() => {
-    return allStudents.map((s) => {
+    return studentsList.map((s) => {
       const classSec = getStudentClassSection(s);
       const rollNumber = s.academics?.[0]?.rollNumber;
       return {
@@ -419,15 +497,35 @@ export function StudentsTab({
         }] : undefined,
       };
     });
-  }, [allStudents, classSections]);
+  }, [studentsList, classSections]);
 
-  // 5. Apply filters client-side
+  // 5. Apply filters client-side (matching admin's client-side sub-filtering)
   const filteredStudents = useMemo(() => {
     let result = mappedStudents;
 
+    // Class selection filter
+    if (selectedClass) {
+      result = result.filter((s: any) =>
+        s.academics?.some((acad: any) => {
+          const cName = acad?.className;
+          return cName === selectedClass || cName === `Class ${selectedClass}`;
+        })
+      );
+    }
+
+    // Section selection filter
+    if (selectedSection) {
+      result = result.filter((s: any) =>
+        s.academics?.some((acad: any) => {
+          const sName = acad?.sectionName;
+          return sName === selectedSection || sName === `Section ${selectedSection}`;
+        })
+      );
+    }
+
     // Search query
-    if (studentSearch) {
-      const q = studentSearch.toLowerCase();
+    if (studentSearch.trim()) {
+      const q = studentSearch.toLowerCase().trim();
       result = result.filter(
         (s: any) =>
           `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) ||
@@ -435,32 +533,19 @@ export function StudentsTab({
       );
     }
 
-    // Class selection filter
-    if (selectedClass) {
-      result = result.filter((s: any) => {
-        const academic = s.academics?.[0];
-        return academic?.className === `Class ${selectedClass}`;
-      });
-    }
-
-    // Section selection filter
-    if (selectedSection) {
-      result = result.filter((s: any) => {
-        const academic = s.academics?.[0];
-        return academic?.sectionName === `Section ${selectedSection}`;
-      });
-    }
-
     return result;
   }, [mappedStudents, studentSearch, selectedClass, selectedSection]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / itemsPerPage));
-  const paginatedStudents = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredStudents.slice(start, start + itemsPerPage);
-  }, [filteredStudents, currentPage]);
+  const totalStudentsCount = selectedClass || studentSearch.trim() ? filteredStudents.length : (defaultStudentData?.pagination?.totalItemsCount ?? 0);
+  const totalPages = selectedClass || studentSearch.trim() ? (Math.ceil(filteredStudents.length / itemsPerPage) || 1) : (defaultStudentData?.pagination?.totalPages ?? 1);
 
-  const hasFilters = !!(studentSearch || selectedClass || selectedSection);
+  const paginatedStudents = useMemo(() => {
+    if (hasFilters) {
+      const start = (currentPage - 1) * itemsPerPage;
+      return filteredStudents.slice(start, start + itemsPerPage);
+    }
+    return filteredStudents;
+  }, [filteredStudents, currentPage, itemsPerPage, hasFilters]);
 
   const clearFilters = () => {
     setStudentSearch('');
@@ -513,42 +598,50 @@ export function StudentsTab({
 
               {/* Class Filter Dropdown */}
               <div className="flex-[1_1_160px]">
-                <select
-                  value={selectedClass}
-                  onChange={(e) => {
-                    setSelectedClass(e.target.value);
+                <Select
+                  value={selectedClass || 'all'}
+                  onValueChange={(val) => {
+                    setSelectedClass(val === 'all' ? '' : val);
                     setSelectedSection('');
                     setCurrentPage(1);
                   }}
-                  className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 >
-                  <option value="">All Classes</option>
-                  {classesList.map((cls) => (
-                    <option key={cls} value={cls}>
-                      Class {cls}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:ring-offset-0 transition-all">
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                    <SelectItem value="all">All Classes</SelectItem>
+                    {classesList.map((cls) => (
+                      <SelectItem key={cls} value={cls}>
+                        {`Class ${cls}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Section Filter Dropdown */}
               <div className="flex-[1_1_160px]">
-                <select
-                  value={selectedSection}
-                  onChange={(e) => {
-                    setSelectedSection(e.target.value);
+                <Select
+                  value={selectedSection || 'all'}
+                  onValueChange={(val) => {
+                    setSelectedSection(val === 'all' ? '' : val);
                     setCurrentPage(1);
                   }}
                   disabled={!selectedClass}
-                  className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                 >
-                  <option value="">All Sections</option>
-                  {sectionsList.map((sec) => (
-                    <option key={sec} value={sec}>
-                      Section {sec}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:ring-offset-0 transition-all disabled:opacity-50">
+                    <SelectValue placeholder="All Sections" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                    <SelectItem value="all">All Sections</SelectItem>
+                    {sectionsList.map((sec) => (
+                      <SelectItem key={sec} value={sec}>
+                        {`Section ${sec}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {hasFilters && (
@@ -562,7 +655,7 @@ export function StudentsTab({
 
               <div className="ml-auto text-right pr-4">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Matches</p>
-                <p className="text-xl font-bold text-indigo-600 leading-none">{filteredStudents.length}</p>
+                <p className="text-xl font-bold text-indigo-600 leading-none">{totalStudentsCount}</p>
               </div>
             </div>
           </div>
@@ -591,37 +684,49 @@ export function StudentsTab({
           <div className="bg-white border border-slate-100 rounded-[2.5rem] p-4 shadow-xl shadow-slate-200/40">
             <div className="flex flex-wrap items-center gap-3 w-full">
               <div className="flex-[1_1_250px]">
-                <select
-                  value={analyticsClassId}
-                  onChange={(e) => {
-                    setAnalyticsClassId(e.target.value ? Number(e.target.value) : '');
+                <Select
+                  value={analyticsClassId ? String(analyticsClassId) : 'none'}
+                  onValueChange={(val) => {
+                    setAnalyticsClassId(val === 'none' ? '' : Number(val));
                     setAnalyticsSectionId('');
                     setSelectedExamId('');
                   }}
-                  className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 >
-                  <option value="">Select Class</option>
-                  {schoolClasses.map((c: any) => (
-                    <option key={c.id} value={c.id}>Class {c.className}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:ring-offset-0 transition-all">
+                    <SelectValue placeholder="Select Class" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                    <SelectItem value="none">Select Class</SelectItem>
+                    {schoolClasses.map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {`Class ${c.className}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex-[1_1_250px]">
-                <select
-                  value={analyticsSectionId}
-                  onChange={(e) => {
-                    setAnalyticsSectionId(e.target.value ? Number(e.target.value) : '');
+                <Select
+                  value={analyticsSectionId ? String(analyticsSectionId) : 'none'}
+                  onValueChange={(val) => {
+                    setAnalyticsSectionId(val === 'none' ? '' : Number(val));
                     setSelectedExamId('');
                   }}
                   disabled={!analyticsClassId}
-                  className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
                 >
-                  <option value="">Select Section</option>
-                  {analyticsSections.map((s: any) => (
-                    <option key={s.id} value={s.id}>Section {s.sectionName}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:ring-offset-0 transition-all disabled:opacity-50">
+                    <SelectValue placeholder="Select Section" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                    <SelectItem value="none">Select Section</SelectItem>
+                    {analyticsSections.map((s: any) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {`Section ${s.sectionName}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <Button
