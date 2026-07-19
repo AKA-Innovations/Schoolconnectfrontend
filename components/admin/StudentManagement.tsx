@@ -13,9 +13,11 @@ import { useRouter } from 'next/navigation';
 import { StudentTableBody } from '@/components/admin/student/StudentTableBody';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useStudentList } from '@/hooks/useStudents';
+import { useStudentList, studentKeys } from '@/hooks/useStudents';
 import { useClassSectionLists } from '@/hooks/useClasses';
-import { StudentListFilters } from '@/services/student.service';
+import { StudentListFilters, studentService } from '@/services/student.service';
+import { useQueries } from '@tanstack/react-query';
+import { useAuthStore } from '@/store/authStore';
 
 export function StudentManagement() {
   const [searchName, setSearchName] = useState('');
@@ -26,29 +28,92 @@ export function StudentManagement() {
 
   const { data: allSections = [] } = useClassSectionLists();
 
+  const schoolId = useAuthStore((s) => s.schoolId);
   const debouncedName = useDebounce(searchName, 400);
   const debouncedMobile = useDebounce(mobileFilter, 400);
 
-  // Extract first word for backend first name search parameter
+  // Extract first word for backend first name search parameter (min 3 chars)
   const searchTerms = debouncedName.trim().split(/\s+/);
-  const firstNameFilter = searchTerms[0] || undefined;
-
-  // Resolve matching classSectionId if both class and section are selected
-  const matchedSection = allSections.find(
-    (s: any) => s.className === selectedClass && s.sectionName === selectedSection
-  );
+  const firstNameFilter = (searchTerms[0] && searchTerms[0].length >= 3) ? searchTerms[0] : undefined;
 
   const hasFilters = !!(searchName.trim() || mobileFilter.trim() || selectedClass || selectedSection);
 
-  const filters: StudentListFilters = {
-    page: hasFilters ? 1 : page,
-    limit: hasFilters ? 1000 : 20, // Fetch all when filtering to ensure precise pagination, otherwise paginate page-by-page
+  // Find all sections belonging to the selected Class
+  const sectionsOfSelectedClass = React.useMemo(() => {
+    if (!selectedClass) return [];
+    return allSections.filter(
+      (cs: any) => cs.className === selectedClass && (!selectedSection || cs.sectionName === selectedSection)
+    );
+  }, [allSections, selectedClass, selectedSection]);
+
+  // Run queries in parallel for each section of the selected class
+  const sectionQueries = useQueries({
+    queries: sectionsOfSelectedClass.map((sec: any) => ({
+      queryKey: studentKeys.list({
+        schoolId: schoolId ?? '',
+        classSectionId: Number(sec.masterSectionId || sec.id),
+        limit: 150, // Fetch all students of this section
+      }),
+      queryFn: () => studentService.list({
+        schoolId: schoolId ?? '',
+        classSectionId: Number(sec.masterSectionId || sec.id),
+        limit: 150,
+      }),
+      enabled: !!selectedClass,
+    })),
+  });
+
+  const loadingSections = sectionQueries.some((q) => q.isLoading);
+  const fetchingSections = sectionQueries.some((q) => q.isFetching);
+
+  // Combine results from all section queries and enrich academics
+  const sectionStudents = React.useMemo(() => {
+    const list: any[] = [];
+    sectionQueries.forEach((q) => {
+      const items = (q.data as any)?.items ?? (q.data as any)?.data ?? [];
+      if (Array.isArray(items)) {
+        list.push(...items);
+      }
+    });
+    // Enrich academics with className/sectionName (same as useStudentList enrichment)
+    return list.map((student) => {
+      const academics = (student.academics ?? []).map((acad: any) => {
+        const csId = acad.classSectionId || acad.classSectionsId;
+        if (csId && (!acad.className || !acad.sectionName) && allSections.length) {
+          const section = allSections.find(
+            (s: any) => s.id === csId || s.masterSectionId === csId || s.mappingId === csId
+          );
+          if (section) {
+            return { ...acad, className: section.className, sectionName: section.sectionName };
+          }
+        }
+        return acad;
+      });
+      return { ...student, academics };
+    });
+  }, [sectionQueries, allSections]);
+
+  const defaultFilters: StudentListFilters = {
+    page: page,
+    limit: 20,
     ...(firstNameFilter && { firstName: firstNameFilter }),
     ...(debouncedMobile && { mobileNumber: debouncedMobile }),
-    ...(matchedSection && { classSectionId: Number(matchedSection.masterSectionId || matchedSection.id) }),
   };
 
-  const { data, isLoading, isFetching, refetch } = useStudentList(filters);
+  const { data, isLoading: loadingDefault, isFetching: fetchingDefault, refetch: refetchDefault } = useStudentList(
+    defaultFilters,
+    { enabled: !selectedClass }
+  );
+
+  const isLoading = selectedClass ? loadingSections : loadingDefault;
+  const isFetching = selectedClass ? fetchingSections : fetchingDefault;
+  const refetch = () => {
+    if (selectedClass) {
+      sectionQueries.forEach((q) => q.refetch());
+    } else {
+      refetchDefault();
+    }
+  };
 
   const router = useRouter();
 
@@ -70,19 +135,14 @@ export function StudentManagement() {
     return Array.from(set).sort();
   }, [allSections, selectedClass]);
 
-  // Default to the first section when a class is selected
+  // Reset section when class changes to allow "All Sections" parallel fetch
   const handleClassChange = (className: string) => {
     setSelectedClass(className);
-    if (className) {
-      const firstSection = allSections.find((s: any) => s.className === className)?.sectionName || '';
-      setSelectedSection(firstSection);
-    } else {
-      setSelectedSection('');
-    }
+    setSelectedSection('');
     setPage(1);
   };
 
-  const rawStudents = data?.items ?? [];
+  const rawStudents = selectedClass ? sectionStudents : (data?.items ?? []);
 
   // Filter students based on all input criteria client-side to filter out database fuzzy similarity false matches
   const filteredStudents = React.useMemo(() => {
@@ -97,23 +157,27 @@ export function StudentManagement() {
       list = list.filter(s => s.mobileNumber?.includes(mobileFilter));
     }
     if (selectedClass) {
-      list = list.filter(s => {
-        const acad = s.academics?.[0];
-        return acad?.className === selectedClass;
-      });
+      list = list.filter(s =>
+        s.academics?.some((acad: any) => {
+          const cName = acad?.className;
+          return cName === selectedClass || cName === `Class ${selectedClass}`;
+        })
+      );
     }
     if (selectedSection) {
-      list = list.filter(s => {
-        const acad = s.academics?.[0];
-        return acad?.sectionName === selectedSection;
-      });
+      list = list.filter(s =>
+        s.academics?.some((acad: any) => {
+          const sName = acad?.sectionName;
+          return sName === selectedSection || sName === `Section ${selectedSection}`;
+        })
+      );
     }
     return list;
   }, [rawStudents, searchName, mobileFilter, selectedClass, selectedSection]);
 
   // Determine pagination variables and list to display
   const { displayStudents, totalPages, totalCount, hasPrev, hasNext } = React.useMemo(() => {
-    if (hasFilters) {
+    if (selectedClass || hasFilters) {
       const count = filteredStudents.length;
       const pages = Math.ceil(count / 20) || 1;
       const start = (page - 1) * 20;
@@ -182,7 +246,7 @@ export function StudentManagement() {
                 <SelectItem value="">All Classes</SelectItem>
                 {classes.map(c => (
                   <SelectItem key={c} value={c}>
-                    Class {c}
+                    {`Class ${c}`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -204,7 +268,7 @@ export function StudentManagement() {
                 <SelectItem value="">All Sections</SelectItem>
                 {sections.map(s => (
                   <SelectItem key={s} value={s}>
-                    Section {s}
+                    {`Section ${s}`}
                   </SelectItem>
                 ))}
               </SelectContent>

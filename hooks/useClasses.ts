@@ -178,56 +178,62 @@ export function useAssignClassTeacher(classDtlsId: number) {
 // ─── Class Section Lists ────────────────────────────────────────────────────
 
 export const classSectionKeys = {
-  lists: ['class-section-lists'] as const,
+  lists: (schoolId: string) => ['class-section-lists', schoolId] as const,
   classList: ['class-list'] as const,
+};
+
+const fetchClassSectionLists = async ({ queryKey }: { queryKey: readonly any[] }) => {
+  const [_, schoolId] = queryKey;
+  if (!schoolId) return [];
+
+  // 1. Fetch both master structure and current mappings
+  const [mSections, mapped] = await Promise.all([
+    classService.getSchoolSections(schoolId),
+    classService.getClassSectionLists(schoolId, CURRENT_SESSION)
+  ]);
+  console.log(mSections, mapped);
+
+  // 2. Merge them. Master list is the baseline.
+  const merged: ClassSectionItem[] = mSections.map(ms => {
+    const matchingMapped = mapped.find(m =>
+      m.className === ms.className &&
+      m.sectionName === ms.sectionName &&
+      (m.session === CURRENT_SESSION || !m.session)
+    );
+
+    return {
+      id: matchingMapped?.id || -ms.id,
+      masterSectionId: ms.id,
+      mappingId: matchingMapped?.id,
+      classId: ms.classId,
+      className: ms.className,
+      sectionName: ms.sectionName,
+      classTeacherId: matchingMapped?.classTeacherId || null,
+      classTeacherName: (matchingMapped as any)?.classTeacherName || null,
+      classTeacherMobileNumber: (matchingMapped as any)?.classTeacherMobileNumber || null,
+      classTeacherProfile: (matchingMapped as any)?.classTeacherProfile || null,
+      maxLimit: matchingMapped?.maxLimit || null,
+      schoolId: ms.schoolId || schoolId || '',
+      session: matchingMapped?.session || CURRENT_SESSION,
+      isMapped: !!matchingMapped
+    } as ClassSectionItem;
+  });
+
+  // 3. Fallback: Add any mapped sections that might be missing from master list
+  mapped.forEach(m => {
+    if (!merged.some(mer => mer.className === m.className && mer.sectionName === m.sectionName)) {
+      merged.push({ ...m, isMapped: true });
+    }
+  });
+
+  return merged;
 };
 
 export function useClassSectionLists() {
   const schoolId = useAuthStore((s) => s.schoolId);
   return useQuery({
-    queryKey: classSectionKeys.lists,
-    queryFn: async () => {
-      // 1. Fetch both master structure and current mappings
-      const [mSections, mapped] = await Promise.all([
-        classService.getSchoolSections(schoolId || ''),
-        classService.getClassSectionLists(schoolId || '', CURRENT_SESSION)
-      ]);
-      console.log(mSections, mapped);
-      // 2. Merge them. Master list is the baseline.
-      const merged: ClassSectionItem[] = mSections.map(ms => {
-        const matchingMapped = mapped.find(m =>
-          m.className === ms.className &&
-          m.sectionName === ms.sectionName &&
-          (m.session === CURRENT_SESSION || !m.session)
-        );
-
-        return {
-          id: matchingMapped?.id || -ms.id,
-          masterSectionId: ms.id,
-          mappingId: matchingMapped?.id,
-          classId: ms.classId,
-          className: ms.className,
-          sectionName: ms.sectionName,
-          classTeacherId: matchingMapped?.classTeacherId || null,
-          classTeacherName: (matchingMapped as any)?.classTeacherName || null,
-          classTeacherMobileNumber: (matchingMapped as any)?.classTeacherMobileNumber || null,
-          classTeacherProfile: (matchingMapped as any)?.classTeacherProfile || null,
-          maxLimit: matchingMapped?.maxLimit || null,
-          schoolId: ms.schoolId || schoolId || '',
-          session: matchingMapped?.session || CURRENT_SESSION,
-          isMapped: !!matchingMapped
-        } as ClassSectionItem;
-      });
-
-      // 3. Fallback: Add any mapped sections that might be missing from master list
-      mapped.forEach(m => {
-        if (!merged.some(mer => mer.className === m.className && mer.sectionName === m.sectionName)) {
-          merged.push({ ...m, isMapped: true });
-        }
-      });
-
-      return merged;
-    },
+    queryKey: classSectionKeys.lists(schoolId || ''),
+    queryFn: fetchClassSectionLists,
     enabled: !!schoolId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,

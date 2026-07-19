@@ -33,12 +33,17 @@ function invalidateStudent(qc: ReturnType<typeof useQueryClient>, studentId: str
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
+const fetchStudentList = async ({ queryKey }: { queryKey: readonly any[] }) => {
+  const filters = queryKey[2];
+  return studentService.list(filters);
+};
+
 export function useStudentList(filters: StudentListFilters, options?: { enabled?: boolean }) {
   const { data: allSections = [] } = useClassSectionLists();
 
   const query = useQuery({
     queryKey: studentKeys.list(filters),
-    queryFn: () => studentService.list(filters),
+    queryFn: fetchStudentList,
     placeholderData: (prev) => prev,
     enabled: options?.enabled !== false,
   });

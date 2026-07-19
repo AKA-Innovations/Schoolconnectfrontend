@@ -89,7 +89,7 @@ export default function PrincipalDashboard() {
   const { data: classSections = [], isLoading: loadingClasses, refetch: refetchClasses } = useClassSectionLists();
   const { data: subjectDetails = [], isLoading: loadingSubjects, refetch: refetchSubjects } = useSubjectDetails();
   const { data: teachersData, isLoading: loadingTeachers, refetch: refetchTeachers } = useTeacherList({ schoolId: schoolId ?? '', page: 1, pageSize: 500 });
-  const { data: studentsData, isLoading: loadingStudents, refetch: refetchStudents } = useStudentList({ schoolId: schoolId ?? '', page: 1, limit: 500 });
+  const { data: studentsData, isLoading: loadingStudents, refetch: refetchStudents } = useStudentList({ schoolId: schoolId ?? '', page: 1, limit: 1 });
   const { data: allHomeworks = [], isLoading: loadingHomework, refetch: refetchHW } = useHomeworks();
   const { data: allClassworks = [], isLoading: loadingClasswork, refetch: refetchCW } = useClassworks();
   const { data: allProgress = [], isLoading: loadingProgress, refetch: refetchProgress } = useTeachingProgressList();
@@ -294,10 +294,7 @@ export default function PrincipalDashboard() {
         )}
         {activeTab === 'students' && (
           <StudentsTab
-            allStudents={allStudents}
             classSections={classSections}
-            totalStudents={totalStudents}
-            loadingStudents={loadingStudents}
             TableSkeleton={TableSkeleton}
           />
         )}
