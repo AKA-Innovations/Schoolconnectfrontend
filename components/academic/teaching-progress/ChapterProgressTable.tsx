@@ -12,6 +12,7 @@ interface Props {
   chapters: SubjectChapter[];
   classSectionId?: number;
   isLoading: boolean;
+  canEdit?: boolean;
 }
 
 function InlineTopicProgressItem({
@@ -133,15 +134,17 @@ function InlineTopicProgressItem({
 
 function ChapterProgressRow({ 
   chapter, 
-  classSectionId 
+  classSectionId,
+  canEdit: canEditProp
 }: { 
   chapter: SubjectChapter; 
   classSectionId?: number;
+  canEdit?: boolean;
 }) {
   const { data: progress } = useChapterProgress(chapter.id, classSectionId, CURRENT_SESSION);
   const [isExpanded, setIsExpanded] = useState(false);
   const role = useAuthStore((s) => s.role);
-  const canEdit = role === 'teacher' || role === 'subject_coordinator';
+  const canEdit = canEditProp !== undefined ? canEditProp : (role === 'teacher' || role === 'subject_coordinator');
 
   const createMutation = useCreateProgress();
   const updateMutation = useUpdateProgress();
@@ -320,7 +323,8 @@ function ChapterProgressRow({
 export const ChapterProgressTable = React.memo(function ChapterProgressTable({ 
   chapters, 
   classSectionId,
-  isLoading 
+  isLoading,
+  canEdit
 }: Props) {
   if (isLoading) {
     return (
@@ -355,6 +359,7 @@ export const ChapterProgressTable = React.memo(function ChapterProgressTable({
               key={ch.id} 
               chapter={ch} 
               classSectionId={classSectionId} 
+              canEdit={canEdit}
             />
           ))}
         </tbody>
