@@ -25,6 +25,7 @@ import { CURRENT_SESSION } from '@/lib/constants';
 import { Plus } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 import { DocumentPreviewModal } from '../shared/DocumentPreviewModal';
+import { ChapterTopicTag } from '../shared/ChapterTopicTag';
 import { HomeworkStatus } from '@/services/academic/types';
 import type { Homework } from '@/services/academic/types';
 
@@ -347,6 +348,13 @@ export function HomeworkDetailView({ homework, onBack }: Props) {
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <User size={14} />{homework.assignedBy?.slice(0, 8) || 'Teacher'}…
                 </div>
+                <ChapterTopicTag
+                  subjectId={homework.subjectId}
+                  chapterId={homework.chapterId}
+                  topicId={homework.topicId}
+                  chapterName={(homework as any).chapterName}
+                  topicName={(homework as any).topicName}
+                />
               </div>
             </div>
             <StatusBadge status={new Date(homework.dueDate) < new Date() ? 'overdue' : 'active'} />

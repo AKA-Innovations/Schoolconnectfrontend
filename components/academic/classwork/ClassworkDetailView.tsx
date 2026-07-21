@@ -1,14 +1,13 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Calendar, User, BookOpen } from 'lucide-react';
+import { ArrowLeft, Calendar, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/dateUtils';
 import type { Classwork } from '@/services/academic/types';
-import { useSubjectTopics } from '@/hooks/useAcademic';
-import { CURRENT_SESSION } from '@/lib/constants';
+import { ChapterTopicTag } from '../shared/ChapterTopicTag';
 
 interface Props {
   classwork: Classwork & {
@@ -23,15 +22,6 @@ interface Props {
 }
 
 export function ClassworkDetailView({ classwork, onBack }: Props) {
-  const { data: topics = [] } = useSubjectTopics(
-    classwork.chapterId || undefined,
-    classwork.subjectId || undefined,
-    classwork.session || CURRENT_SESSION
-  );
-
-  const matchedTopic = topics.find(t => t.id === classwork.topicId);
-  const topicName = matchedTopic?.topicName || (classwork.topicId ? `Topic #${classwork.topicId}` : undefined);
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Back button */}
@@ -58,18 +48,13 @@ export function ClassworkDetailView({ classwork, onBack }: Props) {
                     Grade {classwork.className}-{classwork.sectionName || ''}
                   </Badge>
                 )}
-                {classwork.chapterName && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <BookOpen size={14} className="text-slate-400" />
-                    <span className="font-medium">Chapter: {classwork.chapterName}</span>
-                  </div>
-                )}
-                {topicName && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <BookOpen size={14} className="text-slate-400" />
-                    <span className="font-medium">Topic: {topicName}</span>
-                  </div>
-                )}
+                <ChapterTopicTag
+                  subjectId={classwork.subjectId}
+                  chapterId={classwork.chapterId}
+                  topicId={classwork.topicId}
+                  chapterName={classwork.chapterName}
+                  topicName={classwork.topicName}
+                />
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <Calendar size={14} className="text-slate-400" />
                   <span>Conducted On: {formatDate(new Date(classwork.conductedOn), 'MMM dd, yyyy')}</span>

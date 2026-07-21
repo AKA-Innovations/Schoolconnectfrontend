@@ -356,8 +356,30 @@ export const academicService = {
   },
 
   updateStudyMaterial: async (id: number, data: UpdateStudyMaterialPayload): Promise<StudyMaterial> => {
-    const response = await api.put(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL_BY_ID(id), data);
-    return response.data;
+    const { file, ...metadata } = data;
+    const response = await api.put(API_ENDPOINTS.ACADEMIC.STUDY_MATERIAL_BY_ID(id), metadata);
+    let updatedItem = response.data?.data ?? response.data;
+
+    if (file) {
+      const fileExtension = (file.name.split('.').pop() || '').toLowerCase();
+      const documentFormData = new FormData();
+      documentFormData.append('studyMaterialId', String(id));
+      documentFormData.append('documentTitle', data.title || 'Material Document');
+      documentFormData.append('documentType', fileExtension);
+      documentFormData.append('description', data.description || '');
+      documentFormData.append('file', file);
+
+      const docResponse = await api.post('/academic/study-material/document', documentFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const docData = docResponse.data?.data ?? docResponse.data;
+      updatedItem = {
+        ...updatedItem,
+        documentPath: docData?.documentPath || updatedItem.documentPath,
+        signedUrl: docData?.signedUrl || updatedItem.signedUrl,
+      };
+    }
+    return updatedItem;
   },
 
   deleteStudyMaterial: async (id: number): Promise<void> => {

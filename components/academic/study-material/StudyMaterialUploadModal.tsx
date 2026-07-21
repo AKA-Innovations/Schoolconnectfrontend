@@ -9,9 +9,10 @@ import { FileUploadZone } from '../shared/FileUploadZone';
 import { AssignmentSelector } from '../shared/AssignmentSelector';
 import { ChapterSelect } from '../shared/ChapterSelect';
 import { TopicSelect } from '../shared/TopicSelect';
-import { useUploadStudyMaterial } from '@/hooks/useAcademic';
+import { useUploadStudyMaterial, useUpdateStudyMaterial } from '@/hooks/useAcademic';
 import { CURRENT_SESSION } from '@/lib/constants';
 import { toast } from 'sonner';
+import type { EnrichedStudyMaterial } from './StudyMaterialTable';
 
 interface FormValues {
   title: string;
@@ -25,15 +26,20 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onSuccess: () => void;
+  editItem?: EnrichedStudyMaterial | null;
 }
 
 export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadModal({ 
   open, 
   onOpenChange, 
-  onSuccess 
+  onSuccess,
+  editItem,
 }: Props) {
   const uploadMutation = useUploadStudyMaterial();
+  const updateMutation = useUpdateStudyMaterial();
   const [file, setFile] = useState<File | null>(null);
+
+  const isEditing = !!editItem;
 
   const [selectedClassName, setSelectedClassName] = useState<string | undefined>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); // Mapping ID
@@ -56,17 +62,63 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
 
   useEffect(() => {
     if (open) {
-      reset();
-      setFile(null);
-      setSelectedClassName(undefined);
-      setSelectedSubjectId(undefined);
-      setSelectedClassId(undefined);
-      setSelectedClassSectionId(undefined);
-      setSelectedSubjectDtlsId(undefined);
+      if (editItem) {
+        reset({
+          title: (editItem.documentPath || '').split('/').pop() || '',
+          assignmentKey: '', // Keep empty or allow re-assigning if needed
+          chapterId: editItem.chapterId ? String(editItem.chapterId) : '',
+          topicId: editItem.topicId ? String(editItem.topicId) : '',
+          description: editItem.description || '',
+        });
+        setSelectedClassName(editItem.className);
+        setSelectedSubjectId(editItem.subjectId ? String(editItem.subjectId) : undefined);
+        setSelectedClassId(editItem.classId);
+        setSelectedClassSectionId(editItem.classSectionId);
+        setSelectedSubjectDtlsId(editItem.subjectId);
+      } else {
+        reset({
+          title: '',
+          assignmentKey: '',
+          chapterId: '',
+          topicId: '',
+          description: '',
+        });
+        setFile(null);
+        setSelectedClassName(undefined);
+        setSelectedSubjectId(undefined);
+        setSelectedClassId(undefined);
+        setSelectedClassSectionId(undefined);
+        setSelectedSubjectDtlsId(undefined);
+      }
     }
-  }, [open, reset]);
+  }, [open, editItem, reset]);
 
   const onSubmit = (values: FormValues) => {
+    if (isEditing && editItem) {
+      updateMutation.mutate({
+        id: editItem.id,
+        data: {
+          description: values.description,
+          title: values.title,
+          classId: selectedClassId || editItem.classId,
+          classSectionId: selectedClassSectionId || editItem.classSectionId,
+          subjectId: selectedSubjectDtlsId || editItem.subjectId,
+          chapterId: values.chapterId ? Number(values.chapterId) : null,
+          topicId: values.topicId ? Number(values.topicId) : null,
+          file: file || undefined,
+        },
+      }, {
+        onSuccess: () => {
+          toast.success('Study material updated successfully');
+          onSuccess();
+        },
+        onError: (err: any) => {
+          toast.error(err.message || 'Failed to update study material');
+        }
+      });
+      return;
+    }
+
     if (!file) {
       toast.error('Please select a file to upload');
       return;
@@ -92,43 +144,50 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
         toast.success('Study material uploaded successfully');
         onSuccess();
       },
+      onError: (err: any) => {
+        toast.error(err.message || 'Failed to upload study material');
+      }
     });
   };
+
+  const isPending = uploadMutation.isPending || updateMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upload Study Material</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Study Material' : 'Upload Study Material'}</DialogTitle>
           <DialogDescription>
-            Share educational resources, notes, or presentations with your students.
+            {isEditing ? 'Update details, tagged chapter/topic, or replacement file for this resource.' : 'Share educational resources, notes, or presentations with your students.'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Controller
-            name="assignmentKey"
-            control={control}
-            rules={{ required: 'Required' }}
-            render={({ field }) => (
-              <AssignmentSelector
-                value={field.value}
-                error={errors.assignmentKey?.message}
-                onChange={(val, detail) => {
-                  field.onChange(val);
-                  setSelectedClassName(detail?.className);
-                  setSelectedSubjectId(detail?.subjectDtlsId ? String(detail.subjectDtlsId) : undefined);
-                  setSelectedClassId(detail?.classId);
-                  setSelectedClassSectionId(detail?.classSectionId);
-                  setSelectedSubjectDtlsId(detail?.subjectDtlsId);
-                  setValue('chapterId', '');
-                  setValue('topicId', '');
-                }}
-              />
-            )}
-          />
+          {!isEditing && (
+            <Controller
+              name="assignmentKey"
+              control={control}
+              rules={{ required: !isEditing ? 'Required' : false }}
+              render={({ field }) => (
+                <AssignmentSelector
+                  value={field.value}
+                  error={errors.assignmentKey?.message}
+                  onChange={(val, detail) => {
+                    field.onChange(val);
+                    setSelectedClassName(detail?.className);
+                    setSelectedSubjectId(detail?.subjectDtlsId ? String(detail.subjectDtlsId) : undefined);
+                    setSelectedClassId(detail?.classId);
+                    setSelectedClassSectionId(detail?.classSectionId);
+                    setSelectedSubjectDtlsId(detail?.subjectDtlsId);
+                    setValue('chapterId', '');
+                    setValue('topicId', '');
+                  }}
+                />
+              )}
+            />
+          )}
 
-          <FormField label="Document Title" error={errors.title?.message} required>
+          <FormField label="Document Title / Name" error={errors.title?.message} required>
             <input
               type="text"
               {...register('title', { required: 'Required' })}
@@ -143,15 +202,15 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
               control={control}
               render={({ field }) => (
                 <ChapterSelect
-                  className={selectedClassName}
-                  subjectId={selectedSubjectId}
+                  className={selectedClassName || 'Selected'}
+                  subjectId={selectedSubjectId || (selectedSubjectDtlsId ? String(selectedSubjectDtlsId) : undefined)}
                   value={field.value}
                   onChange={(val) => {
                     field.onChange(val);
                     setValue('topicId', '');
                   }}
                   error={errors.chapterId?.message}
-                  disabled={!assignmentKey}
+                  disabled={!isEditing && !assignmentKey}
                 />
               )}
             />
@@ -162,7 +221,7 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
               render={({ field }) => (
                 <TopicSelect
                   chapterId={chapterId}
-                  subjectId={selectedSubjectDtlsId}
+                  subjectId={selectedSubjectDtlsId || (selectedSubjectId ? Number(selectedSubjectId) : undefined)}
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.topicId?.message}
@@ -180,16 +239,16 @@ export const StudyMaterialUploadModal = React.memo(function StudyMaterialUploadM
             />
           </FormField>
 
-          <FormField label="File Resource" required>
+          <FormField label={isEditing ? "Replace File (Optional)" : "File Resource"} required={!isEditing}>
             <FileUploadZone onFileSelect={setFile} selectedFile={file} onClear={() => setFile(null)} />
           </FormField>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={uploadMutation.isPending}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" loading={uploadMutation.isPending} disabled={!file || !assignmentKey}>
-              {uploadMutation.isPending ? 'Uploading...' : 'Upload Material'}
+            <Button type="submit" loading={isPending} disabled={!isEditing && (!file || !assignmentKey)}>
+              {isPending ? (isEditing ? 'Saving...' : 'Uploading...') : (isEditing ? 'Save Changes' : 'Upload Material')}
             </Button>
           </div>
         </form>
