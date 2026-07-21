@@ -22,7 +22,7 @@ interface Props { teacherIdOverride?: string; }
 export function ProgressManagement({ teacherIdOverride }: Props) {
   const user = useAuthStore((s) => s.user);
   const role = useAuthStore((s) => s.role);
-  const teacherId = teacherIdOverride ?? (user?.role === 'teacher' ? user.id : undefined);
+  const teacherId = teacherIdOverride ?? user?.id;
 
   const canLogProgress = role === 'teacher' || role === 'subject_coordinator';
 
@@ -42,14 +42,55 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
   const { data: classWideSubjects = [] } = useSubjectDetails(
     undefined, 
     CURRENT_SESSION, 
-    (assignedClass as any)?.classDtlsId
+    (assignedClass as any)?.classDtlsId || (assignedClass as any)?.classSectionId || (assignedClass as any)?.id
   );
 
   const mySubjects = useMemo(() => {
-    // For Class Teachers, we always want the full class view
-    if (isClassTeacher && classWideSubjects.length > 0) return classWideSubjects;
-    return taughtSubjects;
+    const map = new Map<string, (typeof taughtSubjects)[0]>();
+
+    // 1. Always add all subjects taught by the teacher
+    taughtSubjects.forEach((s) => {
+      map.set(String(s.id), s);
+    });
+
+    // 2. If class teacher, also include subjects of their class teacher class for viewing progress
+    if (isClassTeacher && classWideSubjects.length > 0) {
+      classWideSubjects.forEach((s) => {
+        const classId = s.classDtlsId || (s as any).classSectionId;
+        const subId = s.subjectDtlsId || (s as any).subjectId;
+
+        const alreadyInTaught = taughtSubjects.some((ts) => {
+          const tsClassId = ts.classDtlsId || (ts as any).classSectionId;
+          const tsSubId = ts.subjectDtlsId || (ts as any).subjectId;
+          return tsClassId === classId && tsSubId === subId;
+        });
+
+        if (!alreadyInTaught && !map.has(String(s.id))) {
+          map.set(String(s.id), s);
+        }
+      });
+    }
+
+    return Array.from(map.values());
   }, [taughtSubjects, classWideSubjects, isClassTeacher]);
+
+  const isSubjectTaughtByMe = useMemo(() => {
+    if (!canLogProgress) return true;
+    if (!selectedAssignment) return false;
+
+    const active = mySubjects.find((s) => String(s.id) === selectedAssignment);
+    if (!active) return false;
+
+    const activeClassId = active.classDtlsId || (active as any).classSectionId;
+    const activeSubId = active.subjectDtlsId || (active as any).subjectId;
+
+    return taughtSubjects.some((ts) => {
+      if (String(ts.id) === String(active.id)) return true;
+      const tsClassId = ts.classDtlsId || (ts as any).classSectionId;
+      const tsSubId = ts.subjectDtlsId || (ts as any).subjectId;
+      return tsClassId === activeClassId && tsSubId === activeSubId;
+    });
+  }, [canLogProgress, selectedAssignment, mySubjects, taughtSubjects]);
 
   const uniqueClasses = useMemo(() => {
     const set = new Set(mySubjects.map((s) => s.className).filter(Boolean) as string[]);
@@ -250,11 +291,24 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">— Select Class-Subject —</SelectItem>
-                    {mySubjects.map((sd) => (
-                      <SelectItem key={sd.id} value={String(sd.id)}>
-                        {`${sd.className || ''} ${sd.sectionName || ''} — ${sd.subjectName || ''}`}
-                      </SelectItem>
-                    ))}
+                    {mySubjects.map((sd) => {
+                      const sdClassId = sd.classDtlsId || (sd as any).classSectionId;
+                      const sdSubId = sd.subjectDtlsId || (sd as any).subjectId;
+                      const isTaught = taughtSubjects.some((ts) => {
+                        if (String(ts.id) === String(sd.id)) return true;
+                        const tsClassId = ts.classDtlsId || (ts as any).classSectionId;
+                        const tsSubId = ts.subjectDtlsId || (ts as any).subjectId;
+                        return tsClassId === sdClassId && tsSubId === sdSubId;
+                      });
+
+                      return (
+                        <SelectItem key={sd.id} value={String(sd.id)}>
+                          {`${sd.className || ''} ${sd.sectionName || ''} — ${sd.subjectName || ''}${
+                            !isTaught ? ' (Class Teacher View)' : ''
+                          }`}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -270,14 +324,27 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
               const d = (subjectSummary as any).data ?? subjectSummary;
               const percentage = d.overallPercentage ?? d.completionPercentage ?? 0;
               const chaptersCount = d.chaptersCount ?? d.chapters?.length ?? 0;
+              const activeSd = mySubjects.find(s => String(s.id) === selectedAssignment);
               
               return (
                 <>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Overall Subject Progress</p>
-                      <h3 className="text-xl font-bold text-foreground">
-                        {mySubjects.find(s => String(s.id) === selectedAssignment)?.subjectName}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Overall Subject Progress</p>
+                        {!isSubjectTaughtByMe && (
+                          <span className="px-2.5 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full border border-amber-500/20">
+                            Class Teacher View (Read Only)
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
+                        {activeSd?.subjectName}
+                        {activeSd?.teacherName && !isSubjectTaughtByMe && (
+                          <span className="text-xs font-medium text-muted-foreground">
+                            (Teacher: {activeSd.teacherName})
+                          </span>
+                        )}
                       </h3>
                     </div>
                     <div className="flex items-center gap-6">
@@ -317,6 +384,7 @@ export function ProgressManagement({ teacherIdOverride }: Props) {
         chapters={items} 
         classSectionId={selectedClassSectionId} 
         isLoading={chaptersLoading} 
+        canEdit={isSubjectTaughtByMe}
       />
     </div>
   );
