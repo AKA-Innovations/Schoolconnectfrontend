@@ -9,10 +9,9 @@ import { useSchoolSections, useSubjectOptions, useSubjectDetails } from '@/hooks
 import { useAuthStore } from '@/store/authStore';
 import { AcademicPageHeader } from '../shared/AcademicPageHeader';
 import { AcademicFilterBar } from '../shared/AcademicFilterBar';
-import { StudyMaterialTable } from './StudyMaterialTable';
+import { StudyMaterialTable, type EnrichedStudyMaterial } from './StudyMaterialTable';
 import { StudyMaterialUploadModal } from './StudyMaterialUploadModal';
 import { DeleteConfirmDialog } from '../shared/DeleteConfirmDialog';
-import type { StudyMaterial } from '@/services/academic/types';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export function StudyMaterialManagement() {
@@ -21,11 +20,12 @@ export function StudyMaterialManagement() {
   const [subjectFilter, setSubjectFilter] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [isUploadOpen, setUploadOpen] = useState(false);
+  const [editItem, setEditItem] = useState<EnrichedStudyMaterial | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const user = useAuthStore((s) => s.user);
   const role = useAuthStore((s) => s.role);
-  const canUpload = role === 'teacher' || role === 'subject_coordinator';
+  const canUpload = role === 'teacher' || role === 'subject_coordinator' || role === 'principal' || role === 'super_admin' || role === 'school_admin';
   const debouncedSearch = useDebounce(search, 400);
 
   const { data, isLoading, isFetching, refetch } = useStudyMaterials();
@@ -176,6 +176,11 @@ export function StudyMaterialManagement() {
     setOwnerFilter('all');
   }, []);
 
+  const handleEdit = (item: EnrichedStudyMaterial) => {
+    setEditItem(item);
+    setUploadOpen(true);
+  };
+
   const handleDelete = (id: number) => {
     setDeleteTarget(id);
   };
@@ -197,7 +202,7 @@ export function StudyMaterialManagement() {
           <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin' : ''}`} />
         </Button>
         {canUpload && (
-          <Button onClick={() => setUploadOpen(true)} className="h-12 px-6 rounded-2xl">
+          <Button onClick={() => { setEditItem(null); setUploadOpen(true); }} className="h-12 px-6 rounded-2xl">
             <Plus className="mr-2 h-5 w-5" /><span className="font-bold">Upload File</span>
           </Button>
         )}
@@ -265,12 +270,34 @@ export function StudyMaterialManagement() {
         </div>
       </AcademicFilterBar>
 
-      <StudyMaterialTable materials={materials} isLoading={isLoading} onDelete={handleDelete} />
+      <StudyMaterialTable 
+        materials={materials} 
+        isLoading={isLoading} 
+        onDelete={handleDelete}
+        onEdit={handleEdit}
+      />
 
-      <StudyMaterialUploadModal open={isUploadOpen} onOpenChange={setUploadOpen} onSuccess={() => setUploadOpen(false)} />
+      <StudyMaterialUploadModal 
+        open={isUploadOpen} 
+        onOpenChange={(o) => {
+          setUploadOpen(o);
+          if (!o) setEditItem(null);
+        }} 
+        editItem={editItem}
+        onSuccess={() => {
+          setUploadOpen(false);
+          setEditItem(null);
+        }} 
+      />
 
-      <DeleteConfirmDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title="Delete Material" description="This will permanently delete this study material file." onConfirm={handleDeleteConfirm} loading={deleteMutation.isPending} />
+      <DeleteConfirmDialog 
+        open={deleteTarget !== null} 
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete Material" 
+        description="This will permanently delete this study material file." 
+        onConfirm={handleDeleteConfirm} 
+        loading={deleteMutation.isPending} 
+      />
     </div>
   );
 }

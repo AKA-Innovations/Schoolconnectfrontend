@@ -297,7 +297,14 @@ export interface UploadStudyMaterialPayload {
 }
 
 export interface UpdateStudyMaterialPayload {
-  description: string;
+  title?: string;
+  description?: string;
+  classId?: number;
+  classSectionId?: number;
+  subjectId?: number;
+  chapterId?: number | null;
+  topicId?: number | null;
+  file?: File;
 }
 
 // ─── Filter Params ──────────────────────────────────────────────────────────

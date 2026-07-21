@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Eye, Edit, Trash2, ClipboardList } from 'lucide-react';
+import { Eye, Edit, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AcademicTable, type ColumnDef } from '../shared/AcademicTable';
 import { StatusBadge } from '../shared/StatusBadge';
+import { ChapterTopicTag } from '../shared/ChapterTopicTag';
 import { formatDate } from '@/lib/dateUtils';
 import type { Homework } from '@/services/academic/types';
-
 import { useAuthStore } from '@/store/authStore';
 
 interface Props {
@@ -30,19 +30,26 @@ function getHomeworkStatus(hw: Homework): string {
 
 export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLoading, onView, onEdit, page, totalPages, onPageChange }: Props) {
   const role = useAuthStore((s) => s.role);
-  const canManage = role === 'teacher' || role === 'subject_coordinator';
+  const canManage = role === 'teacher' || role === 'subject_coordinator' || role === 'principal' || role === 'super_admin' || role === 'school_admin';
 
   const columns = useMemo<ColumnDef<Homework>[]>(() => [
     {
       key: 'title', header: 'Homework',
       render: (item) => (
-        <div className="flex flex-col gap-0.5 max-w-xs">
+        <div className="flex flex-col gap-1 max-w-sm">
           <span className="font-bold text-slate-900 text-sm group-hover:text-teal-600 transition-colors truncate">📘 {item.title}</span>
           {role !== 'teacher' && (
             <span className="text-[10px] font-medium text-slate-400">
               Assigned by: {item.assignedBy || 'Teacher'}
             </span>
           )}
+          <ChapterTopicTag
+            subjectId={item.subjectId}
+            chapterId={item.chapterId}
+            topicId={item.topicId}
+            chapterName={(item as any).chapterName}
+            topicName={(item as any).topicName}
+          />
         </div>
       ),
     },
@@ -82,19 +89,19 @@ export const HomeworkTable = React.memo(function HomeworkTable({ homeworks, isLo
     {
       key: 'actions', header: 'Actions',
       render: (item) => (
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" onClick={e => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+        <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" title="View Details" onClick={(e) => { e.stopPropagation(); onView(item); }}>
             <Eye size={16} className="text-slate-400" />
           </Button>
           {canManage && (
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" title="Edit Homework" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
               <Edit size={16} className="text-slate-400" />
             </Button>
           )}
         </div>
       ),
     },
-  ], [onView, onEdit, canManage]);
+  ], [onView, onEdit, canManage, role]);
 
   return <AcademicTable columns={columns} data={homeworks} isLoading={isLoading} rowKey={(i) => i.id} emptyIcon={<ClipboardList size={48} />} emptyMessage="No Homework Found" onRowClick={onView} page={page} totalPages={totalPages} onPageChange={onPageChange} />;
 });

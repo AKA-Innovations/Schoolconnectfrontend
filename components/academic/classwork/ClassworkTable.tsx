@@ -5,9 +5,9 @@ import { Eye, Edit, Trash2, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AcademicTable, type ColumnDef } from '../shared/AcademicTable';
+import { ChapterTopicTag } from '../shared/ChapterTopicTag';
 import { formatDate } from '@/lib/dateUtils';
 import type { Classwork } from '@/services/academic/types';
-
 import { useAuthStore } from '@/store/authStore';
 
 interface Props { 
@@ -23,19 +23,27 @@ interface Props {
 
 export const ClassworkTable = React.memo(function ClassworkTable({ classworks, isLoading, onView, onEdit, onDelete, page, totalPages, onPageChange }: Props) {
   const role = useAuthStore((s) => s.role);
-  const canManage = role === 'teacher' || role === 'subject_coordinator';
+  const canManage = role === 'teacher' || role === 'subject_coordinator' || role === 'principal' || role === 'super_admin' || role === 'school_admin';
 
   const columns = useMemo<ColumnDef<Classwork>[]>(() => [
     {
       key: 'desc', header: 'Description',
       render: (item) => (
-        <div className="max-w-sm">
+        <div className="max-w-sm space-y-0.5">
           <p className="font-bold text-slate-900 truncate">
             {item.description?.slice(0, 80) || 'No description'}{(item.description?.length ?? 0) > 80 ? '…' : ''}
           </p>
-          <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wide mt-0.5">
+          <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wide">
             Subject: {(item as any).subjectName || `Subject #${item.subjectId}`}
           </p>
+          <ChapterTopicTag
+            subjectId={item.subjectId}
+            chapterId={item.chapterId}
+            topicId={item.topicId}
+            chapterName={(item as any).chapterName}
+            topicName={(item as any).topicName}
+            className="pt-0.5"
+          />
         </div>
       ),
     },
@@ -52,14 +60,14 @@ export const ClassworkTable = React.memo(function ClassworkTable({ classworks, i
     {
       key: 'actions', header: 'Actions',
       render: (item) => (
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0" onClick={e => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+        <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" title="View Details" onClick={(e) => { e.stopPropagation(); onView(item); }}>
             <Eye size={16} className="text-slate-400" />
           </Button>
           {canManage ? (
             <>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" onClick={(e) => { e.stopPropagation(); onEdit(item); }}><Edit size={16} className="text-slate-400" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}><Trash2 size={16} /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-md" title="Edit Classwork" onClick={(e) => { e.stopPropagation(); onEdit(item); }}><Edit size={16} className="text-slate-400" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-400" title="Delete Classwork" onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}><Trash2 size={16} /></Button>
             </>
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
